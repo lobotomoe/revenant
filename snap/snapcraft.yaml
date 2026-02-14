@@ -10,7 +10,6 @@
 #   sudo snap install snapcraft --classic
 
 name: revenant
-version: git
 title: Revenant
 summary: Electronic document signing with ARX CoSign
 description: |
