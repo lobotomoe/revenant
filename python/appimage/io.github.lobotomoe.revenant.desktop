@@ -1,0 +1,13 @@
+[Desktop Entry]
+Name=Revenant
+GenericName=PDF Signing Tool
+Comment=Electronic document signing with ARX CoSign
+Exec=revenant-gui %f
+Icon=io.github.lobotomoe.revenant
+Type=Application
+Categories=Office;Security;
+Keywords=sign;pdf;electronic;signature;cosign;dsa;
+MimeType=application/pdf;application/pkcs7-signature;
+StartupWMClass=revenant-gui
+StartupNotify=true
+Terminal=false

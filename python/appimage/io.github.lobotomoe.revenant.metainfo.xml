@@ -1,0 +1,96 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<component type="desktop-application">
+  <id>io.github.lobotomoe.revenant</id>
+  <name>Revenant</name>
+  <summary>Electronic document signing with ARX CoSign</summary>
+  <metadata_license>CC0-1.0</metadata_license>
+  <project_license>Apache-2.0</project_license>
+
+  <keywords>
+    <keyword>sign</keyword>
+    <keyword>pdf</keyword>
+    <keyword>signature</keyword>
+    <keyword>electronic</keyword>
+    <keyword>cosign</keyword>
+    <keyword>pkcs7</keyword>
+  </keywords>
+
+  <description>
+    <p>
+      Cross-platform client for signing PDF documents via the ARX CoSign
+      SOAP API (OASIS DSS standard). Works on macOS, Linux, and Windows
+      without requiring a Windows-only CoSign client.
+    </p>
+    <p>Features:</p>
+    <ul>
+      <li>Embedded PDF signatures with visual appearance</li>
+      <li>Detached CMS/PKCS#7 signatures</li>
+      <li>Pre-computed SHA-1 hash signing</li>
+      <li>Automatic signer identity discovery from server or signed PDFs</li>
+      <li>Secure credential storage via system keychain</li>
+    </ul>
+  </description>
+
+  <categories>
+    <category>Office</category>
+    <category>Security</category>
+  </categories>
+
+  <launchable type="desktop-id">io.github.lobotomoe.revenant.desktop</launchable>
+
+  <url type="homepage">https://github.com/lobotomoe/revenant</url>
+  <url type="bugtracker">https://github.com/lobotomoe/revenant/issues</url>
+  <url type="vcs-browser">https://github.com/lobotomoe/revenant</url>
+  <url type="contribute">https://github.com/lobotomoe/revenant</url>
+
+  <developer id="io.github.lobotomoe">
+    <name>Aleksandr Kraiz</name>
+  </developer>
+
+  <provides>
+    <binary>revenant-gui</binary>
+    <binary>revenant</binary>
+  </provides>
+
+  <requires>
+    <display_length compare="ge">640</display_length>
+  </requires>
+
+  <supports>
+    <control>pointing</control>
+    <control>keyboard</control>
+  </supports>
+
+  <content_rating type="oars-1.1" />
+
+  <screenshots>
+    <screenshot type="default">
+      <caption>Signing a PDF document with Revenant</caption>
+      <image type="source" width="1280" height="800">https://raw.githubusercontent.com/lobotomoe/revenant/main/docs/screenshots/main-window.png</image>
+    </screenshot>
+  </screenshots>
+
+  <branding>
+    <color type="primary" scheme_preference="light">#4a90d9</color>
+    <color type="primary" scheme_preference="dark">#1c4a7e</color>
+  </branding>
+
+  <releases>
+    <release version="0.1.0" date="2026-02-14">
+      <description>
+        <p>Initial alpha release with full signing and verification support.</p>
+        <ul>
+          <li>PDF digital signing via CoSign SAPI Web Service (SOAP/DSS)</li>
+          <li>Embedded visible signatures with customizable appearance</li>
+          <li>Detached CMS/PKCS#7 signature support</li>
+          <li>PDF signature verification (embedded and detached)</li>
+          <li>Cross-platform GUI with sign, verify, and setup dialogs</li>
+          <li>CLI with sign, verify, check, info, and setup commands</li>
+          <li>Multi-profile configuration with secure credential storage</li>
+          <li>Armenian font support (GHEA Grapalat, GHEA Mariam)</li>
+          <li>Legacy TLS 1.0 transport for EKENG appliance</li>
+        </ul>
+      </description>
+    </release>
+  </releases>
+</component>

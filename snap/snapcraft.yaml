@@ -1,0 +1,89 @@
+# Snap package manifest for Revenant
+#
+# To build locally:
+#   snapcraft
+#
+# To publish:
+#   snapcraft upload revenant_*.snap --release=stable
+#
+# Prerequisites:
+#   sudo snap install snapcraft --classic
+
+name: revenant
+version: git
+title: Revenant
+summary: Electronic document signing with ARX CoSign
+description: |
+  Cross-platform client for signing PDF documents via the ARX CoSign
+  SOAP API (OASIS DSS standard). Works on macOS, Linux, and Windows
+  without requiring a Windows-only CoSign client.
+
+  Features:
+  - Embedded PDF signatures with visual appearance
+  - Detached CMS/PKCS#7 signatures
+  - Pre-computed SHA-1 hash signing
+  - Automatic signer identity discovery from server or signed PDFs
+  - Secure credential storage via system keychain
+
+grade: stable
+confinement: strict
+base: core24
+license: Apache-2.0
+icon: python/appimage/io.github.lobotomoe.revenant.png
+adopt-info: revenant
+website: https://github.com/lobotomoe/revenant
+source-code: https://github.com/lobotomoe/revenant
+contact: https://github.com/lobotomoe/revenant/issues
+issues: https://github.com/lobotomoe/revenant/issues
+
+platforms:
+  amd64:
+
+apps:
+  revenant:
+    command: bin/revenant
+    plugs:
+      - network
+      - home
+    environment:
+      LANG: C.UTF-8
+      LC_ALL: C.UTF-8
+
+  revenant-gui:
+    command: bin/revenant-gui
+    common-id: io.github.lobotomoe.revenant
+    plugs:
+      - network
+      - home
+      - desktop
+      - desktop-legacy
+      - x11
+      - wayland
+      - password-manager-service
+    extensions:
+      - gnome
+    environment:
+      LANG: C.UTF-8
+      LC_ALL: C.UTF-8
+
+parts:
+  revenant:
+    plugin: python
+    source: .
+    source-subdir: python
+    parse-info:
+      - python/appimage/io.github.lobotomoe.revenant.metainfo.xml
+    python-packages:
+      - pikepdf>=8.0,<11
+      - asn1crypto>=1.5,<2
+      - tlslite-ng>=0.8.0,<0.9
+      - defusedxml>=0.7,<1
+      - keyring>=21.0,<26
+    stage-packages:
+      - python3-tk
+      - libsecret-1-0
+    organize:
+      # Desktop integration files
+      python/appimage/io.github.lobotomoe.revenant.desktop: share/applications/io.github.lobotomoe.revenant.desktop
+      python/appimage/io.github.lobotomoe.revenant.png: share/icons/hicolor/256x256/apps/io.github.lobotomoe.revenant.png
+      python/appimage/io.github.lobotomoe.revenant.metainfo.xml: share/metainfo/io.github.lobotomoe.revenant.metainfo.xml

@@ -1,0 +1,11 @@
+{
+  "venvPath": "python",
+  "venv": ".venv",
+  "include": ["python/src"],
+  "pythonVersion": "3.10",
+  "pythonPlatform": "All",
+  "typeCheckingMode": "strict",
+  "reportMissingImports": "error",
+  "reportMissingTypeStubs": false,
+  "reportMissingModuleSource": false
+}

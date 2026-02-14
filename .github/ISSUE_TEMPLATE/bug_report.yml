@@ -1,0 +1,64 @@
+name: Bug Report
+description: Report a bug or unexpected behavior
+labels: ["bug"]
+body:
+  - type: textarea
+    id: description
+    attributes:
+      label: Description
+      description: What happened? What did you expect to happen?
+    validations:
+      required: true
+
+  - type: textarea
+    id: reproduce
+    attributes:
+      label: Steps to reproduce
+      description: Minimal steps to reproduce the issue.
+      placeholder: |
+        1. Run `revenant sign document.pdf`
+        2. ...
+    validations:
+      required: true
+
+  - type: textarea
+    id: error
+    attributes:
+      label: Error output
+      description: Paste the full error message or traceback.
+      render: text
+
+  - type: dropdown
+    id: install
+    attributes:
+      label: Installation method
+      options:
+        - Pre-built binary (from Releases)
+        - pip install
+        - AppImage
+        - DMG (macOS)
+        - MSIX (Windows)
+    validations:
+      required: true
+
+  - type: input
+    id: os
+    attributes:
+      label: OS and version
+      placeholder: "macOS 15.2, Ubuntu 24.04, Windows 11"
+    validations:
+      required: true
+
+  - type: input
+    id: python
+    attributes:
+      label: Python version (if installed via pip)
+      placeholder: "3.12.8"
+
+  - type: input
+    id: version
+    attributes:
+      label: Revenant version
+      placeholder: "0.1.0"
+    validations:
+      required: true

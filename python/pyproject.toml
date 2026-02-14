@@ -1,0 +1,145 @@
+[build-system]
+requires = ["setuptools>=64", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "revenant"
+version = "0.1.0"
+description = "Cross-platform Python client for ARX CoSign electronic signatures via SOAP API"
+readme = "README.md"
+requires-python = ">=3.10"
+license = "Apache-2.0"
+authors = [
+    { name = "Aleksandr Kraiz" },
+]
+keywords = ["revenant", "arx", "cosign", "dsa", "electronic-signature", "pdf", "soap", "pkcs7", "cms", "oasis-dss"]
+classifiers = [
+    "Development Status :: 4 - Beta",
+    "Environment :: Console",
+    "Intended Audience :: Developers",
+    "Intended Audience :: Legal Industry",
+    "Operating System :: MacOS",
+    "Operating System :: Microsoft :: Windows",
+    "Operating System :: POSIX :: Linux",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.10",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Programming Language :: Python :: 3.13",
+    "Topic :: Security :: Cryptography",
+    "Typing :: Typed",
+]
+dependencies = ["pikepdf>=8.0,<11", "asn1crypto>=1.5,<2", "tlslite-ng>=0.8.0,<0.9", "defusedxml>=0.7,<1"]
+
+[project.optional-dependencies]
+secure = ["keyring>=21.0,<26"]
+dev = ["pytest>=7.0,<10", "pytest-cov>=4.0,<8", "ruff>=0.9,<1.0", "pyright>=1.1,<2.0", "pillow>=12.1.1,<13", "keyring>=21.0,<26", "fonttools>=4.0,<5"]
+build = ["pyinstaller>=6.0,<7"]
+build-win = ["nuitka>=2.0,<5", "ordered-set>=4.0,<5", "zstandard>=0.20,<1"]
+build-mac = ["py2app>=0.28,<1", "keyring>=21.0,<26"]
+
+[project.urls]
+Homepage = "https://github.com/lobotomoe/revenant"
+Repository = "https://github.com/lobotomoe/revenant"
+Issues = "https://github.com/lobotomoe/revenant/issues"
+Documentation = "https://github.com/lobotomoe/revenant/tree/main/docs"
+Changelog = "https://github.com/lobotomoe/revenant/blob/main/CHANGELOG.md"
+
+[project.scripts]
+revenant = "revenant.ui.cli:main"
+revenant-gui = "revenant.ui.gui:main"
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.setuptools.package-data]
+"revenant.core.appearance.font_data.noto_sans" = ["*.ttf"]
+"revenant.core.appearance.font_data.ghea_mariam" = ["*.ttf"]
+"revenant.core.appearance.font_data.ghea_grapalat" = ["*.ttf"]
+
+# ── Ruff (linter + formatter) ────────────────────────────────────────
+
+[tool.ruff]
+target-version = "py310"
+line-length = 100
+src = ["src"]
+
+[tool.ruff.lint]
+select = [
+    "E",     # pycodestyle errors
+    "W",     # pycodestyle warnings
+    "F",     # pyflakes
+    "I",     # isort
+    "UP",    # pyupgrade
+    "B",     # flake8-bugbear
+    "SIM",   # flake8-simplify
+    "RUF",   # ruff-specific rules
+    "S",     # flake8-bandit (security)
+    "DTZ",   # flake8-datetimez
+    "TRY",   # tryceratops
+    "ARG",   # flake8-unused-arguments
+    "TCH",   # flake8-type-checking
+    "FURB",  # refurbish
+    "PT",    # flake8-pytest-style
+    "C4",    # flake8-comprehensions
+    "PIE",   # flake8-pie
+    "T20",   # flake8-print
+    "ERA",   # eradicate
+    "PERF",  # perflint
+    "RET",   # flake8-return
+]
+ignore = [
+    "E501",    # line too long — handled by formatter
+    "UP031",   # printf-style formatting — fine in this project
+    "SIM105",  # contextlib.suppress — try/except/pass is clearer for cleanup
+    "SIM108",  # ternary — if/else block is more readable here
+    "TRY003",  # long messages in raise — acceptable for descriptive user-facing errors
+    "RET505",  # unnecessary else after return — explicit branches are clearer
+    "S324",    # hashlib.sha1 — required by CoSign protocol, not a security choice
+]
+
+[tool.ruff.lint.per-file-ignores]
+"src/revenant/constants.py" = ["S105"]  # ENV_PASS is an env var name, not a password
+"src/revenant/network/soap_parsers.py" = ["S105"]  # password redaction regex patterns
+"src/revenant/ui/cli/*.py" = ["T20", "S603"]
+"src/revenant/ui/helpers.py" = ["T20"]
+"src/revenant/ui/gui/*.py" = ["T20", "S603"]
+"tests/*.py" = ["S101", "S105", "S106", "S108", "S301", "S603", "ARG001", "ARG002", "ARG005"]
+"scripts/*.py" = ["T20", "S603", "S607", "S310"]
+
+[tool.ruff.lint.isort]
+known-first-party = ["revenant"]
+
+# ── Pytest ──────────────────────────────────────────────────────────
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+pythonpath = ["src"]
+markers = [
+    "integration: requires live CoSign server and REVENANT_USER/REVENANT_PASS env vars",
+]
+addopts = "-m 'not integration' --cov=revenant --cov-report=term-missing:skip-covered --cov-fail-under=90"
+
+# ── Coverage ───────────────────────────────────────────────────────────
+
+[tool.coverage.run]
+branch = true
+source = ["revenant"]
+omit = [
+    "*/ui/gui/*.py",
+    "*/ui/cli/*.py",
+    "*/__main__.py",
+    "*/appearance/font_data/*/metrics.py",
+]
+
+[tool.coverage.report]
+exclude_lines = [
+    "pragma: no cover",
+    "if TYPE_CHECKING:",
+    "if __name__ == .__main__.",
+    "^\\s*\\.\\.\\.$",
+]
+
+# Pyright config: see /pyrightconfig.json (source of truth).
+# pyrightconfig.json takes priority over [tool.pyright] and is needed
+# because VSCode runs pyright from the repo root, not from python/.

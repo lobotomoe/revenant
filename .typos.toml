@@ -1,0 +1,54 @@
+[default.extend-words]
+# ARX CoSign server error messages (actual responses, not our typos)
+occured = "occured"
+suported = "suported"
+
+# ARX CoSign protocol terms
+cosign = "cosign"
+SAPI = "SAPI"
+SAPIWS = "SAPIWS"
+
+# Cryptography
+CMS = "CMS"
+OID = "OID"
+DN = "DN"
+RDN = "RDN"
+
+# PDF structure
+xref = "xref"
+startxref = "startxref"
+endstream = "endstream"
+AcroForm = "AcroForm"
+Flate = "Flate"
+
+# Font / OpenType terms
+GHEA = "GHEA"
+grapalat = "grapalat"
+Grapalat = "Grapalat"
+mariam = "mariam"
+Mariam = "Mariam"
+OT = "OT"
+
+# PyInstaller spec keyword
+datas = "datas"
+
+# Misc
+PN = "PN"
+
+# Products / organizations
+EKENG = "EKENG"
+
+[files]
+extend-exclude = [
+    "*.ttf",
+    "*.pyc",
+    "*.whl",
+    "*.egg-info/",
+    "*.spec",
+    "python/dist/",
+    "python/.venv/",
+    "python/build/",
+    "python/src/revenant/core/appearance/font_data/*/metrics.py",
+    "snap/",
+    "CHANGELOG.md",
+]

@@ -1,0 +1,615 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - "v*"
+
+permissions: read-all
+
+concurrency:
+  group: release-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  ci:
+    name: CI Check
+    uses: ./.github/workflows/ci.yml
+    with:
+      skip-build-test: true
+
+  build:
+    name: Build (${{ matrix.os }})
+    needs: ci
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 30
+    permissions:
+      contents: read
+    defaults:
+      run:
+        working-directory: python
+
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: macos-latest
+            platform: macos-arm64
+            cli_artifact: revenant
+            gui_artifact: Revenant.dmg
+          - os: ubuntu-latest
+            platform: linux-x64
+            cli_artifact: revenant
+            gui_artifact: Revenant-x86_64.AppImage
+          - os: windows-latest
+            platform: windows-x64
+            cli_artifact: revenant.exe
+            gui_artifact: revenant-gui.exe
+            standalone: true
+
+    env:
+      MACOS_SIGN: ${{ secrets.MACOS_CERTIFICATE_BASE64 != '' && 'true' || '' }}
+      MACOS_NOTARIZE: ${{ secrets.APPSTORE_API_KEY_BASE64 != '' && 'true' || '' }}
+      WINDOWS_SIGN: ${{ secrets.WINDOWS_CERTIFICATE_BASE64 != '' && 'true' || '' }}
+
+    steps:
+      - uses: step-security/harden-runner@5ef0c079ce82195b2a36a210272d6b661572d83e # v2
+        with:
+          egress-policy: audit
+
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6
+        with:
+          persist-credentials: false
+
+      - name: Set up Python
+        uses: actions/setup-python@a309ff8b426b58ec0e2a45f0f869d46889d02405 # v6
+        with:
+          python-version: "3.13"
+          cache: pip
+          cache-dependency-path: python/pyproject.toml
+
+      - name: Install system dependencies (Linux)
+        if: runner.os == 'Linux'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y python3-tk libfuse2
+          # PyInstaller expects /usr/share/tcltk/tcl8 but Ubuntu 24.04
+          # only ships tcl8.6/; create the directory to suppress the warning.
+          sudo mkdir -p /usr/share/tcltk/tcl8
+
+      - name: Install system dependencies (macOS)
+        if: runner.os == 'macOS'
+        run: brew install create-dmg
+
+      - name: Install dependencies
+        shell: bash
+        run: |
+          if [ "$RUNNER_OS" = "Windows" ]; then
+            pip install -e ".[build-win]"
+          elif [ "$RUNNER_OS" = "macOS" ]; then
+            pip install -e ".[build,build-mac]"
+          else
+            pip install -e ".[build]"
+          fi
+
+      # -- macOS: import signing certificate ----------------------------
+      - name: Import code-signing certificate
+        if: runner.os == 'macOS' && env.MACOS_SIGN
+        uses: apple-actions/import-codesign-certs@b610f78488812c1e56b20e6df63ec42d833f2d14 # v6
+        with:
+          p12-file-base64: ${{ secrets.MACOS_CERTIFICATE_BASE64 }}
+          p12-password: ${{ secrets.MACOS_CERTIFICATE_PASSWORD }}
+
+      # Windows: sequential (Nuitka cache conflicts), Linux: parallel
+      - name: Build CLI + GUI
+        if: runner.os != 'macOS'
+        run: python scripts/build.py all
+
+      # macOS: CLI via PyInstaller, GUI via py2app (different toolchains)
+      - name: Build CLI (macOS)
+        if: runner.os == 'macOS'
+        run: python scripts/build.py cli
+
+      # macOS with signing: build .app without DMG (sign first, then DMG)
+      - name: Build GUI (macOS, signed)
+        if: runner.os == 'macOS' && env.MACOS_SIGN
+        run: python scripts/build.py mac --no-dmg
+
+      # macOS without signing secrets: build .app + DMG
+      - name: Build GUI (macOS, unsigned)
+        if: runner.os == 'macOS' && !env.MACOS_SIGN
+        run: python scripts/build.py mac
+
+      # -- macOS: codesign binaries -------------------------------------
+      - name: Codesign .app bundle
+        if: runner.os == 'macOS' && env.MACOS_SIGN
+        run: |
+          IDENTITY="Developer ID Application: ${{ secrets.APPLE_IDENTITY }}"
+
+          # Sign all embedded .so, .dylib files and framework binaries (Tcl, Tk, Python)
+          find "dist/Revenant.app/Contents" \
+            \( -name '*.dylib' -o -name '*.so' -o -name '*.o' \) \
+            -exec codesign --force --timestamp --options runtime \
+              --sign "$IDENTITY" {} \;
+
+          # Sign framework main binaries (Tcl, Tk, Python -- no file extension)
+          find "dist/Revenant.app/Contents/Frameworks" \
+            -type f ! -name '*.*' | while read -r bin; do
+            if file "$bin" | grep -q "Mach-O"; then
+              echo "  signing framework binary: $bin"
+              codesign --force --timestamp --options runtime \
+                --sign "$IDENTITY" "$bin"
+            fi
+          done
+
+          # Sign Python interpreter in MacOS/
+          if [ -f "dist/Revenant.app/Contents/MacOS/python" ]; then
+            codesign --force --timestamp --options runtime \
+              --entitlements entitlements.plist \
+              --sign "$IDENTITY" \
+              "dist/Revenant.app/Contents/MacOS/python"
+          fi
+
+          # Sign the main executable with entitlements
+          codesign --force --timestamp --options runtime \
+            --entitlements entitlements.plist \
+            --sign "$IDENTITY" \
+            "dist/Revenant.app/Contents/MacOS/Revenant"
+
+          # Sign the outer .app bundle
+          codesign --force --timestamp --options runtime \
+            --sign "$IDENTITY" \
+            "dist/Revenant.app"
+
+          # Verify
+          codesign --verify --deep --strict "dist/Revenant.app"
+          echo "Code signature verified."
+
+      - name: Codesign CLI binary
+        if: runner.os == 'macOS' && env.MACOS_SIGN
+        run: |
+          codesign --force --timestamp --options runtime \
+            --entitlements entitlements.plist \
+            --sign "Developer ID Application: ${{ secrets.APPLE_IDENTITY }}" \
+            dist/revenant
+
+          codesign --verify --strict dist/revenant
+
+      # Create DMG from the signed .app
+      - name: Create DMG (signed)
+        if: runner.os == 'macOS' && env.MACOS_SIGN
+        run: python scripts/build.py dmg
+
+      - name: Codesign DMG
+        if: runner.os == 'macOS' && env.MACOS_SIGN
+        run: |
+          codesign --force --timestamp \
+            --sign "Developer ID Application: ${{ secrets.APPLE_IDENTITY }}" \
+            dist/Revenant.dmg
+          codesign --verify --strict dist/Revenant.dmg
+          echo "DMG code signature verified."
+
+      # -- macOS: notarize ----------------------------------------------
+      - name: Decode App Store Connect API key
+        if: runner.os == 'macOS' && env.MACOS_NOTARIZE
+        env:
+          API_KEY_BASE64: ${{ secrets.APPSTORE_API_KEY_BASE64 }}
+          API_KEY_ID: ${{ secrets.APPSTORE_API_KEY_ID }}
+        run: |
+          mkdir -p ~/private_keys
+          echo "$API_KEY_BASE64" | base64 --decode > ~/private_keys/AuthKey_${API_KEY_ID}.p8
+
+      - name: Notarize DMG
+        if: runner.os == 'macOS' && env.MACOS_NOTARIZE
+        env:
+          API_KEY_ID: ${{ secrets.APPSTORE_API_KEY_ID }}
+          API_ISSUER_ID: ${{ secrets.APPSTORE_API_ISSUER_ID }}
+        run: |
+          SUBMIT_OUT=$(xcrun notarytool submit dist/Revenant.dmg \
+            --key ~/private_keys/AuthKey_${API_KEY_ID}.p8 \
+            --key-id "$API_KEY_ID" \
+            --issuer "$API_ISSUER_ID" \
+            --wait 2>&1) || true
+          echo "$SUBMIT_OUT"
+
+          SUBMISSION_ID=$(echo "$SUBMIT_OUT" | grep '  id:' | head -1 | awk '{print $2}')
+
+          if echo "$SUBMIT_OUT" | grep -q "status: Invalid"; then
+            echo "::error::Notarization failed. Fetching detailed log..."
+            xcrun notarytool log "$SUBMISSION_ID" \
+              --key ~/private_keys/AuthKey_${API_KEY_ID}.p8 \
+              --key-id "$API_KEY_ID" \
+              --issuer "$API_ISSUER_ID" \
+              developer_log.json
+            cat developer_log.json
+            exit 1
+          fi
+
+          xcrun stapler staple dist/Revenant.dmg
+          echo "DMG notarized and stapled."
+
+      - name: Notarize CLI binary
+        if: runner.os == 'macOS' && env.MACOS_NOTARIZE
+        env:
+          API_KEY_ID: ${{ secrets.APPSTORE_API_KEY_ID }}
+          API_ISSUER_ID: ${{ secrets.APPSTORE_API_ISSUER_ID }}
+        run: |
+          ditto -c -k --keepParent dist/revenant dist/revenant-cli.zip
+
+          xcrun notarytool submit dist/revenant-cli.zip \
+            --key ~/private_keys/AuthKey_${API_KEY_ID}.p8 \
+            --key-id "$API_KEY_ID" \
+            --issuer "$API_ISSUER_ID" \
+            --wait
+
+          rm dist/revenant-cli.zip
+          echo "CLI binary notarized."
+
+      - name: Clean up signing keys
+        if: runner.os == 'macOS' && env.MACOS_NOTARIZE && always()
+        run: rm -rf ~/private_keys
+
+      # -- Build AppImage (Linux) ---------------------------------------
+      - name: Build AppImage (Linux)
+        if: matrix.platform == 'linux-x64'
+        run: python scripts/build_appimage.py
+
+      # -- Windows: Authenticode signing --------------------------------
+      - name: Import Windows code-signing certificate
+        if: runner.os == 'Windows' && env.WINDOWS_SIGN
+        run: |
+          $pfxBytes = [Convert]::FromBase64String("${{ secrets.WINDOWS_CERTIFICATE_BASE64 }}")
+          [IO.File]::WriteAllBytes("$env:RUNNER_TEMP\codesign.pfx", $pfxBytes)
+        shell: pwsh
+
+      - name: Sign Windows binaries
+        if: runner.os == 'Windows' && env.WINDOWS_SIGN
+        env:
+          SIGN_PASSWORD: ${{ secrets.WINDOWS_CERTIFICATE_PASSWORD }}
+        run: |
+          $cert = "$env:RUNNER_TEMP\codesign.pfx"
+          $ts = "https://timestamp.digicert.com"
+
+          Get-ChildItem -Path dist\revenant-standalone -Filter *.exe | ForEach-Object {
+            Write-Host "Signing $($_.Name)..."
+            & signtool sign /f $cert /p $env:SIGN_PASSWORD /tr $ts /td sha256 /fd sha256 `
+              /d "Revenant" $_.FullName
+            & signtool verify /pa $_.FullName
+          }
+          Write-Host "Windows binaries signed and verified."
+        shell: pwsh
+
+      - name: Clean up Windows certificate
+        if: runner.os == 'Windows' && env.WINDOWS_SIGN && always()
+        run: |
+          $cert = "$env:RUNNER_TEMP\codesign.pfx"
+          if (Test-Path $cert) {
+            Remove-Item $cert
+            Write-Host "Certificate cleaned up."
+          } else {
+            Write-Host "Certificate file not found (already cleaned or never created)."
+          }
+        shell: pwsh
+
+      # -- Windows: MSIX package (for Microsoft Store) ------------------
+      - name: Build MSIX package
+        if: matrix.platform == 'windows-x64'
+        run: python scripts/build_msix.py
+
+      # -- Package standalone as zip (Windows) ----------------------------
+      - name: Package standalone distribution
+        if: matrix.standalone
+        shell: pwsh
+        run: |
+          Compress-Archive -Path dist\revenant-standalone\* `
+            -DestinationPath dist\revenant-cli-${{ matrix.platform }}.zip
+          Write-Host "Created revenant-cli-${{ matrix.platform }}.zip"
+
+      # -- Rename artifacts ---------------------------------------------
+      - name: Rename CLI artifact
+        if: "!matrix.standalone"
+        shell: bash
+        run: |
+          cd dist
+          if [ -f "revenant" ]; then
+            mv revenant revenant-cli-${{ matrix.platform }}
+          fi
+
+      - name: Rename DMG artifact (macOS)
+        if: contains(matrix.platform, 'macos')
+        shell: bash
+        run: |
+          cd dist
+          if [ -f "Revenant.dmg" ]; then
+            mv Revenant.dmg Revenant-gui-${{ matrix.platform }}.dmg
+          fi
+
+      # -- Upload artifacts ---------------------------------------------
+      - name: Upload CLI artifact
+        if: "!matrix.standalone"
+        uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v6
+        with:
+          name: cli-${{ matrix.platform }}
+          path: python/dist/revenant-cli-${{ matrix.platform }}
+          if-no-files-found: error
+
+      - name: Upload standalone artifact (Windows)
+        if: matrix.standalone
+        uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v6
+        with:
+          name: cli-${{ matrix.platform }}
+          path: python/dist/revenant-cli-${{ matrix.platform }}.zip
+          if-no-files-found: error
+
+      - name: Upload GUI artifact
+        if: matrix.gui_artifact != '' && !matrix.standalone
+        uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v6
+        with:
+          name: gui-${{ matrix.platform }}
+          path: |
+            python/dist/Revenant-gui-${{ matrix.platform }}.dmg
+            python/dist/Revenant-x86_64.AppImage
+          if-no-files-found: error
+
+      - name: Upload MSIX artifact
+        if: matrix.platform == 'windows-x64'
+        uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v6
+        with:
+          name: msix-${{ matrix.platform }}
+          path: python/dist/Revenant.msix
+          if-no-files-found: error
+
+  build-mac:
+    name: Build macOS (MAS)
+    needs: ci
+    runs-on: macos-latest
+    timeout-minutes: 30
+    permissions:
+      contents: read
+    defaults:
+      run:
+        working-directory: python
+
+    env:
+      MAS_SIGN: ${{ secrets.MAS_CERTIFICATE_BASE64 != '' && 'true' || '' }}
+
+    steps:
+      - uses: step-security/harden-runner@5ef0c079ce82195b2a36a210272d6b661572d83e # v2
+        with:
+          egress-policy: audit
+
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6
+        with:
+          persist-credentials: false
+
+      - name: Set up Python
+        uses: actions/setup-python@a309ff8b426b58ec0e2a45f0f869d46889d02405 # v6
+        with:
+          python-version: "3.13"
+          cache: pip
+          cache-dependency-path: python/pyproject.toml
+
+      - name: Install dependencies
+        run: pip install -e ".[build-mac]"
+
+      - name: Import MAS signing certificate
+        if: env.MAS_SIGN
+        uses: apple-actions/import-codesign-certs@b610f78488812c1e56b20e6df63ec42d833f2d14 # v6
+        with:
+          p12-file-base64: ${{ secrets.MAS_CERTIFICATE_BASE64 }}
+          p12-password: ${{ secrets.MAS_CERTIFICATE_PASSWORD }}
+
+      - name: Build with py2app
+        run: python scripts/build.py mac --no-dmg
+
+      # -- Codesign for MAS --------------------------------------------
+      - name: Codesign .app bundle (MAS)
+        if: env.MAS_SIGN
+        run: |
+          IDENTITY="3rd Party Mac Developer Application: ${{ secrets.APPLE_IDENTITY }}"
+
+          # Sign all embedded .so, .dylib files and framework binaries (Tcl, Tk, Python)
+          find "dist/Revenant.app/Contents" \
+            \( -name '*.dylib' -o -name '*.so' -o -name '*.o' \) \
+            -exec codesign --force --timestamp --options runtime \
+              --sign "$IDENTITY" {} \;
+
+          # Sign framework main binaries (Tcl, Tk, Python -- no file extension)
+          find "dist/Revenant.app/Contents/Frameworks" \
+            -type f ! -name '*.*' | while read -r bin; do
+            if file "$bin" | grep -q "Mach-O"; then
+              echo "  signing framework binary: $bin"
+              codesign --force --timestamp --options runtime \
+                --entitlements entitlements-sandbox.plist \
+                --sign "$IDENTITY" "$bin"
+            fi
+          done
+
+          # Sign Python interpreter in MacOS/
+          if [ -f "dist/Revenant.app/Contents/MacOS/python" ]; then
+            codesign --force --timestamp --options runtime \
+              --entitlements entitlements-sandbox.plist \
+              --sign "$IDENTITY" \
+              "dist/Revenant.app/Contents/MacOS/python"
+          fi
+
+          # Sign the main executable with sandbox entitlements
+          codesign --force --timestamp --options runtime \
+            --entitlements entitlements-sandbox.plist \
+            --sign "$IDENTITY" \
+            "dist/Revenant.app/Contents/MacOS/Revenant"
+
+          # Sign the outer .app bundle
+          codesign --force --timestamp --options runtime \
+            --sign "$IDENTITY" \
+            "dist/Revenant.app"
+
+          codesign --verify --deep --strict "dist/Revenant.app"
+          echo "MAS code signature verified."
+
+      # -- Package as .pkg for MAS submission ---------------------------
+      - name: Create installer .pkg
+        if: env.MAS_SIGN
+        run: |
+          INSTALLER_IDENTITY="3rd Party Mac Developer Installer: ${{ secrets.APPLE_IDENTITY }}"
+          productbuild --component "dist/Revenant.app" /Applications \
+            --sign "$INSTALLER_IDENTITY" \
+            dist/Revenant-MAS.pkg
+
+      - name: Upload MAS artifact
+        if: env.MAS_SIGN
+        uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v6
+        with:
+          name: mas-macos-arm64
+          path: python/dist/Revenant-MAS.pkg
+          if-no-files-found: error
+
+  release:
+    name: Create Release
+    needs: build
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    permissions:
+      contents: write
+      id-token: write
+      attestations: write
+
+    steps:
+      - uses: step-security/harden-runner@5ef0c079ce82195b2a36a210272d6b661572d83e # v2
+        with:
+          egress-policy: audit
+
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6
+        with:
+          persist-credentials: false
+
+      - name: Download all artifacts
+        uses: actions/download-artifact@37930b1c2abaa49bbe596cd826c3c89aef350131 # v7
+        with:
+          path: artifacts
+          merge-multiple: true
+
+      - name: List artifacts
+        run: ls -la artifacts/
+
+      - name: Generate checksums
+        run: |
+          cd artifacts
+          sha256sum * > SHA256SUMS.txt
+          cat SHA256SUMS.txt
+
+      - name: Attest build provenance
+        uses: actions/attest-build-provenance@977bb373ede98d70efdf65b84cb5f73e068dcc2a # v3
+        with:
+          subject-path: "artifacts/*"
+
+      - name: Generate SBOM
+        uses: anchore/sbom-action@28d71544de8eaf1b958d335707167c5f783590ad # v0
+        with:
+          path: python/
+          format: spdx-json
+          output-file: artifacts/revenant-sbom.spdx.json
+
+      - name: Create Release
+        uses: softprops/action-gh-release@a06a81a03ee405af7f2048a818ed3f03bbf83c7b # v2
+        with:
+          draft: false
+          prerelease: ${{ contains(github.ref_name, '-') }}
+          generate_release_notes: true
+          files: |
+            artifacts/*
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+  publish-testpypi:
+    name: Publish to TestPyPI
+    needs: release
+    if: ${{ contains(github.ref_name, '-') }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    environment: testpypi
+    permissions:
+      contents: read
+      id-token: write
+
+    steps:
+      - uses: step-security/harden-runner@5ef0c079ce82195b2a36a210272d6b661572d83e # v2
+        with:
+          egress-policy: audit
+
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6
+        with:
+          persist-credentials: false
+
+      - name: Set up Python
+        uses: actions/setup-python@a309ff8b426b58ec0e2a45f0f869d46889d02405 # v6
+        with:
+          python-version: "3.13"
+          cache: pip
+          cache-dependency-path: python/pyproject.toml
+
+      - name: Set version from tag
+        run: |
+          TAG="${GITHUB_REF_NAME#v}"
+          # Convert semver pre-release to PEP 440: 0.1.0-rc.1 -> 0.1.0rc1, 0.1.0-alpha.1 -> 0.1.0a1
+          VERSION=$(echo "$TAG" | sed -E 's/-alpha\./a/; s/-beta\./b/; s/-rc\./rc/')
+          echo "VERSION=$VERSION" >> "$GITHUB_ENV"
+          sed -i "s/^version = .*/version = \"$VERSION\"/" python/pyproject.toml
+
+      - name: Install build tools
+        run: pip install "build==1.4.0"
+
+      - name: Build sdist and wheel
+        run: python -m build python/
+
+      - name: Publish to TestPyPI
+        uses: pypa/gh-action-pypi-publish@ed0c53931b1dc9bd32cbe73a98c7f6766f8a527e # release/v1
+        with:
+          repository-url: https://test.pypi.org/legacy/
+          packages-dir: python/dist/
+          attestations: true
+
+  publish-pypi:
+    name: Publish to PyPI
+    needs: release
+    if: ${{ !contains(github.ref_name, '-') }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    environment: pypi
+    permissions:
+      contents: read
+      id-token: write
+
+    steps:
+      - uses: step-security/harden-runner@5ef0c079ce82195b2a36a210272d6b661572d83e # v2
+        with:
+          egress-policy: audit
+
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6
+        with:
+          persist-credentials: false
+
+      - name: Set up Python
+        uses: actions/setup-python@a309ff8b426b58ec0e2a45f0f869d46889d02405 # v6
+        with:
+          python-version: "3.13"
+          cache: pip
+          cache-dependency-path: python/pyproject.toml
+
+      - name: Set version from tag
+        run: |
+          VERSION="${GITHUB_REF_NAME#v}"
+          echo "VERSION=$VERSION" >> "$GITHUB_ENV"
+          sed -i "s/^version = .*/version = \"$VERSION\"/" python/pyproject.toml
+
+      - name: Install build tools
+        run: pip install "build==1.4.0"
+
+      - name: Build sdist and wheel
+        run: python -m build python/
+
+      - name: Publish to PyPI
+        uses: pypa/gh-action-pypi-publish@ed0c53931b1dc9bd32cbe73a98c7f6766f8a527e # release/v1
+        with:
+          packages-dir: python/dist/
+          attestations: true

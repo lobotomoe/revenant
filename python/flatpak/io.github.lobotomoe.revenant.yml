@@ -1,0 +1,96 @@
+# Flatpak manifest for Revenant
+#
+# STATUS: Deferred. Flathub submission is planned for a future release.
+# The tag, commit hash, and dependency pinning below need updating before
+# submitting to Flathub.
+#
+# To build locally:
+#   flatpak-builder --user --install --force-clean build-dir \
+#     flatpak/io.github.lobotomoe.revenant.yml
+#
+# For Flathub submission, this file goes in the Flathub repo:
+#   https://github.com/flathub/io.github.lobotomoe.revenant
+#
+# Prerequisites:
+#   flatpak install flathub org.freedesktop.Platform//24.08
+#   flatpak install flathub org.freedesktop.Sdk//24.08
+
+app-id: io.github.lobotomoe.revenant
+runtime: org.freedesktop.Platform
+runtime-version: "24.08"
+sdk: org.freedesktop.Sdk
+command: revenant-gui
+
+finish-args:
+  # Network access for CoSign SOAP API
+  - --share=network
+  # Display access
+  - --share=ipc
+  - --socket=x11
+  - --socket=fallback-x11
+  - --socket=wayland
+  # File access for opening/saving PDFs
+  - --filesystem=home
+  # D-Bus access for SecretService (keyring)
+  - --talk-name=org.freedesktop.secrets
+
+modules:
+  # tkinter module for the runtime's Python.
+  # The freedesktop runtime includes Python but not _tkinter.
+  # Uses tkinter-standalone to build the C extension against Tcl/Tk below.
+  # Reference: https://github.com/iwalton3/tkinter-standalone
+  - name: tkinter
+    buildsystem: simple
+    build-commands:
+      - pip3 install --prefix=${FLATPAK_DEST} --no-build-isolation .
+    sources:
+      - type: git
+        url: https://github.com/iwalton3/tkinter-standalone.git
+        commit: 8e78e38ef0cceb44a3a0062e1c314a4ff3f981db
+    modules:
+      - name: tcl
+        buildsystem: autotools
+        subdir: unix
+        post-install:
+          - chmod 755 ${FLATPAK_DEST}/lib/libtcl*.so
+        cleanup:
+          - /bin
+          - /lib/pkgconfig
+          - /man
+        sources:
+          - type: archive
+            url: https://prdownloads.sourceforge.net/tcl/tcl8.6.14-src.tar.gz
+            sha256: 5880225babf7954c58b4f05bfd2d2b24b6f22f516b7c1a22d5f9a76b56ef6d8f
+
+      - name: tk
+        buildsystem: autotools
+        subdir: unix
+        post-install:
+          - chmod 755 ${FLATPAK_DEST}/lib/libtk*.so
+        cleanup:
+          - /bin
+          - /lib/pkgconfig
+          - /man
+        sources:
+          - type: archive
+            url: https://prdownloads.sourceforge.net/tcl/tk8.6.14-src.tar.gz
+            sha256: 8ffdb720f47a6ca6107eac2dd877e30b0ef7fac14f3a84ebbd0b3612cee41a94
+
+  # Revenant application
+  - name: revenant
+    buildsystem: simple
+    build-commands:
+      - cd python && pip3 install --prefix=${FLATPAK_DEST} --no-build-isolation .
+      # Install desktop file, icon, and metainfo
+      - install -Dm644 python/appimage/io.github.lobotomoe.revenant.desktop
+        ${FLATPAK_DEST}/share/applications/io.github.lobotomoe.revenant.desktop
+      - install -Dm644 python/appimage/io.github.lobotomoe.revenant.svg
+        ${FLATPAK_DEST}/share/icons/hicolor/scalable/apps/io.github.lobotomoe.revenant.svg
+      - install -Dm644 python/appimage/io.github.lobotomoe.revenant.metainfo.xml
+        ${FLATPAK_DEST}/share/metainfo/io.github.lobotomoe.revenant.metainfo.xml
+    sources:
+      - type: git
+        url: https://github.com/lobotomoe/revenant.git
+        # Tag and commit are updated at release time to match the git tag.
+        tag: v0.1.0
+        commit: null  # TODO: Fill with actual commit hash before Flathub submission

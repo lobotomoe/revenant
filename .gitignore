@@ -1,0 +1,62 @@
+# Credentials and personal documents
+docs/ekeng/credentials/
+
+# Python — certificates and research (contain personal data)
+python/certs/
+python/research/
+
+# Secrets and environment files
+.env
+.env.*
+*.p12
+*.p8
+*.pem
+
+# Temp/output files from probing and testing
+*.bin
+*.der
+*.p7s
+*.log
+
+# macOS
+.DS_Store
+
+# Python
+__pycache__/
+*.pyc
+*.pyo
+*.egg-info/
+dist/
+build/
+.venv/
+venv/
+AppDir/
+appimagetool
+.coverage
+htmlcov/
+.pytest_cache/
+.ruff_cache/
+
+# Packaging artifacts
+*.msix
+*.appx
+*.snap
+*.flatpak
+msix-staging/
+parts/
+prime/
+stage/
+*.flatpak-builder/
+
+# Node
+node_modules/
+
+# IDE / tools
+.idea/
+.vscode/
+.claude/
+*.swp
+*.swo
+
+# Development scratch space
+playground/
