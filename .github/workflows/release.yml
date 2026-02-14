@@ -439,8 +439,9 @@ jobs:
             --sign "$IDENTITY" \
             "dist/Revenant.app/Contents/MacOS/Revenant"
 
-          # Sign the outer .app bundle
+          # Sign the outer .app bundle (must include entitlements to preserve sandbox)
           codesign --force --timestamp --options runtime \
+            --entitlements entitlements-sandbox.plist \
             --sign "$IDENTITY" \
             "dist/Revenant.app"
 
