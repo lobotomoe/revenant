@@ -5,6 +5,8 @@
 # Revenant
 
 [![CI](https://github.com/lobotomoe/revenant/actions/workflows/ci.yml/badge.svg)](https://github.com/lobotomoe/revenant/actions/workflows/ci.yml)
+[![PyPI](https://img.shields.io/pypi/v/revenant.svg)](https://pypi.org/project/revenant/)
+[![Snap Store](https://snapcraft.io/revenant/badge.svg)](https://snapcraft.io/revenant)
 [![Python 3.10+](https://img.shields.io/badge/python-3.10%2B-blue.svg)](https://www.python.org/downloads/)
 [![pyright: strict](https://img.shields.io/badge/pyright-strict-blue)](https://github.com/microsoft/pyright)
 [![coverage: 96%](https://img.shields.io/badge/coverage-96%25-brightgreen)](python/pyproject.toml)
@@ -28,9 +30,19 @@ Yes. DocuSign [officially retired](https://www.docusign.com/blog/developers/docu
 
 The Armenian Government's EKENG CoSign appliance doesn't care about DocuSign's product roadmap -- it's on-prem, it works, and thousands of documents get signed through it every day. Somebody had to write a proper cross-platform client for it. Might as well be me.
 
-## Client
+## Install
 
-The client is implemented in Python. See [`python/`](python/README.md) for usage and installation.
+```bash
+pip install revenant        # PyPI (all platforms)
+snap install revenant       # Snap Store (Linux)
+brew install lobotomoe/revenant/revenant  # Homebrew (macOS)
+```
+
+[![Get it from the Snap Store](https://snapcraft.io/en/dark/install.svg)](https://snapcraft.io/revenant)
+
+Or download binaries from [GitHub Releases](https://github.com/lobotomoe/revenant/releases).
+
+For detailed usage, see [`python/`](python/README.md).
 
 ## Compatibility
 
