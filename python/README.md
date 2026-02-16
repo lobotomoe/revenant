@@ -144,8 +144,8 @@ revenant sign document.pdf --detached
 revenant sign document.pdf --dry-run
 
 # Specify page and position
-revenant sign document.pdf --page 1 --position left-top
-revenant sign document.pdf --page last --position center-bottom
+revenant sign document.pdf --page 1 --position top-left
+revenant sign document.pdf --page last --position bottom-center
 
 # Add signature image (PNG or JPEG, scaled to fit field, left side)
 revenant sign document.pdf --image signature.png
@@ -253,10 +253,10 @@ for r in results:
 ```python
 # Available position presets
 print(revenant.POSITION_PRESETS)
-# {'right-bottom', 'right-top', 'left-bottom', 'left-top', 'center-bottom'}
+# {'bottom-right', 'top-right', 'bottom-left', 'top-left', 'bottom-center'}
 
-# Resolve aliases (e.g. "rb" -> "right-bottom")
-pos = revenant.resolve_position("rb")
+# Resolve aliases (e.g. "br" -> "bottom-right")
+pos = revenant.resolve_position("br")
 ```
 
 ### Signature options
@@ -268,7 +268,7 @@ from revenant import EmbeddedSignatureOptions
 
 opts = EmbeddedSignatureOptions(
     page="last",                 # 0-based int, "first", or "last"
-    position="right-bottom",     # preset name (ignored when x/y are set)
+    position="bottom-right",     # preset name (ignored when x/y are set)
     x=350, y=50,                 # manual coordinates (PDF points, origin=bottom-left)
     w=200, h=70,                 # field dimensions in PDF points
     reason="Approved",           # signature reason string

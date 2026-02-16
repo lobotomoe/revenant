@@ -46,7 +46,7 @@ class EmbeddedSignatureOptions:
 
     Attributes:
         page: Page for the signature -- 0-based int, "first", or "last".
-        position: Preset position name ("right-bottom", "rb", etc.).
+        position: Preset position name ("bottom-right", "br", etc.).
             Ignored when x/y are provided explicitly.
         x: Manual x-coordinate (PDF points, origin = bottom-left).
         y: Manual y-coordinate (PDF points, origin = bottom-left).
@@ -61,7 +61,7 @@ class EmbeddedSignatureOptions:
     """
 
     page: int | str = "last"
-    position: str = "right-bottom"
+    position: str = "bottom-right"
     x: float | None = None
     y: float | None = None
     w: float = SIG_WIDTH

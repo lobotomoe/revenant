@@ -131,7 +131,7 @@ def sign(
     timeout: int | None = None,
     options: EmbeddedSignatureOptions | None = None,
     page: int | str = "last",
-    position: str = "right-bottom",
+    position: str = "bottom-right",
     x: float | None = None,
     y: float | None = None,
     w: float | None = None,
@@ -168,7 +168,7 @@ def sign(
         options: Reusable options object. Individual keyword arguments
             below override the corresponding fields in *options*.
         page: Target page -- 0-based ``int``, ``"first"``, or ``"last"``.
-        position: Position preset (``"right-bottom"``, ``"left-top"``, etc.).
+        position: Position preset (``"bottom-right"``, ``"top-left"``, etc.).
         x: Manual x-coordinate in PDF points (overrides *position*).
         y: Manual y-coordinate in PDF points (overrides *position*).
         w: Signature field width in PDF points.

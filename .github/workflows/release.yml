@@ -302,8 +302,8 @@ jobs:
         shell: pwsh
         run: |
           Compress-Archive -Path dist\revenant-standalone\* `
-            -DestinationPath dist\revenant-cli-${{ matrix.platform }}.zip
-          Write-Host "Created revenant-cli-${{ matrix.platform }}.zip"
+            -DestinationPath dist\revenant-${{ matrix.platform }}.zip
+          Write-Host "Created revenant-${{ matrix.platform }}.zip"
 
       # -- Rename artifacts ---------------------------------------------
       - name: Rename CLI artifact
@@ -337,8 +337,8 @@ jobs:
         if: matrix.standalone
         uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v6
         with:
-          name: cli-${{ matrix.platform }}
-          path: python/dist/revenant-cli-${{ matrix.platform }}.zip
+          name: standalone-${{ matrix.platform }}
+          path: python/dist/revenant-${{ matrix.platform }}.zip
           if-no-files-found: error
 
       - name: Upload GUI artifact

@@ -125,7 +125,7 @@ def test_sign_pdf_embedded_happy_path(mock_transport):
         "pass",
         120,
         page=0,
-        position="rb",
+        position="br",
         name="Test User",
         reason="Test",
     )
@@ -158,7 +158,7 @@ def test_sign_pdf_embedded_with_fields(mock_transport):
         "pass",
         120,
         page="last",
-        position="rb",
+        position="br",
         name="Test",
         fields=["Test User", "SSN: 12345", "Date: 2026-02-07"],
     )
@@ -199,7 +199,7 @@ def test_sign_pdf_embedded_verification_failure(mock_transport):
             "pass",
             120,
             page=0,
-            position="rb",
+            position="br",
             name="Test",
         )
 
@@ -228,7 +228,7 @@ def test_sign_pdf_embedded_with_font(mock_transport):
         "pass",
         120,
         page=0,
-        position="rb",
+        position="br",
         name="Test User",
         font="ghea-grapalat",
     )

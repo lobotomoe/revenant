@@ -38,8 +38,14 @@ USER, PASS = resolve_credentials()
 URL = os.environ.get("REVENANT_URL", "https://ca.gov.am:8080/SAPIWS/DSS.asmx")
 TRANSPORT = SoapSigningTransport(URL)
 
-# Pre-register TLS mode so transport uses the correct strategy (legacy RC4 for EKENG)
+# Pre-register TLS mode so transport uses the correct strategy.
+# Saved profile takes priority; otherwise match URL against built-in profiles.
 _profile = get_active_profile()
+if not _profile:
+    from revenant.config.profiles import BUILTIN_PROFILES
+
+    _profile = next((p for p in BUILTIN_PROFILES.values() if p.url == URL), None)
+
 if _profile:
     _host = urlparse(_profile.url).hostname
     if _host:
@@ -385,15 +391,15 @@ def test_sign_data_large_payload():
 
 
 @requires_creds
-def test_sign_pdf_embedded_position_left_top():
-    """Embedded signing with left-top position should work."""
+def test_sign_pdf_embedded_position_top_left():
+    """Embedded signing with top-left position should work."""
     signed = sign_pdf_embedded(
         TINY_PDF,
         TRANSPORT,
         USER,
         PASS,
         120,
-        position="left-top",
+        position="top-left",
         name="Test Signer",
     )
     assert isinstance(signed, bytes)
@@ -402,15 +408,15 @@ def test_sign_pdf_embedded_position_left_top():
 
 
 @requires_creds
-def test_sign_pdf_embedded_position_center_bottom():
-    """Embedded signing with center-bottom position should work."""
+def test_sign_pdf_embedded_position_bottom_center():
+    """Embedded signing with bottom-center position should work."""
     signed = sign_pdf_embedded(
         TINY_PDF,
         TRANSPORT,
         USER,
         PASS,
         120,
-        position="center-bottom",
+        position="bottom-center",
         name="Test Signer",
     )
     assert isinstance(signed, bytes)
@@ -420,14 +426,14 @@ def test_sign_pdf_embedded_position_center_bottom():
 
 @requires_creds
 def test_sign_pdf_embedded_position_alias():
-    """Position aliases (rb, lt, etc.) should work."""
+    """Position aliases (br, tl, etc.) should work."""
     signed = sign_pdf_embedded(
         TINY_PDF,
         TRANSPORT,
         USER,
         PASS,
         120,
-        position="lt",  # alias for left-top
+        position="tl",  # alias for top-left
         name="Test Signer",
     )
     assert isinstance(signed, bytes)
@@ -802,7 +808,7 @@ def test_sign_pdf_embedded_double_sign():
         PASS,
         120,
         page=0,
-        position="rb",
+        position="br",
         name="First Signer",
         reason="First signature",
     )
@@ -816,7 +822,7 @@ def test_sign_pdf_embedded_double_sign():
         PASS,
         120,
         page=0,
-        position="lb",
+        position="bl",
         name="Second Signer",
         reason="Second signature",
     )

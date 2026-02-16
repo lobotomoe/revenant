@@ -12,7 +12,7 @@ import importlib.metadata
 try:
     __version__ = importlib.metadata.version("revenant")
 except importlib.metadata.PackageNotFoundError:
-    __version__ = "0.1.0"
+    __version__ = "0.2.0"
 
 __all__ = [
     "BYTES_PER_MB",
@@ -118,7 +118,7 @@ MAX_TIMEOUT = 3600
 # ── Signature defaults ──────────────────────────────────────────────
 
 # Default position preset for embedded signatures
-DEFAULT_POSITION = "right-bottom"
+DEFAULT_POSITION = "bottom-right"
 
 # PDF file magic bytes
 PDF_MAGIC = b"%PDF-"

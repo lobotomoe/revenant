@@ -212,8 +212,8 @@ def test_resolve_position_aliases():
 
 
 def test_resolve_position_case_insensitive():
-    assert resolve_position("Right-Bottom") == "right-bottom"
-    assert resolve_position("RB") == "right-bottom"
+    assert resolve_position("Bottom-Right") == "bottom-right"
+    assert resolve_position("BR") == "bottom-right"
 
 
 def test_resolve_position_unknown():
@@ -262,7 +262,7 @@ def test_parse_page_spec_invalid(spec, match):
 def test_compute_sig_rect_right_bottom():
     from revenant.core.pdf import SIG_MARGIN_H, SIG_MARGIN_V, SIG_WIDTH
 
-    x, y, _w, _h = compute_sig_rect(595, 842, "right-bottom")
+    x, y, _w, _h = compute_sig_rect(595, 842, "bottom-right")
     assert x == 595 - SIG_MARGIN_H - SIG_WIDTH  # page_w - margin_h - sig_w
     assert y == SIG_MARGIN_V  # margin_v
 
@@ -270,7 +270,7 @@ def test_compute_sig_rect_right_bottom():
 def test_compute_sig_rect_left_top():
     from revenant.core.pdf import SIG_HEIGHT, SIG_MARGIN_H, SIG_MARGIN_V
 
-    x, y, _w, _h = compute_sig_rect(595, 842, "lt")
+    x, y, _w, _h = compute_sig_rect(595, 842, "tl")
     assert x == SIG_MARGIN_H  # margin_h
     assert y == 842 - SIG_MARGIN_V - SIG_HEIGHT  # page_h - margin_v - sig_h
 
@@ -278,7 +278,7 @@ def test_compute_sig_rect_left_top():
 def test_compute_sig_rect_center_bottom():
     from revenant.core.pdf import SIG_MARGIN_V, SIG_WIDTH
 
-    x, y, _w, _h = compute_sig_rect(600, 800, "cb")
+    x, y, _w, _h = compute_sig_rect(600, 800, "bc")
     assert x == (600 - SIG_WIDTH) / 2.0
     assert y == SIG_MARGIN_V
 
@@ -287,7 +287,7 @@ def test_compute_sig_rect_landscape():
     """Landscape page (wider than tall) — positions should still be correct."""
     from revenant.core.pdf import SIG_MARGIN_H, SIG_MARGIN_V, SIG_WIDTH
 
-    x, y, _w, _h = compute_sig_rect(842, 595, "right-bottom")
+    x, y, _w, _h = compute_sig_rect(842, 595, "bottom-right")
     assert x == 842 - SIG_MARGIN_H - SIG_WIDTH
     assert y == SIG_MARGIN_V
 
@@ -317,7 +317,7 @@ def test_prepare_and_verify_roundtrip():
 
     # Prepare with sig field (uses position preset)
     prepared, hex_start, hex_len = prepare_pdf_with_sig_field(
-        pdf_bytes, page=0, position="right-bottom", reason="Test", name="Test User"
+        pdf_bytes, page=0, position="bottom-right", reason="Test", name="Test User"
     )
 
     assert hex_start > 0
@@ -361,7 +361,7 @@ def test_prepare_landscape_pdf():
     pdf_bytes = _make_blank_pdf(page_size=(842, 595))  # A4 landscape
 
     _prepared, hex_start, _hex_len = prepare_pdf_with_sig_field(
-        pdf_bytes, page=0, position="right-bottom", name="Test"
+        pdf_bytes, page=0, position="bottom-right", name="Test"
     )
     assert hex_start > 0
 
@@ -373,7 +373,7 @@ def test_prepare_page_last():
     pdf_bytes = _make_blank_pdf(num_pages=3)
 
     _prepared, hex_start, _hex_len = prepare_pdf_with_sig_field(
-        pdf_bytes, page="last", position="left-top", name="Test"
+        pdf_bytes, page="last", position="top-left", name="Test"
     )
     assert hex_start > 0
 
@@ -404,7 +404,7 @@ def test_prepare_page_with_existing_annots():
     pdf_bytes = buf.getvalue()
 
     prepared, hex_start, hex_len = prepare_pdf_with_sig_field(
-        pdf_bytes, page=0, position="rb", name="Test"
+        pdf_bytes, page=0, position="br", name="Test"
     )
     assert hex_start > 0
     assert hex_len == CMS_HEX_SIZE
@@ -419,7 +419,7 @@ def test_prepare_page_out_of_range():
     pdf_bytes = _make_blank_pdf(num_pages=2)
 
     with pytest.raises(PDFError, match="out of range"):
-        prepare_pdf_with_sig_field(pdf_bytes, page=5, position="rb")
+        prepare_pdf_with_sig_field(pdf_bytes, page=5, position="br")
 
 
 def test_prepare_manual_coordinates():
@@ -480,7 +480,7 @@ def test_prepare_with_signature_image(tmp_path):
     prepared, hex_start, hex_len = prepare_pdf_with_sig_field(
         pdf_bytes,
         page=0,
-        position="rb",
+        position="br",
         name="Test",
         image_path=str(img_path),
     )
@@ -898,7 +898,7 @@ def test_prepare_roundtrip_armenian_fields():
     prepared, hex_start, hex_len = prepare_pdf_with_sig_field(
         pdf_bytes,
         page=0,
-        position="right-bottom",
+        position="bottom-right",
         reason="Test",
         name="Test",
         fields=armenian_fields,
@@ -937,7 +937,7 @@ def test_prepare_roundtrip_ghea_grapalat():
     prepared, hex_start, hex_len = prepare_pdf_with_sig_field(
         pdf_bytes,
         page=0,
-        position="right-bottom",
+        position="bottom-right",
         reason="Test",
         name="Test User",
         fields=["Test User", "Date: 9 Feb 2026"],
@@ -972,7 +972,7 @@ def test_prepare_noto_sans_explicit():
     prepared, hex_start, _hex_len = prepare_pdf_with_sig_field(
         pdf_bytes,
         page=0,
-        position="rb",
+        position="br",
         name="Test",
         fields=["Test"],
         font="noto-sans",
@@ -1309,7 +1309,7 @@ def test_prepare_xref_stream_pdf_roundtrip():
 
     # Visible signature
     prepared, hex_start, hex_len = prepare_pdf_with_sig_field(
-        pdf_bytes, page="last", position="rb", reason="Test", name="Test User"
+        pdf_bytes, page="last", position="br", reason="Test", name="Test User"
     )
 
     assert hex_start > 0
@@ -1392,7 +1392,7 @@ def test_prepare_rotated_page(rotation):
     pdf_bytes = buf.getvalue()
 
     prepared, hex_start, hex_len = prepare_pdf_with_sig_field(
-        pdf_bytes, page=0, position="rb", reason="Test", name="Test"
+        pdf_bytes, page=0, position="br", reason="Test", name="Test"
     )
     assert hex_start > 0
     assert hex_len == CMS_HEX_SIZE
@@ -1457,7 +1457,7 @@ def test_prepare_various_page_sizes(page_size):
     pdf_bytes = _make_blank_pdf(page_size=page_size)
 
     prepared, hex_start, hex_len = prepare_pdf_with_sig_field(
-        pdf_bytes, page=0, position="rb", reason="Test", name="Test"
+        pdf_bytes, page=0, position="br", reason="Test", name="Test"
     )
     assert hex_start > 0
     assert hex_len == CMS_HEX_SIZE
@@ -1510,7 +1510,7 @@ def test_prepare_pdf_with_cropbox():
     pdf_bytes = buf.getvalue()
 
     prepared, hex_start, hex_len = prepare_pdf_with_sig_field(
-        pdf_bytes, page=0, position="rb", reason="Test", name="Test"
+        pdf_bytes, page=0, position="br", reason="Test", name="Test"
     )
     assert hex_start > 0
 
@@ -1548,7 +1548,7 @@ def test_prepare_inherited_mediabox():
     pdf_bytes = buf.getvalue()
 
     prepared, hex_start, hex_len = prepare_pdf_with_sig_field(
-        pdf_bytes, page=0, position="rb", reason="Test", name="Test"
+        pdf_bytes, page=0, position="br", reason="Test", name="Test"
     )
     assert hex_start > 0
 
@@ -1597,7 +1597,7 @@ def test_prepare_pdf_with_existing_acroform():
     pdf_bytes = buf.getvalue()
 
     prepared, hex_start, hex_len = prepare_pdf_with_sig_field(
-        pdf_bytes, page=0, position="rb", reason="Test", name="Test"
+        pdf_bytes, page=0, position="br", reason="Test", name="Test"
     )
     assert hex_start > 0
 
@@ -1616,14 +1616,14 @@ def test_re_sign_already_signed_pdf():
 
     # First signature
     prepared1, hex_start1, hex_len1 = prepare_pdf_with_sig_field(
-        pdf_bytes, page=0, position="rb", reason="First sig", name="Signer1"
+        pdf_bytes, page=0, position="br", reason="First sig", name="Signer1"
     )
     fake_cms = b"\x30\x82\x07\x00" + b"\xab" * 1788
     signed1 = insert_cms(prepared1, hex_start1, hex_len1, fake_cms)
 
     # Second signature on the already-signed PDF
     prepared2, hex_start2, hex_len2 = prepare_pdf_with_sig_field(
-        signed1, page=0, position="lt", reason="Second sig", name="Signer2"
+        signed1, page=0, position="tl", reason="Second sig", name="Signer2"
     )
     signed2 = insert_cms(prepared2, hex_start2, hex_len2, fake_cms)
 
@@ -1672,7 +1672,7 @@ def test_prepare_page_with_many_annots():
     pdf_bytes = buf.getvalue()
 
     prepared, hex_start, _hex_len = prepare_pdf_with_sig_field(
-        pdf_bytes, page=0, position="rb", reason="Test", name="Test"
+        pdf_bytes, page=0, position="br", reason="Test", name="Test"
     )
     assert hex_start > 0
 
@@ -1697,7 +1697,7 @@ def test_prepare_page_too_small_for_signature():
     pdf_bytes = _make_blank_pdf(page_size=(100, 100))
 
     with pytest.raises(PDFError, match="does not fit"):
-        prepare_pdf_with_sig_field(pdf_bytes, page=0, position="rb", reason="Test")
+        prepare_pdf_with_sig_field(pdf_bytes, page=0, position="br", reason="Test")
 
 
 # ── Large page count ─────────────────────────────────────────────────
@@ -1710,7 +1710,7 @@ def test_prepare_100_page_pdf():
     pdf_bytes = _make_blank_pdf(num_pages=100)
 
     prepared, hex_start, hex_len = prepare_pdf_with_sig_field(
-        pdf_bytes, page="last", position="rb", reason="Test", name="Test"
+        pdf_bytes, page="last", position="br", reason="Test", name="Test"
     )
     assert hex_start > 0
 
@@ -1740,7 +1740,7 @@ def test_prepare_object_stream_pdf_roundtrip():
     pdf_bytes = buf.getvalue()
 
     prepared, hex_start, hex_len = prepare_pdf_with_sig_field(
-        pdf_bytes, page=0, position="rb", reason="Test", name="Test"
+        pdf_bytes, page=0, position="br", reason="Test", name="Test"
     )
     assert hex_start > 0
 
@@ -1789,14 +1789,14 @@ def test_verify_all_double_signed():
 
     # First signature
     prepared1, hex_start1, hex_len1 = prepare_pdf_with_sig_field(
-        pdf_bytes, page=0, position="rb", reason="First", name="Signer1"
+        pdf_bytes, page=0, position="br", reason="First", name="Signer1"
     )
     fake_cms = b"\x30\x82\x07\x00" + b"\xab" * 1788
     signed1 = insert_cms(prepared1, hex_start1, hex_len1, fake_cms)
 
     # Second signature
     prepared2, hex_start2, hex_len2 = prepare_pdf_with_sig_field(
-        signed1, page=0, position="lt", reason="Second", name="Signer2"
+        signed1, page=0, position="tl", reason="Second", name="Signer2"
     )
     signed2 = insert_cms(prepared2, hex_start2, hex_len2, fake_cms)
 
@@ -1828,7 +1828,7 @@ def test_prepare_pdf_with_text_content():
     pdf_bytes = buf.getvalue()
 
     prepared, hex_start, hex_len = prepare_pdf_with_sig_field(
-        pdf_bytes, page=0, position="rb", reason="Test", name="Test"
+        pdf_bytes, page=0, position="br", reason="Test", name="Test"
     )
     assert hex_start > 0
 
@@ -1879,7 +1879,7 @@ def test_compute_sig_rect_custom_sig_dimensions():
     """Custom sig_w/sig_h should override defaults."""
     from revenant.core.pdf import compute_sig_rect
 
-    _x, _y, w, h = compute_sig_rect(612, 792, "left-bottom", sig_w=150, sig_h=60)
+    _x, _y, w, h = compute_sig_rect(612, 792, "bottom-left", sig_w=150, sig_h=60)
     assert w == 150
     assert h == 60
 

@@ -78,7 +78,7 @@ def test_sign_embedded_happy_path(valid_pdf_bytes, mock_transport, tmp_path):
             "pass",
             120,
             page=0,
-            position="rb",
+            position="br",
             name="Test User",
             reason="Test",
         )
@@ -181,7 +181,7 @@ def test_sign_embedded_permission_error_on_write(valid_pdf_bytes, mock_transport
             "pass",
             120,
             page=0,
-            position="rb",
+            position="br",
             name="Test",
         )
 
@@ -206,7 +206,7 @@ def test_sign_embedded_registers_tls(valid_pdf_bytes, mock_transport, tmp_path):
             "pass",
             120,
             page=0,
-            position="rb",
+            position="br",
             name="Test",
         )
 

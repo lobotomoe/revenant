@@ -2,7 +2,7 @@
 Signature field positioning and page geometry helpers.
 
 Computes where to place the signature rectangle on a PDF page,
-given a preset name ("right-bottom", "rb", etc.) or explicit coordinates.
+given a preset name ("bottom-right", "br", etc.) or explicit coordinates.
 """
 
 from __future__ import annotations
@@ -24,29 +24,29 @@ SIG_MARGIN_V = 60  # vertical margin from top/bottom edge (~21 mm)
 
 # Full names -> short aliases
 POSITION_ALIASES = {
-    "rb": "right-bottom",
-    "rt": "right-top",
-    "lb": "left-bottom",
-    "lt": "left-top",
-    "cb": "center-bottom",
+    "br": "bottom-right",
+    "tr": "top-right",
+    "bl": "bottom-left",
+    "tl": "top-left",
+    "bc": "bottom-center",
 }
 
 POSITION_PRESETS = {
-    "right-bottom",
-    "right-top",
-    "left-bottom",
-    "left-top",
-    "center-bottom",
+    "bottom-right",
+    "top-right",
+    "bottom-left",
+    "top-left",
+    "bottom-center",
 }
 
 
 def resolve_position(position_name: str) -> str:
     """Normalize a position name, resolving aliases.
 
-    >>> resolve_position("rb")
-    'right-bottom'
-    >>> resolve_position("right-bottom")
-    'right-bottom'
+    >>> resolve_position("br")
+    'bottom-right'
+    >>> resolve_position("bottom-right")
+    'bottom-right'
 
     Raises RevenantError for unknown positions.
     """
@@ -90,7 +90,7 @@ def parse_page_spec(page_str: str) -> str | int:
 def compute_sig_rect(
     page_width: float,
     page_height: float,
-    position: str = "right-bottom",
+    position: str = "bottom-right",
     sig_w: float = SIG_WIDTH,
     sig_h: float = SIG_HEIGHT,
     margin_h: float = SIG_MARGIN_H,
