@@ -32,9 +32,7 @@ APPDIR = DIST_DIR / "AppDir"
 _ARCH_MAP = {"x86_64": "x86_64", "aarch64": "aarch64", "arm64": "aarch64"}
 ARCH = _ARCH_MAP.get(platform.machine(), "")
 
-APPIMAGETOOL_BASE_URL = (
-    "https://github.com/AppImage/AppImageKit/releases/download/continuous"
-)
+APPIMAGETOOL_BASE_URL = "https://github.com/AppImage/AppImageKit/releases/download/continuous"
 APPIMAGETOOL_MIN_SIZE = 1_000_000  # legitimate appimagetool is > 1 MB
 APPIMAGETOOL_DOWNLOAD_TIMEOUT = 120  # seconds
 
