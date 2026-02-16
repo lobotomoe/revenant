@@ -41,6 +41,10 @@ jobs:
             platform: linux-x64
             cli_artifact: revenant
             gui_artifact: Revenant-x86_64.AppImage
+          - os: ubuntu-24.04-arm
+            platform: linux-arm64
+            cli_artifact: revenant
+            gui_artifact: Revenant-aarch64.AppImage
           - os: windows-latest
             platform: windows-x64
             cli_artifact: revenant.exe
@@ -251,7 +255,7 @@ jobs:
 
       # -- Build AppImage (Linux) ---------------------------------------
       - name: Build AppImage (Linux)
-        if: matrix.platform == 'linux-x64'
+        if: startsWith(matrix.platform, 'linux-')
         run: python scripts/build_appimage.py
 
       # -- Windows: Authenticode signing --------------------------------
@@ -348,7 +352,7 @@ jobs:
           name: gui-${{ matrix.platform }}
           path: |
             python/dist/Revenant-gui-${{ matrix.platform }}.dmg
-            python/dist/Revenant-x86_64.AppImage
+            python/dist/${{ matrix.gui_artifact }}
           if-no-files-found: error
 
       - name: Upload MSIX artifact

@@ -37,6 +37,7 @@ issues: https://github.com/lobotomoe/revenant/issues
 
 platforms:
   amd64:
+  arm64:
 
 apps:
   revenant:

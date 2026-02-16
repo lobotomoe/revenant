@@ -21,7 +21,8 @@ Pre-built binaries are available on the [Releases](https://github.com/lobotomoe/
 |----------|-----|-----|
 | **macOS (Apple Silicon)** | `revenant-cli-macos-arm64` | `Revenant-gui-macos-arm64.dmg` |
 | **Linux (x64)** | `revenant-cli-linux-x64` | `Revenant-x86_64.AppImage` |
-| **Windows (x64)** | `revenant-cli-windows-x64.zip` | `Revenant.msix` |
+| **Linux (ARM64)** | `revenant-cli-linux-arm64` | `Revenant-aarch64.AppImage` |
+| **Windows (x64)** | `revenant-windows-x64.zip` | `Revenant.msix` |
 
 ### Quick start (macOS)
 
@@ -32,7 +33,7 @@ chmod +x revenant-cli-macos-arm64
 ./revenant-cli-macos-arm64 setup
 ```
 
-### Quick start (Linux)
+### Quick start (Linux x64)
 
 ```bash
 # CLI
@@ -46,12 +47,26 @@ chmod +x Revenant-x86_64.AppImage
 ./Revenant-x86_64.AppImage
 ```
 
+### Quick start (Linux ARM64)
+
+```bash
+# CLI
+curl -LO https://github.com/lobotomoe/revenant/releases/latest/download/revenant-cli-linux-arm64
+chmod +x revenant-cli-linux-arm64
+./revenant-cli-linux-arm64 setup
+
+# GUI (AppImage)
+curl -LO https://github.com/lobotomoe/revenant/releases/latest/download/Revenant-aarch64.AppImage
+chmod +x Revenant-aarch64.AppImage
+./Revenant-aarch64.AppImage
+```
+
 ### Quick start (Windows)
 
-Download `revenant-cli-windows-x64.zip` from [Releases](https://github.com/lobotomoe/revenant/releases), extract, and run:
+Download `revenant-windows-x64.zip` from [Releases](https://github.com/lobotomoe/revenant/releases), extract, and run:
 
 ```powershell
-Expand-Archive revenant-cli-windows-x64.zip -DestinationPath revenant
+Expand-Archive revenant-windows-x64.zip -DestinationPath revenant
 .\revenant\revenant.exe setup
 ```
 
@@ -497,7 +512,7 @@ python scripts/build_appimage.py
 
 **Requires:** Python 3.10+, tkinter (`apt install python3-tk` for GUI).
 
-**Output:** `dist/revenant` (CLI), `dist/revenant-gui` (GUI), `dist/Revenant-x86_64.AppImage`
+**Output:** `dist/revenant` (CLI), `dist/revenant-gui` (GUI), `dist/Revenant-{arch}.AppImage` (e.g. `Revenant-x86_64.AppImage`, `Revenant-aarch64.AppImage`)
 
 ### Windows (CLI + GUI + MSIX)
 
