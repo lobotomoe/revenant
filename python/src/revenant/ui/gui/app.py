@@ -108,7 +108,7 @@ class RevenantGUI:
         self.image_path = tk.StringVar()
         self.output_path = tk.StringVar()
         self.signing_mode = tk.StringVar(value="embedded")
-        self.position = tk.StringVar(value="right-bottom")
+        self.position = tk.StringVar(value="bottom-right")
         self.page = tk.StringVar(value="last")
         self.font_key = tk.StringVar(value="noto-sans")
         self.invisible = tk.BooleanVar(value=False)

@@ -9,11 +9,12 @@ Prerequisites:
     - appimagetool must be available in PATH or will be downloaded
 
 Output:
-    dist/Revenant-x86_64.AppImage
+    dist/Revenant-{arch}.AppImage    (e.g. Revenant-x86_64.AppImage, Revenant-aarch64.AppImage)
 """
 
 import hashlib
 import os
+import platform
 import stat
 import subprocess
 import sys
@@ -26,22 +27,35 @@ DIST_DIR = PROJECT_DIR / "dist"
 APPIMAGE_DIR = PROJECT_DIR / "appimage"
 APPDIR = DIST_DIR / "AppDir"
 
-APPIMAGETOOL_URL = "https://github.com/AppImage/AppImageKit/releases/download/continuous/appimagetool-x86_64.AppImage"
+# ── Architecture detection ───────────────────────────────────────────
+
+_ARCH_MAP = {"x86_64": "x86_64", "aarch64": "aarch64", "arm64": "aarch64"}
+ARCH = _ARCH_MAP.get(platform.machine(), "")
+
+APPIMAGETOOL_BASE_URL = "https://github.com/AppImage/AppImageKit/releases/download/continuous"
 APPIMAGETOOL_MIN_SIZE = 1_000_000  # legitimate appimagetool is > 1 MB
 APPIMAGETOOL_DOWNLOAD_TIMEOUT = 120  # seconds
 
-# Pinned SHA-256 hash for supply chain integrity verification.
-# The 'continuous' release is mutable -- this hash ensures we detect changes.
+# Pinned SHA-256 hashes for supply chain integrity verification.
+# The 'continuous' release is mutable -- these hashes ensure we detect changes.
 # To update: download the new binary, verify it manually, then replace the hash.
-# Last pinned: 2026-02-14
-APPIMAGETOOL_SHA256 = "b90f4a8b18967545fda78a445b27680a1642f1ef9488ced28b65398f2be7add2"
+# Last pinned: 2026-02-16
+APPIMAGETOOL_SHA256 = {
+    "x86_64": "b90f4a8b18967545fda78a445b27680a1642f1ef9488ced28b65398f2be7add2",
+    "aarch64": "a48972e5ae91c944c5a7c80214e7e0a42dd6aa3ae979d8756203512a74ff574d",
+}
 
 
 def _check_platform():
-    """Verify we're on Linux."""
+    """Verify we're on Linux with a supported architecture."""
     if sys.platform != "linux":
         print("ERROR: AppImage can only be built on Linux", file=sys.stderr)
         sys.exit(1)
+    if not ARCH:
+        machine = platform.machine()
+        print(f"ERROR: Unsupported architecture: {machine}", file=sys.stderr)
+        sys.exit(1)
+    print(f"Architecture: {ARCH}")
 
 
 def _check_binary():
@@ -68,19 +82,21 @@ def _get_appimagetool():
         return "appimagetool"
 
     # Check local copy (verify hash before trusting)
+    expected_sha256 = APPIMAGETOOL_SHA256[ARCH]
     local_tool = DIST_DIR / "appimagetool"
     if local_tool.exists():
         local_hash = hashlib.sha256(local_tool.read_bytes()).hexdigest()
-        if local_hash == APPIMAGETOOL_SHA256:
+        if local_hash == expected_sha256:
             return str(local_tool)
         print(f"Local appimagetool hash mismatch (got {local_hash[:16]}...), re-downloading...")
         local_tool.unlink()
 
     # Download
-    print("Downloading appimagetool...")
+    url = f"{APPIMAGETOOL_BASE_URL}/appimagetool-{ARCH}.AppImage"
+    print(f"Downloading appimagetool ({ARCH})...")
     DIST_DIR.mkdir(parents=True, exist_ok=True)
 
-    with urllib.request.urlopen(APPIMAGETOOL_URL, timeout=APPIMAGETOOL_DOWNLOAD_TIMEOUT) as resp:
+    with urllib.request.urlopen(url, timeout=APPIMAGETOOL_DOWNLOAD_TIMEOUT) as resp:
         local_tool.write_bytes(resp.read())
 
     # Verify downloaded binary is plausible (size + ELF header)
@@ -101,11 +117,11 @@ def _get_appimagetool():
 
     # Verify SHA-256 hash to prevent supply chain attacks.
     actual_sha256 = hashlib.sha256(file_bytes).hexdigest()
-    if actual_sha256 != APPIMAGETOOL_SHA256:
+    if actual_sha256 != expected_sha256:
         local_tool.unlink()
         print(
             f"ERROR: SHA-256 hash mismatch for appimagetool.\n"
-            f"  Expected: {APPIMAGETOOL_SHA256}\n"
+            f"  Expected: {expected_sha256}\n"
             f"  Got:      {actual_sha256}\n"
             f"The 'continuous' release may have been updated. Verify the new\n"
             f"binary is legitimate, then update APPIMAGETOOL_SHA256 in this script.",
@@ -184,7 +200,7 @@ def _create_appdir(binary):
 
 def _build_appimage(appimagetool):
     """Run appimagetool to create AppImage."""
-    output = DIST_DIR / "Revenant-x86_64.AppImage"
+    output = DIST_DIR / f"Revenant-{ARCH}.AppImage"
 
     # Remove existing
     if output.exists():
@@ -194,7 +210,7 @@ def _build_appimage(appimagetool):
 
     # appimagetool needs ARCH env var
     env = os.environ.copy()
-    env["ARCH"] = "x86_64"
+    env["ARCH"] = ARCH
 
     result = subprocess.run(
         [appimagetool, str(APPDIR), str(output)],

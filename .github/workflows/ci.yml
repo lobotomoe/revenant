@@ -44,7 +44,7 @@ jobs:
           cache-dependency-path: python/pyproject.toml
 
       - name: Install ruff
-        run: pip install "ruff==0.15.1"
+        run: pip install --require-hashes --no-deps -r ../.github/requirements/lint.txt
 
       - name: Check formatting
         run: ruff format --check src/ tests/ scripts/
@@ -88,7 +88,10 @@ jobs:
           cache-dependency-path: python/pyproject.toml
 
       - name: Install dependencies
-        run: pip install -e ".[dev]" "pip-audit==2.10.0"
+        run: pip install -e ".[dev]"
+
+      - name: Install pip-audit
+        run: pip install "pip-audit==2.10.0"
 
       - name: Run pip-audit
         run: |
@@ -256,7 +259,7 @@ jobs:
           cache-dependency-path: python/pyproject.toml
 
       - name: Install build tools
-        run: pip install "build==1.4.0"
+        run: pip install --require-hashes -r .github/requirements/build.txt
 
       - name: Build sdist and wheel
         run: python -m build python/

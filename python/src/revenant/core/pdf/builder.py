@@ -63,7 +63,7 @@ def prepare_pdf_with_sig_field(
     y: float | None = None,
     w: float = SIG_WIDTH,
     h: float = SIG_HEIGHT,
-    position: str = "right-bottom",
+    position: str = "bottom-right",
     reason: str = "Signed with Revenant",
     name: str | None = None,
     image_path: str | None = None,
@@ -80,7 +80,7 @@ def prepare_pdf_with_sig_field(
     file bytes are unchanged.
 
     Position can be set in two ways:
-    - **Preset** (default): use ``position`` name like "right-bottom" or alias "rb".
+    - **Preset** (default): use ``position`` name like "bottom-right" or alias "br".
       Coordinates are computed from actual page dimensions.
     - **Manual**: pass explicit ``x`` and ``y`` to override the preset.
 
@@ -90,7 +90,7 @@ def prepare_pdf_with_sig_field(
         x, y: Manual coordinates (PDF points, origin = bottom-left).
             If None, computed from ``position`` preset.
         w, h: Signature field size in PDF points.
-        position: Preset name ("right-bottom", "rb", etc.).
+        position: Preset name ("bottom-right", "br", etc.).
             Ignored when x/y are provided explicitly.
         reason: Signature reason string.
         name: Signer display name (used for PDF /Name entry).

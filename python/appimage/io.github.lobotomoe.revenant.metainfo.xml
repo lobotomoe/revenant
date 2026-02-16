@@ -76,6 +76,17 @@
   </branding>
 
   <releases>
+    <release version="0.2.0" date="2026-02-16">
+      <description>
+        <p>Naming and convention fixes.</p>
+        <ul>
+          <li>Rename position presets to Y-first convention (bottom-right, top-left, etc.)</li>
+          <li>Rename position aliases to match (br, tl, tr, bl, bc)</li>
+          <li>Fix Windows artifact naming in CI (revenant-windows-x64.zip)</li>
+          <li>Fix integration tests TLS setup for env-var-only credentials</li>
+        </ul>
+      </description>
+    </release>
     <release version="0.1.0" date="2026-02-14">
       <description>
         <p>Initial alpha release with full signing and verification support.</p>

@@ -142,11 +142,11 @@ def main() -> None:
     p_sign.add_argument(
         "-p",
         "--position",
-        default="right-bottom",
+        default="bottom-right",
         help=(
-            "Signature position preset (default: right-bottom). "
-            "Presets: right-bottom (rb), right-top (rt), left-bottom (lb), "
-            "left-top (lt), center-bottom (cb)"
+            "Signature position preset (default: bottom-right). "
+            "Presets: bottom-right (br), top-right (tr), bottom-left (bl), "
+            "top-left (tl), bottom-center (bc)"
         ),
     )
     p_sign.add_argument(
