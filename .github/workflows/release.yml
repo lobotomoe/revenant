@@ -562,7 +562,7 @@ jobs:
           sed -i "s/^version = .*/version = \"$VERSION\"/" python/pyproject.toml
 
       - name: Install build tools
-        run: pip install "build==1.4.0"
+        run: pip install --require-hashes -r .github/requirements/build.txt
 
       - name: Build sdist and wheel
         run: python -m build python/
@@ -608,7 +608,7 @@ jobs:
           sed -i "s/^version = .*/version = \"$VERSION\"/" python/pyproject.toml
 
       - name: Install build tools
-        run: pip install "build==1.4.0"
+        run: pip install --require-hashes -r .github/requirements/build.txt
 
       - name: Build sdist and wheel
         run: python -m build python/
