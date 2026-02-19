@@ -73,6 +73,10 @@ This is an **unofficial**, independently developed client. It is not affiliated 
 - You are responsible for safeguarding your CoSign credentials and for all signatures made using this tool
 - This tool communicates with CoSign servers using the documented [OASIS DSS](https://docs.oasis-open.org/dss/v1.0/oasis-dss-core-spec-v1.0-os.pdf) SOAP protocol — the same public API described in the [official API Guide](https://www.docusign.com/sites/default/files/Signature_Appliance_API_Guide_8.0.pdf). No proprietary software is reverse-engineered or redistributed
 
+## Privacy
+
+This program does not collect, transmit, or share any data with the developer or third parties. It communicates only with the CoSign server you configure. See [Privacy Policy](docs/privacy-policy.md).
+
 ## License
 
 Apache 2.0

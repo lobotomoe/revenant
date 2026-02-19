@@ -86,6 +86,37 @@ pip install -e ".[secure]"        # + secure credential storage (keyring)
 pip install -e ".[dev]"           # + development tools (pytest, ruff, pyright)
 ```
 
+## Uninstall
+
+```bash
+# PyPI
+pip uninstall revenant
+
+# Snap Store
+sudo snap remove revenant
+
+# Homebrew (macOS)
+brew uninstall lobotomoe/revenant/revenant
+```
+
+**Pre-built binaries:** delete the downloaded file (`revenant-cli-*`, `Revenant-*.AppImage`, etc.).
+
+**macOS DMG:** drag `Revenant.app` from `/Applications` to Trash.
+
+**Windows MSIX:** Settings > Apps > Revenant > Uninstall.
+
+**Remove configuration and saved credentials:**
+
+```bash
+revenant reset                # clears ~/.revenant/config.json
+```
+
+If you used keyring (secure credential storage), the password is stored in your system keychain. To remove it:
+
+- **macOS:** Keychain Access > search "revenant" > delete entry
+- **Linux:** `secret-tool clear service revenant`
+- **Windows:** Credential Manager > Windows Credentials > search "revenant" > remove
+
 ## Quick start (library)
 
 ```python
