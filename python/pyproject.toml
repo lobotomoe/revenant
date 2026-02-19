@@ -118,6 +118,7 @@ pythonpath = ["src"]
 markers = [
     "integration: requires live CoSign server and REVENANT_USER/REVENANT_PASS env vars",
 ]
+strict_markers = true
 addopts = "-m 'not integration' --cov=revenant --cov-report=term-missing:skip-covered --cov-fail-under=90"
 
 # ── Coverage ───────────────────────────────────────────────────────────
