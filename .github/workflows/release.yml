@@ -618,3 +618,64 @@ jobs:
         with:
           packages-dir: python/dist/
           attestations: true
+
+  update-homebrew:
+    name: Update Homebrew Tap
+    needs: release
+    if: ${{ !contains(github.ref_name, '-') }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    permissions:
+      contents: read
+
+    steps:
+      - uses: step-security/harden-runner@5ef0c079ce82195b2a36a210272d6b661572d83e # v2
+        with:
+          egress-policy: audit
+
+      - name: Download macOS ARM64 CLI binary
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          gh release download "$GITHUB_REF_NAME" \
+            --repo "$GITHUB_REPOSITORY" \
+            --pattern "revenant-cli-macos-arm64" \
+            --dir .
+
+      - name: Update formula in tap repository
+        env:
+          GH_TOKEN: ${{ secrets.HOMEBREW_TAP_TOKEN }}
+        run: |
+          VERSION="${GITHUB_REF_NAME#v}"
+          SHA256=$(sha256sum revenant-cli-macos-arm64 | awk '{print $1}')
+          FILE_SHA=$(gh api repos/lobotomoe/homebrew-revenant/contents/Formula/revenant.rb --jq '.sha')
+
+          cat > /tmp/revenant.rb << RUBY
+          class Revenant < Formula
+            desc "Electronic document signing with ARX CoSign (SOAP/DSS)"
+            homepage "https://github.com/lobotomoe/revenant"
+            license "Apache-2.0"
+            version "$VERSION"
+
+            url "https://github.com/lobotomoe/revenant/releases/download/v#{version}/revenant-cli-macos-arm64"
+            sha256 "$SHA256"
+
+            depends_on :macos
+            depends_on arch: :arm64
+
+            def install
+              bin.install "revenant-cli-macos-arm64" => "revenant"
+            end
+
+            test do
+              assert_match version.to_s, shell_output("#{bin}/revenant --version")
+            end
+          end
+          RUBY
+
+          CONTENT=$(base64 -w 0 /tmp/revenant.rb)
+          gh api repos/lobotomoe/homebrew-revenant/contents/Formula/revenant.rb \
+            --method PUT \
+            --field message="revenant $VERSION" \
+            --field content="$CONTENT" \
+            --field sha="$FILE_SHA"
