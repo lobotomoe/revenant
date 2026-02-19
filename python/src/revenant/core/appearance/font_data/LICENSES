@@ -1,0 +1,69 @@
+Bundled Font Licenses
+=====================
+
+This directory contains subset fonts used for PDF signature visual
+appearances. Only the glyphs needed for signature fields are included.
+
+
+Noto Sans (NotoSans-Subset.ttf)
+--------------------------------
+Source:     NotoSans-Regular.ttf + NotoSansArmenian-Regular.ttf
+            Google Noto Fonts (https://fonts.google.com/noto)
+Copyright:  2012 Google Inc. All Rights Reserved.
+License:    SIL Open Font License, Version 1.1 (https://openfontlicense.org)
+
+The OFL permits use, modification, and redistribution (including in
+binary/embedded form) provided the fonts are not sold by themselves.
+Full license: https://github.com/notofonts/noto-fonts/blob/main/LICENSE
+
+
+GHEA Grapalat (GHEAGrapalat-Subset.ttf)
+-----------------------------------------
+Source:     GHEAGrapalat-Regular.ttf
+Designer:   Edik Ghabuzyan (2008), National Book Chamber of Armenia
+Copyright:  "Armenian National Grapalat" SNCO (National Book Chamber),
+            a state non-commercial organization of the Republic of Armenia.
+
+Legal basis:
+  Government of the Republic of Armenia, Decree N 1259-N,
+  adopted September 24, 2010, effective October 8, 2010.
+  Signed by Prime Minister Tigran Sargsyan.
+
+  Official title (Armenian):
+    "Hayastani Hanrapetutyan petakan pashtonakan p'astatghtashrjanarhutyan
+    mej kirarhman hamar partadir haykakan hamakargchayin taratesaktner
+    hastatelu masin"
+  (On Establishing Armenian Computer Fonts Mandatory for Use in RA State
+  Official Document Circulation)
+
+  Sources:
+    - ARLIS (Armenian Legal Information System): docid=61217
+      https://www.arlis.am/DocumentView.aspx?docid=61217
+    - e-gov.am: decree item 18506
+      https://www.e-gov.am/gov-decrees/item/18506
+    - Full text (PDF):
+      https://www.e-gov.am/u_files/file/decrees/kar/2010/09/10_1259.pdf
+
+  Article 2 of the decree declares both fonts property of the Republic
+  of Armenia and grants unrestricted free use to all natural persons
+  (individuals) and legal entities in electronic information and
+  communication systems.
+
+  The decree was adopted with reference to the provisions of the RA Law
+  on Copyrights.
+
+No standardized open-source license (SIL OFL, MIT, etc.) is attached.
+The legal basis for redistribution is the government decree granting
+unrestricted free use in electronic information systems.
+
+
+GHEA Mariam (GHEAMariam-Subset.ttf)
+-------------------------------------
+Source:     GHEAMariamReg.otf
+Designer:   Edik Ghabuzyan (2008), National Book Chamber of Armenia
+Copyright:  "Armenian National Grapalat" SNCO (National Book Chamber),
+            a state non-commercial organization of the Republic of Armenia.
+
+Legal basis:
+  Same as GHEA Grapalat above (Decree N 1259-N, September 24, 2010).
+  Article 2 grants the same unrestricted free use rights.
