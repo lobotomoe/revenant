@@ -7,6 +7,23 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- Linux ARM64 build support in CI
+
+## [0.2.0] - 2026-02-16
+
+### Changed
+
+- **BREAKING:** Position preset names renamed to Y-first (CSS/UI) convention: `right-bottom` -> `bottom-right`, `right-top` -> `top-right`, `left-bottom` -> `bottom-left`, `left-top` -> `top-left`, `center-bottom` -> `bottom-center`. Short aliases updated accordingly (`rb` -> `br`, `rt` -> `tr`, etc.)
+- Windows release artifact renamed from `revenant-cli-windows-x64.zip` to `revenant-windows-x64.zip` (contains both CLI and GUI)
+
+### Fixed
+
+- MAS build: include sandbox entitlements when signing outer .app bundle
+- Snap: use `adopt-info` for version instead of `git describe`
+- Integration tests TLS setup for env-var-only credentials
+
 ## [0.1.0] - 2026-02-14
 
 ### Added
@@ -31,5 +48,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Pyright strict mode type checking with 0 errors
 - 96%+ test coverage (600+ tests)
 
-[Unreleased]: https://github.com/lobotomoe/revenant/compare/v0.1.0...HEAD
+[Unreleased]: https://github.com/lobotomoe/revenant/compare/v0.2.0...HEAD
+[0.2.0]: https://github.com/lobotomoe/revenant/compare/v0.1.0...v0.2.0
 [0.1.0]: https://github.com/lobotomoe/revenant/releases/tag/v0.1.0
