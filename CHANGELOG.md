@@ -7,9 +7,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.2.1] - 2026-02-20
+
 ### Added
 
-- Linux ARM64 build support in CI
+- Linux ARM64 build support
+- Automatic Homebrew tap update on release
 
 ## [0.2.0] - 2026-02-16
 
@@ -48,6 +51,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Pyright strict mode type checking with 0 errors
 - 96%+ test coverage (600+ tests)
 
-[Unreleased]: https://github.com/lobotomoe/revenant/compare/v0.2.0...HEAD
+[Unreleased]: https://github.com/lobotomoe/revenant/compare/v0.2.1...HEAD
+[0.2.1]: https://github.com/lobotomoe/revenant/compare/v0.2.0...v0.2.1
 [0.2.0]: https://github.com/lobotomoe/revenant/compare/v0.1.0...v0.2.0
 [0.1.0]: https://github.com/lobotomoe/revenant/releases/tag/v0.1.0
