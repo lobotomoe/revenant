@@ -76,6 +76,15 @@
   </branding>
 
   <releases>
+    <release version="0.2.1" date="2026-02-20">
+      <description>
+        <p>Distribution improvements.</p>
+        <ul>
+          <li>Add Linux ARM64 build support</li>
+          <li>Automatic Homebrew tap update on release</li>
+        </ul>
+      </description>
+    </release>
     <release version="0.2.0" date="2026-02-16">
       <description>
         <p>Naming and convention fixes.</p>
