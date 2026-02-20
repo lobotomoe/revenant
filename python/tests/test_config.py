@@ -1159,7 +1159,7 @@ def test_config_layer_after_reset(config_dir):
 
 
 def test_version_fallback_on_missing_package():
-    """__version__ falls back to '0.2.0' when package metadata is unavailable."""
+    """__version__ falls back to hardcoded version when package metadata is unavailable."""
     import importlib
     import importlib.metadata
 
@@ -1172,7 +1172,7 @@ def test_version_fallback_on_missing_package():
         import revenant.constants
 
         importlib.reload(revenant.constants)
-        assert revenant.constants.__version__ == "0.2.0"
+        assert revenant.constants.__version__ == "0.2.1"
 
     # Reload again to restore real version
     importlib.reload(revenant.constants)
