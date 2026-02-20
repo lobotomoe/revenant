@@ -406,6 +406,14 @@ jobs:
       - name: Build with py2app
         run: python scripts/build.py mac --no-dmg
 
+      # -- Embed provisioning profile ----------------------------------
+      - name: Embed provisioning profile
+        if: env.MAS_SIGN
+        run: |
+          echo "${{ secrets.MAS_PROVISIONING_PROFILE_BASE64 }}" | base64 --decode \
+            > dist/Revenant.app/Contents/embedded.provisionprofile
+          echo "Embedded provisioning profile ($(wc -c < dist/Revenant.app/Contents/embedded.provisionprofile) bytes)"
+
       # -- Codesign for MAS --------------------------------------------
       - name: Codesign .app bundle (MAS)
         if: env.MAS_SIGN

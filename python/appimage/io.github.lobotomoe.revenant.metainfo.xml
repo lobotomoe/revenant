@@ -76,6 +76,14 @@
   </branding>
 
   <releases>
+    <release version="0.2.2" date="2026-02-21">
+      <description>
+        <p>Mac App Store fix.</p>
+        <ul>
+          <li>Embed provisioning profile in MAS build for TestFlight and App Store submission</li>
+        </ul>
+      </description>
+    </release>
     <release version="0.2.1" date="2026-02-20">
       <description>
         <p>Distribution improvements.</p>
