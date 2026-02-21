@@ -1,0 +1,7 @@
+# Runtime dependencies (must match pyproject.toml [project.dependencies])
+pikepdf>=8.0,<11
+asn1crypto>=1.5,<2
+tlslite-ng>=0.8.0,<0.9
+defusedxml>=0.7,<1
+# Build extras (must match pyproject.toml [project.optional-dependencies] build)
+pyinstaller>=6.0,<7

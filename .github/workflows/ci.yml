@@ -88,10 +88,12 @@ jobs:
           cache-dependency-path: python/pyproject.toml
 
       - name: Install dependencies
-        run: pip install -e ".[dev]"
+        run: |
+          pip install --require-hashes --no-deps -r ../.github/requirements/dev.txt
+          pip install --no-deps -e .
 
       - name: Install pip-audit
-        run: pip install "pip-audit==2.10.0"
+        run: pip install --require-hashes --no-deps -r ../.github/requirements/audit.txt
 
       - name: Run pip-audit
         run: |
@@ -148,7 +150,9 @@ jobs:
           cache-dependency-path: python/pyproject.toml
 
       - name: Install dependencies
-        run: pip install -e ".[dev]"
+        run: |
+          pip install --require-hashes --no-deps -r ../.github/requirements/dev.txt
+          pip install --no-deps -e .
 
       - name: Run pyright
         run: pyright src/
@@ -181,7 +185,9 @@ jobs:
           cache-dependency-path: python/pyproject.toml
 
       - name: Install dependencies
-        run: pip install -e ".[dev]"
+        run: |
+          pip install --require-hashes --no-deps -r ../.github/requirements/dev.txt
+          pip install --no-deps -e .
 
       - name: Run tests
         run: pytest -v --junitxml=junit.xml
@@ -259,7 +265,7 @@ jobs:
           cache-dependency-path: python/pyproject.toml
 
       - name: Install build tools
-        run: pip install --require-hashes -r .github/requirements/build.txt
+        run: pip install --require-hashes --no-deps -r .github/requirements/build.txt
 
       - name: Build sdist and wheel
         run: python -m build python/
@@ -301,10 +307,11 @@ jobs:
         shell: bash
         run: |
           if [ "$RUNNER_OS" = "Windows" ]; then
-            pip install -e ".[build-win]"
+            pip install --require-hashes --no-deps -r ../.github/requirements/build-windows.txt
           else
-            pip install -e ".[build]"
+            pip install --require-hashes --no-deps -r ../.github/requirements/build-linux.txt
           fi
+          pip install --no-deps -e .
 
       - name: Build CLI binary
         run: python scripts/build.py cli

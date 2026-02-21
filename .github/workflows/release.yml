@@ -89,12 +89,13 @@ jobs:
         shell: bash
         run: |
           if [ "$RUNNER_OS" = "Windows" ]; then
-            pip install -e ".[build-win]"
+            pip install --require-hashes --no-deps -r ../.github/requirements/build-windows.txt
           elif [ "$RUNNER_OS" = "macOS" ]; then
-            pip install -e ".[build,build-mac]"
+            pip install --require-hashes --no-deps -r ../.github/requirements/build-macos.txt
           else
-            pip install -e ".[build]"
+            pip install --require-hashes --no-deps -r ../.github/requirements/build-linux.txt
           fi
+          pip install --no-deps -e .
 
       # -- macOS: import signing certificate ----------------------------
       - name: Import code-signing certificate
@@ -394,7 +395,9 @@ jobs:
           cache-dependency-path: python/pyproject.toml
 
       - name: Install dependencies
-        run: pip install -e ".[build-mac]"
+        run: |
+          pip install --require-hashes --no-deps -r ../.github/requirements/build-macos.txt
+          pip install --no-deps -e .
 
       - name: Import MAS signing certificate
         if: env.MAS_SIGN
@@ -571,7 +574,7 @@ jobs:
           sed -i "s/^version = .*/version = \"$VERSION\"/" python/pyproject.toml
 
       - name: Install build tools
-        run: pip install --require-hashes -r .github/requirements/build.txt
+        run: pip install --require-hashes --no-deps -r .github/requirements/build.txt
 
       - name: Build sdist and wheel
         run: python -m build python/
@@ -617,7 +620,7 @@ jobs:
           sed -i "s/^version = .*/version = \"$VERSION\"/" python/pyproject.toml
 
       - name: Install build tools
-        run: pip install --require-hashes -r .github/requirements/build.txt
+        run: pip install --require-hashes --no-deps -r .github/requirements/build.txt
 
       - name: Build sdist and wheel
         run: python -m build python/
