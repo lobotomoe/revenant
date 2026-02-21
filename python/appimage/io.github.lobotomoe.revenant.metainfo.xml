@@ -76,6 +76,14 @@
   </branding>
 
   <releases>
+    <release version="0.2.3" date="2026-02-21">
+      <description>
+        <p>Mac App Store fix.</p>
+        <ul>
+          <li>Add application identifier to sandbox entitlements for TestFlight compatibility</li>
+        </ul>
+      </description>
+    </release>
     <release version="0.2.2" date="2026-02-21">
       <description>
         <p>Mac App Store fix.</p>
