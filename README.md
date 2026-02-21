@@ -12,6 +12,7 @@
 [![coverage: 96%](https://img.shields.io/badge/coverage-96%25-brightgreen)](python/pyproject.toml)
 [![License: Apache 2.0](https://img.shields.io/badge/license-Apache%202.0-blue.svg)](LICENSE)
 [![Code style: ruff](https://img.shields.io/badge/code%20style-ruff-000000.svg)](https://docs.astral.sh/ruff/)
+[![OpenSSF Scorecard](https://api.scorecard.dev/projects/github.com/lobotomoe/revenant/badge)](https://scorecard.dev/viewer/?uri=github.com/lobotomoe/revenant)
 
 Cross-platform clients for [DocuSign Signature Appliance (DSA)](https://www.docusign.com/products/hybrid-cloud-appliances) (formerly ARX CoSign) electronic signatures via the SOAP API (OASIS DSS standard).
 

@@ -1,0 +1,12 @@
+# Runtime dependencies (must match pyproject.toml [project.dependencies])
+pikepdf>=8.0,<11
+asn1crypto>=1.5,<2
+tlslite-ng>=0.8.0,<0.9
+defusedxml>=0.7,<1
+# Dev extras (must match pyproject.toml [project.optional-dependencies] dev, minus ruff)
+pytest>=7.0,<10
+pytest-cov>=4.0,<8
+pyright>=1.1,<2.0
+pillow>=12.1.1,<13
+keyring>=21.0,<26
+fonttools>=4.0,<5
