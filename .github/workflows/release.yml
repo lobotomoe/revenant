@@ -427,12 +427,13 @@ jobs:
               --sign "$IDENTITY" {} \;
 
           # Sign framework main binaries (Tcl, Tk, Python -- no file extension)
+          # Use nested entitlements (no application-identifier) to avoid ITMS-90885
           find "dist/Revenant.app/Contents/Frameworks" \
             -type f ! -name '*.*' | while read -r bin; do
             if file "$bin" | grep -q "Mach-O"; then
               echo "  signing framework binary: $bin"
               codesign --force --timestamp --options runtime \
-                --entitlements entitlements-sandbox.plist \
+                --entitlements entitlements-sandbox-nested.plist \
                 --sign "$IDENTITY" "$bin"
             fi
           done
@@ -440,7 +441,7 @@ jobs:
           # Sign Python interpreter in MacOS/
           if [ -f "dist/Revenant.app/Contents/MacOS/python" ]; then
             codesign --force --timestamp --options runtime \
-              --entitlements entitlements-sandbox.plist \
+              --entitlements entitlements-sandbox-nested.plist \
               --sign "$IDENTITY" \
               "dist/Revenant.app/Contents/MacOS/python"
           fi

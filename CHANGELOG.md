@@ -7,6 +7,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.2.4] - 2026-02-21
+
+### Fixed
+
+- MAS build: use separate entitlements for nested executables to avoid ITMS-90885
+
 ## [0.2.3] - 2026-02-21
 
 ### Fixed
@@ -63,7 +69,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Pyright strict mode type checking with 0 errors
 - 96%+ test coverage (600+ tests)
 
-[Unreleased]: https://github.com/lobotomoe/revenant/compare/v0.2.3...HEAD
+[Unreleased]: https://github.com/lobotomoe/revenant/compare/v0.2.4...HEAD
+[0.2.4]: https://github.com/lobotomoe/revenant/compare/v0.2.3...v0.2.4
 [0.2.3]: https://github.com/lobotomoe/revenant/compare/v0.2.2...v0.2.3
 [0.2.2]: https://github.com/lobotomoe/revenant/compare/v0.2.1...v0.2.2
 [0.2.1]: https://github.com/lobotomoe/revenant/compare/v0.2.0...v0.2.1
