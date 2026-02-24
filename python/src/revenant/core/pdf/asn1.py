@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: Apache-2.0
 """ASN.1/DER parsing utilities for CMS signature extraction."""
 
 from __future__ import annotations

@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: Apache-2.0
 """Shared signing and verification workflows.
 
 UI-agnostic orchestration of signing and verification operations.

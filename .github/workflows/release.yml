@@ -631,6 +631,109 @@ jobs:
           packages-dir: python/dist/
           attestations: true
 
+  publish-npm:
+    name: Publish to npm
+    needs: release
+    if: ${{ !contains(github.ref_name, '-') }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    environment: npm
+    permissions:
+      contents: read
+      id-token: write
+    defaults:
+      run:
+        working-directory: typescript
+
+    steps:
+      - uses: step-security/harden-runner@5ef0c079ce82195b2a36a210272d6b661572d83e # v2
+        with:
+          egress-policy: audit
+
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6
+        with:
+          persist-credentials: false
+
+      - uses: pnpm/action-setup@41ff72655975bd51cab0327fa583b6e92b6d3061 # v4
+        with:
+          version: 9
+
+      - name: Set up Node.js
+        uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
+        with:
+          node-version: "22"
+          cache: pnpm
+          cache-dependency-path: typescript/pnpm-lock.yaml
+          registry-url: "https://registry.npmjs.org"
+
+      - name: Set version from tag
+        run: |
+          VERSION="${GITHUB_REF_NAME#v}"
+          npm version "$VERSION" --no-git-tag-version
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Build
+        run: pnpm build
+
+      - name: Publish
+        run: pnpm publish --no-git-checks --access public
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+
+  publish-npm-prerelease:
+    name: Publish to npm (pre-release)
+    needs: release
+    if: ${{ contains(github.ref_name, '-') }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    environment: npm
+    permissions:
+      contents: read
+      id-token: write
+    defaults:
+      run:
+        working-directory: typescript
+
+    steps:
+      - uses: step-security/harden-runner@5ef0c079ce82195b2a36a210272d6b661572d83e # v2
+        with:
+          egress-policy: audit
+
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6
+        with:
+          persist-credentials: false
+
+      - uses: pnpm/action-setup@41ff72655975bd51cab0327fa583b6e92b6d3061 # v4
+        with:
+          version: 9
+
+      - name: Set up Node.js
+        uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
+        with:
+          node-version: "22"
+          cache: pnpm
+          cache-dependency-path: typescript/pnpm-lock.yaml
+          registry-url: "https://registry.npmjs.org"
+
+      - name: Set version from tag
+        run: |
+          TAG="${GITHUB_REF_NAME#v}"
+          # Convert semver pre-release: 0.2.5-alpha.1 -> 0.2.5-alpha.1 (npm supports semver natively)
+          npm version "$TAG" --no-git-tag-version
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Build
+        run: pnpm build
+
+      - name: Publish
+        run: pnpm publish --no-git-checks --access public --tag next
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+
   update-homebrew:
     name: Update Homebrew Tap
     needs: release

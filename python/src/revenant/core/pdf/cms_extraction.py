@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: Apache-2.0
 """ByteRange and CMS extraction from signed PDFs."""
 
 from __future__ import annotations

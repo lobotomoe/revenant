@@ -6,36 +6,56 @@ Thank you for your interest in contributing to Revenant.
 
 ### Prerequisites
 
-- Python 3.10 or later
-- Git
+**Python client:**
+- Python 3.10+
+- [ruff](https://docs.astral.sh/ruff/) (linting/formatting)
+- [pyright](https://github.com/microsoft/pyright) (type checking)
+
+**TypeScript client:**
+- Node.js 18+
+- [pnpm](https://pnpm.io/)
 
 ### Development Setup
 
 ```bash
-git clone https://github.com/lobotomoe/revenant.git
-cd revenant/python
+# Python
+cd python
+python -m venv .venv
+source .venv/bin/activate
 pip install -e ".[dev]"
+
+# TypeScript
+cd typescript
+pnpm install
 ```
 
 ### Running Checks
 
 ```bash
-# Lint and format
-ruff check src/ tests/ scripts/
-ruff format --check src/ tests/ scripts/
+# Python
+cd python
+ruff check src/ tests/          # lint
+ruff format --check src/ tests/ # format check
+pyright src/                    # type check (strict, 0 errors expected)
+pytest                          # tests (96%+ coverage)
 
-# Type check (strict mode, 0 errors expected)
-pyright src/
-
-# Tests (expects 96%+ coverage)
-pytest
-
-# Security audit
-pip install pip-audit
-pip-audit --skip-editable --ignore-vuln CVE-2024-23342
+# TypeScript
+cd typescript
+pnpm lint                       # lint (Biome)
+pnpm typecheck                  # type check (tsc --noEmit)
+pnpm test                       # tests (Vitest, 96%+ coverage)
+pnpm build                      # build
 ```
 
-All four checks must pass before submitting a pull request. CI runs them automatically.
+Or use the root Makefile:
+
+```bash
+make check    # lint + typecheck + test (both languages)
+make lint     # lint both
+make test     # test both
+```
+
+All checks must pass before submitting a pull request. CI runs them automatically.
 
 ## How to Contribute
 
@@ -54,18 +74,42 @@ Open an [issue](https://github.com/lobotomoe/revenant/issues) with:
 
 1. Fork the repository and create a branch from `main`
 2. Make your changes
-3. Ensure all checks pass (lint, typecheck, tests, audit)
-4. Submit a pull request against `main`
+3. Ensure all checks pass (lint, typecheck, tests)
+4. Fill out the PR template
+5. Submit a pull request against `main`
 
 Keep PRs focused on a single change. If you're fixing a bug and want to refactor nearby code, split them into separate PRs.
 
-## Code Style
+### PR Checklist
+
+- [ ] Linter passes with zero warnings
+- [ ] Type checker passes with zero errors
+- [ ] Tests pass on all supported versions
+- [ ] Coverage thresholds met (90%+ Python, 96%+ TypeScript)
+- [ ] No unused code, imports, or files
+
+## Code Standards
+
+### Both Languages
 
 - **Language:** All code, comments, and commit messages in English
-- **Formatting:** ruff (no configuration needed, uses `pyproject.toml`)
+- **No magic numbers or strings** -- use named constants
+- **Explicit error handling** -- no silent catches, no swallowed errors
+- **Files under 400 lines** -- split by responsibility when they grow
+
+### Python
+
+- **Formatting:** ruff (config in `pyproject.toml`)
 - **Type hints:** Required on all function signatures, pyright strict mode
 - **Docstrings:** Module-level required, Google style for public functions
 - **Imports:** isort order (stdlib, third-party, first-party), relative within package
+
+### TypeScript
+
+- **`as` type assertions are banned** -- use runtime checks or Zod validation (`as const` is allowed)
+- **Formatting:** Biome (config in `biome.json`)
+- **Zod validation** for all external data (API responses, file contents, env vars)
+- **No `any` types** -- the codebase is strict TypeScript
 
 ## Commit Messages
 

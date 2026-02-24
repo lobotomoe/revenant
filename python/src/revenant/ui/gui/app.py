@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: Apache-2.0
 # pyright: reportUnknownMemberType=false, reportUnknownArgumentType=false
 """
 Minimal cross-platform GUI for Revenant PDF signing.

@@ -140,11 +140,8 @@ def test_http_get_auto_detect_standard():
 
 
 def test_http_get_auto_detect_legacy():
-    """Pre-registered legacy host: urllib fails -> fallback to legacy, cache as legacy."""
+    """Unknown host: urllib fails with SSL error -> fallback to legacy, cache as legacy."""
     import urllib.error
-
-    # Host must be pre-registered for legacy TLS fallback to occur
-    transport.register_host_tls("old-server.com", True)
 
     with (
         patch.object(
@@ -159,19 +156,21 @@ def test_http_get_auto_detect_legacy():
     assert transport._host_legacy_tls["old-server.com"] is True
 
 
-def test_http_get_auto_detect_unknown_no_legacy_fallback():
-    """Unknown host: urllib fails -> no silent fallback to legacy TLS."""
+def test_http_get_auto_detect_falls_back_on_ssl_error():
+    """Unknown host: urllib fails with SSL error -> automatic legacy TLS fallback."""
     import urllib.error
 
     with (
         patch.object(
             transport,
             "_safe_urlopen",
-            side_effect=urllib.error.URLError("SSL error"),
+            side_effect=urllib.error.URLError("SSL: CERTIFICATE_VERIFY_FAILED"),
         ),
-        pytest.raises(TLSError, match="legacy TLS"),
+        patch.object(transport, "legacy_request", return_value=b"fallback response"),
     ):
-        transport.http_get("https://unknown-server.com/path")
+        result = transport.http_get("https://unknown-server.com/path")
+        assert result == b"fallback response"
+    assert transport._host_legacy_tls["unknown-server.com"] is True
 
 
 # ── http_post (legacy path) ─────────────────────────────────────────
@@ -224,8 +223,8 @@ def test_http_post_standard_success():
         assert result == b"urllib post response"
 
 
-def test_http_post_unknown_host_defaults_standard():
-    """Unknown host: POST defaults to standard HTTPS."""
+def test_http_post_unknown_host_auto_detects_standard():
+    """Unknown host: POST auto-detects standard HTTPS."""
     mock_response = _make_urllib_response(b"default response")
 
     with patch.object(transport, "_safe_urlopen", return_value=mock_response):
@@ -234,6 +233,28 @@ def test_http_post_unknown_host_defaults_standard():
             b"body",
         )
         assert result == b"default response"
+    assert transport._host_legacy_tls["unknown.example.com"] is False
+
+
+def test_http_post_unknown_host_auto_detects_legacy():
+    """Unknown host: POST auto-detects legacy TLS on SSL error."""
+    import urllib.error
+
+    with (
+        patch.object(
+            transport,
+            "_safe_urlopen",
+            side_effect=urllib.error.URLError("SSL error"),
+        ),
+        patch.object(transport, "legacy_request", return_value=b"legacy post response"),
+    ):
+        result = transport.http_post(
+            "https://legacy-post.example.com/api",
+            b"body",
+            headers={"Content-Type": "text/xml"},
+        )
+        assert result == b"legacy post response"
+    assert transport._host_legacy_tls["legacy-post.example.com"] is True
 
 
 # ── legacy_request internals ─────────────────────────────────────────

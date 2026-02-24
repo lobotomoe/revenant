@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: Apache-2.0
 """Signature visual appearance — layout, fonts, and image handling."""
 
 from .fields import extract_cert_fields, extract_display_fields, format_utc_offset, make_date_str

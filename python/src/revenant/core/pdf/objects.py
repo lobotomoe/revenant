@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: Apache-2.0
 """Low-level PDF object construction.
 
 Types, constants, and helpers for building PDF objects used in

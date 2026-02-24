@@ -44,7 +44,7 @@ No other files are created or modified outside of the documents you explicitly s
 
 Revenant offers two methods for storing your CoSign password:
 
-1. **System keychain** (recommended) -- when the `keyring` package is installed, your password is stored in your operating system's secure credential store (macOS Keychain, Windows Credential Manager, or Linux Secret Service). The developer has no access to these credentials.
+1. **System keychain** (recommended) -- when the `keyring` (Python) or `keytar` (Node.js) package is installed, your password is stored in your operating system's secure credential store (macOS Keychain, Windows Credential Manager, or Linux Secret Service). The developer has no access to these credentials.
 
 2. **Local configuration file** (fallback) -- if `keyring` is not available, your password is stored in `~/.revenant/config.json` with restricted file permissions (`0600`). Revenant warns you when this fallback is used.
 

@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: Apache-2.0
 """
 Font registry and text rendering for PDF signature appearances.
 

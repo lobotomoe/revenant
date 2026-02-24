@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: Apache-2.0
 """Low-level PDF object construction for signature fields.
 
 Builds the individual PDF objects that form a signature's visual

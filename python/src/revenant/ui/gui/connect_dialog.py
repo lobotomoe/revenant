@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: Apache-2.0
 """Server connection dialog for the Revenant GUI.
 
 ConnectDialog: server selection and connection test (Layer 0 -> 1).

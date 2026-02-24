@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: Apache-2.0
 # pyright: reportUnknownMemberType=false, reportUnknownVariableType=false, reportUnknownArgumentType=false
 """CMS metadata extraction -- digest info, signer identity, and blob inspection."""
 

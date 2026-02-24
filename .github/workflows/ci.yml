@@ -205,6 +205,114 @@ jobs:
           echo '' >> $GITHUB_STEP_SUMMARY
           coverage report --format=markdown >> $GITHUB_STEP_SUMMARY
 
+  # -- TypeScript ---------------------------------------------------------------
+
+  ts-typecheck:
+    name: TypeScript Type Check
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    defaults:
+      run:
+        working-directory: typescript
+
+    steps:
+      - uses: step-security/harden-runner@5ef0c079ce82195b2a36a210272d6b661572d83e # v2
+        with:
+          egress-policy: audit
+
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6
+
+      - uses: pnpm/action-setup@41ff72655975bd51cab0327fa583b6e92b6d3061 # v4
+        with:
+          version: 9
+
+      - name: Set up Node.js
+        uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
+        with:
+          node-version: "22"
+          cache: pnpm
+          cache-dependency-path: typescript/pnpm-lock.yaml
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Type check
+        run: pnpm typecheck
+
+  ts-test:
+    name: TypeScript Test (Node ${{ matrix.node-version }})
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    defaults:
+      run:
+        working-directory: typescript
+
+    strategy:
+      fail-fast: false
+      matrix:
+        node-version: ["18", "22"]
+
+    steps:
+      - uses: step-security/harden-runner@5ef0c079ce82195b2a36a210272d6b661572d83e # v2
+        with:
+          egress-policy: audit
+
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6
+
+      - uses: pnpm/action-setup@41ff72655975bd51cab0327fa583b6e92b6d3061 # v4
+        with:
+          version: 9
+
+      - name: Set up Node.js ${{ matrix.node-version }}
+        uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
+        with:
+          node-version: ${{ matrix.node-version }}
+          cache: pnpm
+          cache-dependency-path: typescript/pnpm-lock.yaml
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Run tests
+        run: pnpm test
+
+  ts-build:
+    name: TypeScript Build
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    defaults:
+      run:
+        working-directory: typescript
+
+    steps:
+      - uses: step-security/harden-runner@5ef0c079ce82195b2a36a210272d6b661572d83e # v2
+        with:
+          egress-policy: audit
+
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6
+
+      - uses: pnpm/action-setup@41ff72655975bd51cab0327fa583b6e92b6d3061 # v4
+        with:
+          version: 9
+
+      - name: Set up Node.js
+        uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
+        with:
+          node-version: "22"
+          cache: pnpm
+          cache-dependency-path: typescript/pnpm-lock.yaml
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Build
+        run: pnpm build
+
+      - name: Test CLI binary
+        run: node dist/cli.js --help
+
+  # -- Manifests & packaging ---------------------------------------------------
+
   validate-manifests:
     name: Validate Manifests
     runs-on: ubuntu-latest

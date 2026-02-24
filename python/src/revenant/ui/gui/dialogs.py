@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: Apache-2.0
 """Modal dialogs -- About information and credential entry."""
 
 from __future__ import annotations

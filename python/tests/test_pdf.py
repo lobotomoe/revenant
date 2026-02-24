@@ -647,7 +647,7 @@ def test_find_root_obj_num_missing():
 def test_find_prev_startxref_basic():
     """find_prev_startxref should return valid values for a real PDF."""
     pdf_bytes = _make_blank_pdf()
-    prev_xref, max_size, _trailer_extra = find_prev_startxref(pdf_bytes)
+    prev_xref, max_size, _trailer_extra, _use_xref_stream = find_prev_startxref(pdf_bytes)
     assert prev_xref >= 0
     assert max_size > 0
 
@@ -667,7 +667,7 @@ def test_find_prev_startxref_with_info_and_id():
     pdf.save(buf)
     pdf_bytes = buf.getvalue()
 
-    prev_xref, max_size, trailer_extra = find_prev_startxref(pdf_bytes)
+    prev_xref, max_size, trailer_extra, _use_xref_stream = find_prev_startxref(pdf_bytes)
     assert prev_xref >= 0
     assert max_size > 0
     # Should have /ID at minimum (pikepdf always generates /ID)
@@ -1202,7 +1202,7 @@ def test_xref_consecutive_entries_valid():
     obj_b = b"11 0 obj\n<< /Type /XObject >>\nendobj\n"
 
     root_num, root_gen = find_root_obj_num(pdf_bytes)
-    prev_xref, prev_size, trailer_extra = find_prev_startxref(pdf_bytes)
+    prev_xref, prev_size, trailer_extra, _use_xref_stream = find_prev_startxref(pdf_bytes)
 
     raw_objects = [(obj_a, 10), (obj_b, 11)]
     new_size = max(prev_size, 12)
@@ -1283,7 +1283,7 @@ def test_find_prev_startxref_xref_stream():
 
     pdf_bytes = _make_xref_stream_pdf()
 
-    prev_xref, max_size, trailer_extra = find_prev_startxref(pdf_bytes)
+    prev_xref, max_size, trailer_extra, _use_xref_stream = find_prev_startxref(pdf_bytes)
     assert prev_xref >= 0
     assert max_size > 0
 
@@ -1348,27 +1348,25 @@ def test_prepare_xref_stream_pdf_invisible():
     with pikepdf.open(io.BytesIO(prepared)) as pdf:
         assert len(pdf.pages) == 3
 
-    # Trailer should contain /ID from the xref stream
-    trailer_section = prepared[prepared.rfind(b"trailer") :]
-    assert b"/ID" in trailer_section
+    # XRef stream incremental update should carry /ID from the original
+    incr_update = prepared[len(pdf_bytes) :]
+    assert b"/ID" in incr_update
 
 
-def test_prepare_xref_stream_pdf_trailer_has_info_and_id():
-    """Incremental update trailer should carry forward /Info and /ID from xref stream."""
+def test_prepare_xref_stream_pdf_uses_xref_stream():
+    """Incremental update on XRef stream PDF should use XRef stream, not traditional xref."""
     from revenant.core.pdf import prepare_pdf_with_sig_field
 
     pdf_bytes = _make_xref_stream_pdf()
 
     prepared, _hs, _hl = prepare_pdf_with_sig_field(pdf_bytes, page=0, reason="Test", visible=False)
 
-    # Find the incremental update's trailer (after original PDF)
-    incr_trailer = prepared[len(pdf_bytes) :]
-    trailer_start = incr_trailer.find(b"trailer")
-    assert trailer_start >= 0
-    trailer_section = incr_trailer[trailer_start:]
-
-    # Must have /ID carried forward
-    assert b"/ID" in trailer_section
+    # The incremental update (after original PDF) should NOT have a
+    # traditional "trailer" keyword -- it should use /Type /XRef stream
+    incr_update = prepared[len(pdf_bytes) :]
+    assert b"trailer" not in incr_update
+    assert b"/Type /XRef" in incr_update
+    assert b"/ID" in incr_update
 
 
 # ── Page rotation round-trips ────────────────────────────────────────

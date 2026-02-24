@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: Apache-2.0
 """Revenant GUI -- tkinter-based graphical interface."""
 
 from __future__ import annotations

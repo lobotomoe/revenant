@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: Apache-2.0
 """GUI utility functions for Revenant.
 
 Platform-specific helpers and tkinter availability checks.

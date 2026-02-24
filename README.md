@@ -6,12 +6,12 @@
 
 [![CI](https://github.com/lobotomoe/revenant/actions/workflows/ci.yml/badge.svg)](https://github.com/lobotomoe/revenant/actions/workflows/ci.yml)
 [![PyPI](https://img.shields.io/pypi/v/revenant.svg)](https://pypi.org/project/revenant/)
+[![npm](https://img.shields.io/npm/v/revenant-sign.svg)](https://www.npmjs.com/package/revenant-sign)
 [![Snap Store](https://snapcraft.io/revenant/badge.svg)](https://snapcraft.io/revenant)
 [![Python 3.10+](https://img.shields.io/badge/python-3.10%2B-blue.svg)](https://www.python.org/downloads/)
-[![pyright: strict](https://img.shields.io/badge/pyright-strict-blue)](https://github.com/microsoft/pyright)
-[![coverage: 96%](https://img.shields.io/badge/coverage-96%25-brightgreen)](python/pyproject.toml)
+[![Node.js 18+](https://img.shields.io/badge/node-18%2B-green.svg)](https://nodejs.org/)
+[![TypeScript: strict](https://img.shields.io/badge/TypeScript-strict-blue)](https://www.typescriptlang.org/)
 [![License: Apache 2.0](https://img.shields.io/badge/license-Apache%202.0-blue.svg)](LICENSE)
-[![Code style: ruff](https://img.shields.io/badge/code%20style-ruff-000000.svg)](https://docs.astral.sh/ruff/)
 [![OpenSSF Scorecard](https://api.scorecard.dev/projects/github.com/lobotomoe/revenant/badge)](https://scorecard.dev/viewer/?uri=github.com/lobotomoe/revenant)
 
 Cross-platform clients for [DocuSign Signature Appliance (DSA)](https://www.docusign.com/products/hybrid-cloud-appliances) (formerly ARX CoSign) electronic signatures via the SOAP API (OASIS DSS standard).
@@ -19,10 +19,13 @@ Cross-platform clients for [DocuSign Signature Appliance (DSA)](https://www.docu
 Originally built for the Armenian Government's EKENG CoSign appliance, but works with any CoSign / DSA server that exposes the DSS SOAP endpoint.
 
 ```
-+-------------------+         SOAP/TLS            +-------------------+
-|  Client (Python)  | --------------------------> |  CoSign appliance |
-|                   | <-------------------------- |  (any server)     |
-+-------------------+      Signed PDF response    +-------------------+
++-------------------+
+|  Python client    |----+
++-------------------+    |    SOAP/TLS         +-------------------+
+                         +------------------->  |  CoSign appliance |
++-------------------+    |                      |  (any server)     |
+|  TypeScript client|----+  <-----------------  +-------------------+
++-------------------+         Signed PDF
 ```
 
 ## Wait, isn't this thing dead?
@@ -32,6 +35,8 @@ Yes. DocuSign [officially retired](https://www.docusign.com/blog/developers/docu
 The Armenian Government's EKENG CoSign appliance doesn't care about DocuSign's product roadmap -- it's on-prem, it works, and thousands of documents get signed through it every day. Somebody had to write a proper cross-platform client for it. Might as well be me.
 
 ## Install
+
+### Python
 
 ```bash
 pip install revenant        # PyPI (all platforms)
@@ -44,6 +49,15 @@ brew install lobotomoe/revenant/revenant  # Homebrew (macOS)
 Or download binaries from [GitHub Releases](https://github.com/lobotomoe/revenant/releases).
 
 For detailed usage, see [`python/`](python/README.md).
+
+### TypeScript / Node.js
+
+```bash
+npm install revenant-sign   # npm
+pnpm add revenant-sign      # pnpm
+```
+
+For detailed usage, see [`typescript/`](typescript/README.md).
 
 ## Compatibility
 
