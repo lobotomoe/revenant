@@ -126,7 +126,7 @@ jobs:
             Apache-2.0, MIT, BSD-2-Clause, BSD-3-Clause, ISC, PSF-2.0,
             MPL-2.0, LGPL-2.1-only, LGPL-2.1-or-later, LGPL-3.0-only,
             0BSD, Unlicense, CC0-1.0, Zlib, GPL-2.0, GPL-2.0-only,
-            WTFPL
+            WTFPL, BlueOak-1.0.0
 
   typecheck:
     name: Type Check
