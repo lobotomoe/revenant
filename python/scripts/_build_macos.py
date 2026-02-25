@@ -157,7 +157,7 @@ def build_py2app():
             [sys.executable, "setup.py", "py2app"],
             cwd=str(tmp_path),
             env={**__import__("os").environ, "PYTHONPATH": str(src_dir)},
-            timeout=300,
+            timeout=600,
         )
 
         if result.returncode != 0:
