@@ -670,7 +670,7 @@ jobs:
       - name: Set version from tag
         run: |
           VERSION="${GITHUB_REF_NAME#v}"
-          npm version "$VERSION" --no-git-tag-version
+          npm version "$VERSION" --no-git-tag-version --allow-same-version
 
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
@@ -722,7 +722,7 @@ jobs:
         run: |
           TAG="${GITHUB_REF_NAME#v}"
           # Convert semver pre-release: 0.2.5-alpha.1 -> 0.2.5-alpha.1 (npm supports semver natively)
-          npm version "$TAG" --no-git-tag-version
+          npm version "$TAG" --no-git-tag-version --allow-same-version
 
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
