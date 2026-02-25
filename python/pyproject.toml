@@ -14,7 +14,7 @@ authors = [
 ]
 keywords = ["revenant", "arx", "cosign", "dsa", "electronic-signature", "pdf", "soap", "pkcs7", "cms", "oasis-dss"]
 classifiers = [
-    "Development Status :: 4 - Beta",
+    "Development Status :: 5 - Production/Stable",
     "Environment :: Console",
     "Intended Audience :: Developers",
     "Intended Audience :: Legal Industry",

@@ -344,6 +344,70 @@ def _set_windows_icon(root: tk.Tk) -> None:
         _logger.debug("Failed to set icon from PE header")
 
 
+def _build_macos_menubar(root: tk.Tk) -> None:
+    """Build standard macOS menu bar (File, Edit) and Cmd+W binding."""
+    import tkinter as tk
+
+    def _send_virtual_event(event_name: str) -> None:
+        widget = root.focus_get()
+        if widget is not None:
+            widget.event_generate(event_name)
+
+    def _select_all() -> None:
+        widget = root.focus_get()
+        if widget is None:
+            return
+        select_fn = getattr(widget, "select_range", None)
+        tag_add_fn = getattr(widget, "tag_add", None)
+        if select_fn is not None:
+            select_fn(0, "end")
+        elif tag_add_fn is not None:
+            tag_add_fn("sel", "1.0", "end")
+
+    menubar = tk.Menu(root)
+
+    # -- File --
+    file_menu = tk.Menu(menubar, tearoff=0)
+    file_menu.add_command(label="Close Window", accelerator="Cmd+W", command=root.destroy)
+    menubar.add_cascade(label="File", menu=file_menu)
+
+    # -- Edit --
+    edit_menu = tk.Menu(menubar, tearoff=0)
+    edit_menu.add_command(
+        label="Undo",
+        accelerator="Cmd+Z",
+        command=lambda: _send_virtual_event("<<Undo>>"),
+    )
+    edit_menu.add_separator()
+    edit_menu.add_command(
+        label="Cut",
+        accelerator="Cmd+X",
+        command=lambda: _send_virtual_event("<<Cut>>"),
+    )
+    edit_menu.add_command(
+        label="Copy",
+        accelerator="Cmd+C",
+        command=lambda: _send_virtual_event("<<Copy>>"),
+    )
+    edit_menu.add_command(
+        label="Paste",
+        accelerator="Cmd+V",
+        command=lambda: _send_virtual_event("<<Paste>>"),
+    )
+    edit_menu.add_separator()
+    edit_menu.add_command(label="Select All", accelerator="Cmd+A", command=_select_all)
+    menubar.add_cascade(label="Edit", menu=edit_menu)
+
+    root.config(menu=menubar)
+
+    # Cmd+W: close the focused window (main or dialog)
+    def _on_close_window(event: tk.Event[tk.Misc]) -> str:
+        event.widget.winfo_toplevel().destroy()
+        return "break"
+
+    root.bind_all("<Command-w>", _on_close_window)
+
+
 def main() -> None:
     """Launch the Revenant GUI."""
     ok, err = check_tkinter()
@@ -382,6 +446,8 @@ def main() -> None:
     if platform.system() == "Darwin":
         root.createcommand("tkAboutDialog", lambda: show_about(root))
         root.createcommand("::tk::mac::ShowHelp", lambda: show_about(root))
+        root.createcommand("::tk::mac::ShowPreferences", lambda: None)
+        _build_macos_menubar(root)
         bind_macos_shortcuts(root)
 
     root.mainloop()

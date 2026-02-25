@@ -96,6 +96,8 @@ OPTIONS = {
         "NSHighResolutionCapable": True,
         "LSMinimumSystemVersion": "11.0",
         "LSApplicationCategoryType": "public.app-category.productivity",
+        # MAS Guideline 5.1.1(i): privacy policy link required
+        "NSPrivacyPolicyURL": "https://github.com/lobotomoe/revenant/blob/main/docs/privacy-policy.md",
         # MAS: app uses only exempt encryption (HTTPS/TLS)
         "ITSAppUsesNonExemptEncryption": False,
         "CFBundleDocumentTypes": [
