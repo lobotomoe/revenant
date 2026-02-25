@@ -76,6 +76,17 @@
   </branding>
 
   <releases>
+    <release version="0.2.5" date="2026-02-26">
+      <description>
+        <p>Mac App Store compliance fixes.</p>
+        <ul>
+          <li>Switch to Tk 9.0 for MAS build (resolves private API rejection)</li>
+          <li>Add macOS menu bar with File and Edit menus</li>
+          <li>Add Cmd+W keyboard shortcut to close windows</li>
+          <li>Add privacy policy URL to Info.plist</li>
+        </ul>
+      </description>
+    </release>
     <release version="0.2.4" date="2026-02-21">
       <description>
         <p>Mac App Store fix.</p>

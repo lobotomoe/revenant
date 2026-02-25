@@ -13,7 +13,7 @@ import importlib.metadata
 try:
     __version__ = importlib.metadata.version("revenant")
 except importlib.metadata.PackageNotFoundError:
-    __version__ = "0.2.4"
+    __version__ = "0.2.5"
 
 __all__ = [
     "BYTES_PER_MB",
