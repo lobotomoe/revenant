@@ -22,7 +22,7 @@ Pre-built binaries are available on the [Releases](https://github.com/lobotomoe/
 | **macOS (Apple Silicon)** | `revenant-cli-macos-arm64` | `Revenant-gui-macos-arm64.dmg` |
 | **Linux (x64)** | `revenant-cli-linux-x64` | `Revenant-x86_64.AppImage` |
 | **Linux (ARM64)** | `revenant-cli-linux-arm64` | `Revenant-aarch64.AppImage` |
-| **Windows (x64)** | `revenant-windows-x64.zip` | `Revenant.msix` |
+| **Windows (x64)** | `revenant-windows-x64.zip` | `RevenantSign.msix` |
 
 ### Quick start (macOS)
 
@@ -70,7 +70,7 @@ Expand-Archive revenant-windows-x64.zip -DestinationPath revenant
 .\revenant\revenant.exe setup
 ```
 
-Alternatively, install the GUI via `Revenant.msix` (double-click to install).
+Alternatively, install the GUI via `RevenantSign.msix` (double-click to install).
 
 ## Installation (pip)
 
@@ -568,7 +568,7 @@ python scripts/build_msix.py
 
 **Requires:** Python 3.10+, tkinter (included with Python on Windows), Windows SDK (for MSIX only).
 
-**Output:** `dist/revenant-standalone/` (folder with `revenant.exe` + `revenant-gui.exe`), `dist/Revenant.msix`
+**Output:** `dist/revenant-standalone/` (folder with `revenant.exe` + `revenant-gui.exe`), `dist/RevenantSign.msix`
 
 ## EKENG-specific notes
 

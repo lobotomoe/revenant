@@ -2,21 +2,19 @@
 <!--
   MSIX Package Manifest for Microsoft Store submission.
 
-  STATUS: Deferred. Windows Store submission is planned for a future release.
-  The Publisher CN=PLACEHOLDER must be replaced with the actual code-signing
-  certificate subject before Store submission.
-
   Build:
     1. Build binaries:  python scripts/build.py all
     2. Pack MSIX:       python scripts/build_msix.py
 
   Prerequisites:
     - Windows SDK (makeappx.exe, signtool.exe)
-    - Code-signing certificate
 
-  The Publisher attribute must match your code-signing certificate subject exactly.
-  Replace CN=PLACEHOLDER with your actual certificate CN before Store submission.
   The Version attribute is updated automatically by build_msix.py from pyproject.toml.
+  Microsoft signs the package upon Store publication - no developer certificate needed.
+
+  Partner Center identity:
+    Store ID: 9NVH62M20DS3
+    Store URL: https://apps.microsoft.com/detail/9NVH62M20DS3
 -->
 <Package
   xmlns="http://schemas.microsoft.com/appx/manifest/foundation/windows10"
@@ -26,14 +24,14 @@
   IgnorableNamespaces="uap rescap desktop">
 
   <Identity
-    Name="lobotomoe.Revenant"
-    Publisher="CN=PLACEHOLDER, O=Aleksandr Kraiz, L=Yerevan, C=AM"
+    Name="AlexKraiz.RevenantSign"
+    Publisher="CN=75EAF6D2-1668-428D-93DD-CE60A78F2DEB"
     Version="0.1.0.0"
     ProcessorArchitecture="x64" />
 
   <Properties>
-    <DisplayName>Revenant</DisplayName>
-    <PublisherDisplayName>Aleksandr Kraiz</PublisherDisplayName>
+    <DisplayName>Revenant Sign</DisplayName>
+    <PublisherDisplayName>Alex Kraiz</PublisherDisplayName>
     <Description>Electronic document signing with ARX CoSign</Description>
     <Logo>Assets\StoreLogo.png</Logo>
   </Properties>
@@ -56,7 +54,7 @@
       Executable="revenant-gui.exe"
       EntryPoint="Windows.FullTrustApplication">
       <uap:VisualElements
-        DisplayName="Revenant"
+        DisplayName="Revenant Sign"
         Description="Electronic document signing with ARX CoSign"
         BackgroundColor="transparent"
         Square150x150Logo="Assets\Square150x150Logo.png"
@@ -64,7 +62,7 @@
         <uap:DefaultTile
           Wide310x150Logo="Assets\Wide310x150Logo.png"
           Square310x310Logo="Assets\Square310x310Logo.png"
-          ShortName="Revenant" />
+          ShortName="Revenant Sign" />
       </uap:VisualElements>
 
       <!-- File type associations -->

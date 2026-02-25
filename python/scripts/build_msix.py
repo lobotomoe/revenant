@@ -10,7 +10,7 @@ Prerequisites:
     - MSIX asset images in msix/Assets/ (see README)
 
 Output:
-    dist/Revenant.msix
+    dist/RevenantSign.msix
 """
 
 import re
@@ -41,6 +41,7 @@ def _find_makeappx():
         ["where", "makeappx.exe"],
         capture_output=True,
         text=True,
+        timeout=10,
     )
     if result.returncode == 0:
         return result.stdout.strip().split("\n")[0]
@@ -85,15 +86,36 @@ def _check_standalone():
 
 
 def _read_version():
-    """Read project version from pyproject.toml."""
+    """Read project version from pyproject.toml and convert to MSIX format.
+
+    MSIX requires 4-part version (Major.Minor.Build.Revision) where:
+    - First section cannot be 0 (MS Store requirement)
+    - Last section must be 0 (reserved for Store use)
+
+    Maps semver M.m.p to MSIX M.m.p.0.
+    """
     pyproject = (PROJECT_DIR / "pyproject.toml").read_text(encoding="utf-8")
     match = re.search(r'^version\s*=\s*"([^"]+)"', pyproject, re.MULTILINE)
-    version = match.group(1) if match else "0.0.0"
-    # MSIX requires 4-part version
-    parts = version.split(".")
+    version = match.group(1) if match else "1.0.0"
+
+    parts = [int(p) for p in version.split(".")]
+
+    if parts[0] == 0:
+        print(
+            f"ERROR: Version {version} has major=0. "
+            "MS Store requires first section >= 1.",
+            file=sys.stderr,
+        )
+        sys.exit(1)
+
+    # Pad to 4 parts, last must be 0 (reserved for Store)
     while len(parts) < 4:
-        parts.append("0")
-    return ".".join(parts[:4])
+        parts.append(0)
+    parts[3] = 0
+
+    msix_version = ".".join(str(p) for p in parts[:4])
+    print(f"  Project version: {version} -> MSIX version: {msix_version}")
+    return msix_version
 
 
 def _prepare_staging():
@@ -153,7 +175,7 @@ def _prepare_staging():
 
 def _build_msix(makeappx):
     """Run makeappx to create the MSIX package."""
-    output = DIST_DIR / "Revenant.msix"
+    output = DIST_DIR / "RevenantSign.msix"
     if output.exists():
         output.unlink()
 
@@ -188,8 +210,8 @@ def main():
     print("\nDone!")
     print(
         "\nNext steps:\n"
-        "  1. Sign with signtool: signtool sign /f cert.pfx /p <password> dist/Revenant.msix\n"
-        "  2. Test with WACK: appcert.exe reset && appcert.exe test -appxpackagepath dist/Revenant.msix\n"
+        "  1. Sign with signtool: signtool sign /f cert.pfx /p <password> dist/RevenantSign.msix\n"
+        "  2. Test with WACK: appcert.exe reset && appcert.exe test -appxpackagepath dist/RevenantSign.msix\n"
         "  3. Upload to Partner Center: https://partner.microsoft.com/dashboard"
     )
 

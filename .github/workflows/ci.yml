@@ -326,11 +326,16 @@ jobs:
 
       - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6
 
-      - name: Check MSIX PLACEHOLDER
+      - name: Validate MSIX identity
         run: |
-          # MSIX / Windows Store submission is deferred. Warn but never block.
+          # Verify AppxManifest.xml has the real Partner Center identity (not a placeholder)
+          if ! grep -q 'Publisher="CN=' python/msix/AppxManifest.xml; then
+            echo "::error::MSIX AppxManifest.xml is missing Publisher identity"
+            exit 1
+          fi
           if grep -q 'CN=PLACEHOLDER' python/msix/AppxManifest.xml; then
-            echo "::warning::MSIX AppxManifest.xml contains CN=PLACEHOLDER -- update before Windows Store submission"
+            echo "::error::MSIX AppxManifest.xml still contains CN=PLACEHOLDER"
+            exit 1
           fi
 
       - name: Check Flatpak null commits

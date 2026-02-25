@@ -278,7 +278,7 @@ jobs:
           Get-ChildItem -Path dist\revenant-standalone -Filter *.exe | ForEach-Object {
             Write-Host "Signing $($_.Name)..."
             & signtool sign /f $cert /p $env:SIGN_PASSWORD /tr $ts /td sha256 /fd sha256 `
-              /d "Revenant" $_.FullName
+              /d "Revenant Sign" $_.FullName
             & signtool verify /pa $_.FullName
           }
           Write-Host "Windows binaries signed and verified."
@@ -361,7 +361,7 @@ jobs:
         uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v6
         with:
           name: msix-${{ matrix.platform }}
-          path: python/dist/Revenant.msix
+          path: python/dist/RevenantSign.msix
           if-no-files-found: error
 
   build-mac:
@@ -484,7 +484,7 @@ jobs:
 
   release:
     name: Create Release
-    needs: build
+    needs: [build, build-mac]
     runs-on: ubuntu-latest
     timeout-minutes: 15
     permissions:
