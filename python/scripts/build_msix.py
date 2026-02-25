@@ -102,8 +102,7 @@ def _read_version():
 
     if parts[0] == 0:
         print(
-            f"ERROR: Version {version} has major=0. "
-            "MS Store requires first section >= 1.",
+            f"ERROR: Version {version} has major=0. MS Store requires first section >= 1.",
             file=sys.stderr,
         )
         sys.exit(1)
