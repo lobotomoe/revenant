@@ -17,7 +17,8 @@ runs:
       shell: bash
       run: |
         brew install python-tk@3.13
-        /opt/homebrew/bin/python3.13 -m venv /tmp/venv-tk9
+        PYTHON="$(brew --prefix python@3.13)/bin/python3.13"
+        "$PYTHON" -m venv /tmp/venv-tk9
         echo "/tmp/venv-tk9/bin" >> "$GITHUB_PATH"
 
     - name: Cache pip downloads

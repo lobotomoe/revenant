@@ -457,8 +457,10 @@ jobs:
         run: |
           found=0
           while IFS= read -r bin; do
-            if nm -u "$bin" 2>/dev/null | grep -q 'NSWindowDidOrderOnScreen'; then
+            matches=$(nm -u "$bin" 2>/dev/null | grep 'NSWindowDidOrderOnScreen' || true)
+            if [ -n "$matches" ]; then
               echo "::error::Private API symbol in $bin"
+              echo "$matches"
               found=1
             fi
           done < <(find dist/Revenant.app/Contents -type f \( -name 'libtk*' -o -name 'Tk' \))
