@@ -23,6 +23,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - PDF incremental updates now use cross-reference streams for PDFs that use XRef streams (PDF 1.5+), per ISO 32000-1 S7.5.8.4 -- fixes compatibility with macOS Preview and strict PDF readers when signing pdf-lib or modern-tool-generated PDFs (both Python and TypeScript)
 
+## [0.2.6] - 2026-02-26
+
+### Changed
+
+- GUI window title simplified to "Revenant" (version removed to avoid screenshot staleness)
+- MAS minimum deployment target bumped from macOS 11.0 to 12.0 (required for arm64-only builds)
+
 ## [0.2.5] - 2026-02-26
 
 ### Added
@@ -103,7 +110,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Pyright strict mode type checking with 0 errors
 - 96%+ test coverage (600+ tests)
 
-[Unreleased]: https://github.com/lobotomoe/revenant/compare/v0.2.5...HEAD
+[Unreleased]: https://github.com/lobotomoe/revenant/compare/v0.2.6...HEAD
+[0.2.6]: https://github.com/lobotomoe/revenant/compare/v0.2.5...v0.2.6
 [0.2.5]: https://github.com/lobotomoe/revenant/compare/v0.2.4...v0.2.5
 [0.2.4]: https://github.com/lobotomoe/revenant/compare/v0.2.3...v0.2.4
 [0.2.3]: https://github.com/lobotomoe/revenant/compare/v0.2.2...v0.2.3

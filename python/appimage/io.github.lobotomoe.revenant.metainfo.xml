@@ -76,6 +76,15 @@
   </branding>
 
   <releases>
+    <release version="0.2.6" date="2026-02-26">
+      <description>
+        <p>MAS build fix and UI cleanup.</p>
+        <ul>
+          <li>Bump minimum macOS deployment target to 12.0 for arm64-only MAS builds</li>
+          <li>Remove version from window title</li>
+        </ul>
+      </description>
+    </release>
     <release version="0.2.5" date="2026-02-26">
       <description>
         <p>Mac App Store compliance fixes.</p>
