@@ -30,7 +30,6 @@ from ...config import (
     logout,
     reset_all,
 )
-from ...constants import __version__
 from .connect_dialog import ConnectDialog
 from .dialogs import about_footer, login_dialog, show_about
 from .setup import LoginDialog
@@ -101,7 +100,7 @@ class RevenantGUI:
 
         self._tk = tk
         self.root = root
-        self.root.title(f"Revenant v{__version__}")
+        self.root.title("Revenant")
         self.root.columnconfigure(0, weight=1)
         self.root.rowconfigure(0, weight=1)
 

@@ -94,7 +94,7 @@ OPTIONS = {
         "CFBundlePackageType": "APPL",
         "NSHumanReadableCopyright": "Copyright 2026 Aleksandr Kraiz. Apache License 2.0.",
         "NSHighResolutionCapable": True,
-        "LSMinimumSystemVersion": "11.0",
+        "LSMinimumSystemVersion": "12.0",
         "LSApplicationCategoryType": "public.app-category.productivity",
         # MAS Guideline 5.1.1(i): privacy policy link required
         "NSPrivacyPolicyURL": "https://github.com/lobotomoe/revenant/blob/main/docs/privacy-policy.md",
