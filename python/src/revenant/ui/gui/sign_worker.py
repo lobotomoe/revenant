@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: Apache-2.0
 """Signing workflow -- validation, credential handling, and background execution."""
 
 from __future__ import annotations

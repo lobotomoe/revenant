@@ -47,6 +47,18 @@ This project handles:
 - **Logging:** Credentials are never logged. Only server URLs, status codes, and operation results appear in logs
 - **Input validation:** PDF structure is validated before signing. ByteRange integrity is verified after signing. SOAP responses are validated for expected structure
 
+## Known Exceptions
+
+### CVE-2024-23342 (ecdsa timing attack)
+
+**Status:** Acknowledged, not fixable at this time.
+
+The `ecdsa` library (a dependency of `tlslite-ng`) has a known timing side-channel vulnerability. The ecdsa maintainers consider side-channel attacks out of scope for a pure-Python implementation. This dependency is used only for legacy TLS 1.0/RC4 connections to older CoSign appliances.
+
+- Tracking: https://github.com/tlsfuzzer/python-ecdsa/issues/339
+- Last reviewed: 2026-02-12
+- Re-evaluate when: ecdsa > 0.19.1 is released or tlslite-ng drops the ecdsa dependency
+
 ## Supported Versions
 
 | Version | Supported |

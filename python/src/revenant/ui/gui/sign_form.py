@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: Apache-2.0
 """Sign form panel -- file pickers, signature options, and account info."""
 
 from __future__ import annotations

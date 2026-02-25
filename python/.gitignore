@@ -1,0 +1,28 @@
+# Python-specific (patterns shared with root are kept here for clarity)
+*.pyo
+*.egg-info/
+build/
+
+# Testing
+htmlcov/
+.pytest_cache/
+.ruff_cache/
+
+# AppImage
+AppDir/
+appimagetool
+
+# Certificates and research (contain personal data)
+certs/
+research/
+
+# Packaging artifacts
+*.msix
+*.appx
+*.snap
+*.flatpak
+msix-staging/
+parts/
+prime/
+stage/
+*.flatpak-builder/

@@ -2,7 +2,7 @@
 
 Technical details of the CoSign SOAP API (OASIS DSS standard).
 
-Server endpoints are configured through profiles (see `python/src/revenant/config/profiles.py`).
+Server endpoints are configured through profiles (see [`python/src/revenant/config/profiles.py`](../python/src/revenant/config/profiles.py) and [`typescript/src/config/profiles.ts`](../typescript/src/config/profiles.ts)).
 The WSDL is saved in [`wsdl_dss.xml`](wsdl_dss.xml) for reference.
 
 ## Discovery summary

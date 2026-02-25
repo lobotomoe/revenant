@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: Apache-2.0
 """Signing command handlers for Revenant CLI."""
 
 from __future__ import annotations

@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: Apache-2.0
 """High-level convenience API for PDF signing.
 
 Provides :func:`sign` and :func:`sign_detached` that handle profile

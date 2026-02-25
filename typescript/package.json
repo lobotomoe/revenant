@@ -1,0 +1,94 @@
+{
+  "name": "revenant-sign",
+  "version": "0.2.4",
+  "description": "Cross-platform client for ARX CoSign electronic signatures via SOAP API",
+  "license": "Apache-2.0",
+  "author": "Aleksandr Kraiz",
+  "type": "module",
+  "main": "./dist/index.cjs",
+  "module": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "import": {
+        "types": "./dist/index.d.ts",
+        "default": "./dist/index.js"
+      },
+      "require": {
+        "types": "./dist/index.d.cts",
+        "default": "./dist/index.cjs"
+      }
+    }
+  },
+  "bin": {
+    "revenant": "./dist/cli.js"
+  },
+  "files": [
+    "dist"
+  ],
+  "engines": {
+    "node": ">=18.0.0"
+  },
+  "scripts": {
+    "build": "tsup && node scripts/copy-fonts.cjs",
+    "dev": "tsx bin/revenant.ts",
+    "prepublishOnly": "pnpm build && pnpm typecheck && pnpm test",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "test:coverage": "vitest run --coverage",
+    "test:integration": "vitest run --config vitest.integration.config.ts",
+    "typecheck": "tsc --noEmit",
+    "lint": "biome check src/ tests/",
+    "lint:fix": "biome check --fix src/ tests/",
+    "clean": "rm -rf dist"
+  },
+  "dependencies": {
+    "asn1js": "^3.0.5",
+    "commander": "^13.1.0",
+    "fast-xml-parser": "^5.1.0",
+    "jpeg-js": "^0.4.4",
+    "node-forge": "^1.3.1",
+    "pdf-lib": "^1.17.1",
+    "pkijs": "^3.2.4",
+    "pngjs": "^7.0.0",
+    "zod": "^4.0.0"
+  },
+  "optionalDependencies": {
+    "keytar": "^7.9.0"
+  },
+  "devDependencies": {
+    "@biomejs/biome": "^2.4.4",
+    "@types/node": "^22.13.5",
+    "@types/node-forge": "^1.3.11",
+    "@types/pngjs": "^6.0.5",
+    "@vitest/coverage-v8": "^3.0.0",
+    "tsup": "^8.4.0",
+    "tsx": "^4.19.0",
+    "typescript": "^5.7.0",
+    "vitest": "^3.0.0"
+  },
+  "keywords": [
+    "revenant",
+    "arx",
+    "cosign",
+    "electronic-signature",
+    "digital-signature",
+    "pdf-signing",
+    "soap",
+    "pkcs7",
+    "cms",
+    "oasis-dss"
+  ],
+  "pnpm": {
+    "overrides": {
+      "minimatch@<10.2.1": ">=10.2.1"
+    }
+  },
+  "homepage": "https://github.com/lobotomoe/revenant/tree/main/typescript#readme",
+  "bugs": "https://github.com/lobotomoe/revenant/issues",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/lobotomoe/revenant",
+    "directory": "typescript"
+  }
+}

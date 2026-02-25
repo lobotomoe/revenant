@@ -1,0 +1,8 @@
+# TypeScript incremental
+*.tsbuildinfo
+
+# Test coverage
+coverage/
+
+# npm pack artifacts
+*.tgz

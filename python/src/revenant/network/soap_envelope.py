@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: Apache-2.0
 """SOAP envelope builders for CoSign API requests."""
 
 from __future__ import annotations

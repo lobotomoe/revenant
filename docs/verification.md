@@ -8,8 +8,8 @@ After inserting the CMS into the PDF, the tool automatically verifies the result
 
 1. **Structure check** — re-reads the PDF, finds the last `/ByteRange`, extracts chunk1 + chunk2 (the signed data) and the CMS hex from `/Contents`
 2. **Hash check** — computes SHA-1 of the extracted ByteRange data and compares with the hash originally sent to CoSign. Mismatch = corruption during incremental update construction
-3. **CMS sanity** — checks blob is non-empty and starts with ASN.1 SEQUENCE tag (0x30)
-4. **pikepdf readability** — opens the final PDF with pikepdf to confirm it's structurally valid
+3. **CMS sanity** -- checks blob is non-empty and starts with ASN.1 SEQUENCE tag (0x30)
+4. **PDF readability** -- opens the final PDF with pikepdf (Python) or pdf-lib (TypeScript) to confirm it's structurally valid
 
 If any check fails, the signed PDF is **not saved** and an error is raised.
 
@@ -42,20 +42,26 @@ The error comes from `CMS_SignerInfo_verify_content` — openssl cannot determin
 Since we control both the hash computation (before signing) and the hash extraction (after signing), we can verify directly:
 
 ```python
-# During signing: we know the hash we sent
+# Python
 br_hash = compute_byterange_hash(prepared_pdf, hex_start, hex_len)
-
-# After signing: re-extract and compare
 signed_data, cms_der = extract_signature_data(signed_pdf)
 actual_hash = hashlib.sha1(signed_data).digest()
-assert actual_hash == br_hash  # This is our verification
+assert actual_hash == br_hash
+```
+
+```typescript
+// TypeScript
+const brHash = computeByterangeHash(preparedPdf, hexStart, hexLen);
+const { signedData, cmsDer } = extractSignatureData(signedPdf);
+const actualHash = createHash("sha1").update(signedData).digest();
+// compare brHash === actualHash
 ```
 
 This catches all corruption scenarios:
 - ByteRange offsets are wrong -> hash mismatch
 - CMS inserted at wrong position -> hash mismatch
 - Original PDF bytes corrupted during incremental update -> hash mismatch
-- Object serialization errors (e.g. `None` vs `null`) -> pikepdf readability check fails
+- Object serialization errors (e.g. `None` vs `null`) -> PDF readability check fails
 
 ### Future: pyhanko
 
@@ -66,7 +72,8 @@ This catches all corruption scenarios:
 For verifying already-signed PDFs (without the original hash):
 
 ```bash
-python -m revenant check signed.pdf
+revenant check signed.pdf        # Python CLI
+npx revenant check signed.pdf    # TypeScript CLI
 ```
 
 Output:
@@ -81,7 +88,7 @@ Checking signed.pdf (275.0 KB)...
   RESULT: Signature structure is VALID
 ```
 
-Without the expected hash, `check` verifies structure, CMS format, and pikepdf readability. It cannot detect content tampering (since it doesn't know the original hash), but it confirms the PDF is well-formed and the signature field is structurally correct.
+Without the expected hash, `check` verifies structure, CMS format, and PDF readability. It cannot detect content tampering (since it doesn't know the original hash), but it confirms the PDF is well-formed and the signature field is structurally correct.
 
 ## ByteRange layout
 

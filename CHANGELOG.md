@@ -7,6 +7,22 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- **TypeScript/Node.js client** (`revenant-sign` on npm) -- full-featured port of the Python client with CLI, library API, and 655 tests at 97%+ coverage
+  - Dual ESM + CJS build via tsup
+  - Embedded and detached PDF signing
+  - Signature verification (embedded and detached CMS/PKCS#7)
+  - CMS blob inspection and certificate info extraction
+  - Multi-profile configuration with keytar credential storage
+  - Legacy TLS 1.0 + RC4 transport for EKENG (pure JS via node-forge)
+  - Armenian font support (GHEA Grapalat, GHEA Mariam, Noto Sans)
+  - Signature image embedding (PNG/JPEG) with alpha channel support
+
+### Fixed
+
+- PDF incremental updates now use cross-reference streams for PDFs that use XRef streams (PDF 1.5+), per ISO 32000-1 S7.5.8.4 -- fixes compatibility with macOS Preview and strict PDF readers when signing pdf-lib or modern-tool-generated PDFs (both Python and TypeScript)
+
 ## [0.2.4] - 2026-02-21
 
 ### Fixed

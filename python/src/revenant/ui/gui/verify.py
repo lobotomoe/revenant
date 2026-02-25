@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: Apache-2.0
 # pyright: reportUnknownMemberType=false, reportUnknownArgumentType=false
 """
 Verify panel for the Revenant GUI main window.

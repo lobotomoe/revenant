@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: Apache-2.0
 # pyright: reportUnknownMemberType=false, reportUnknownVariableType=false, reportUnknownArgumentType=false
 """
 Certificate information extraction from CMS/PKCS#7 blobs, X.509 certs, and signed PDFs.

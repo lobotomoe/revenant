@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: Apache-2.0
 """
 Post-sign verification of embedded PDF signatures.
 

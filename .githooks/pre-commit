@@ -1,0 +1,59 @@
+#!/bin/sh
+# Pre-commit hook: runs lint + typecheck on changed files.
+# Activate: git config core.hooksPath .githooks
+
+set -e
+
+RED='\033[0;31m'
+GREEN='\033[0;32m'
+YELLOW='\033[0;33m'
+NC='\033[0m'
+
+PY_CHANGED=$(git diff --cached --name-only --diff-filter=ACMR -- 'python/src/' 'python/tests/' || true)
+TS_CHANGED=$(git diff --cached --name-only --diff-filter=ACMR -- 'typescript/src/' 'typescript/tests/' || true)
+
+if [ -z "$PY_CHANGED" ] && [ -z "$TS_CHANGED" ]; then
+  exit 0
+fi
+
+FAILED=0
+
+if [ -n "$PY_CHANGED" ]; then
+  printf "${YELLOW}[pre-commit]${NC} Checking Python...\n"
+
+  if ! (cd python && ruff check src/ tests/ --quiet); then
+    printf "${RED}[pre-commit]${NC} ruff check failed\n"
+    FAILED=1
+  fi
+
+  if ! (cd python && ruff format --check src/ tests/ --quiet); then
+    printf "${RED}[pre-commit]${NC} ruff format failed (run: cd python && ruff format src/ tests/)\n"
+    FAILED=1
+  fi
+
+  if ! (cd python && pyright src/ --warnings 2>/dev/null); then
+    printf "${RED}[pre-commit]${NC} pyright failed\n"
+    FAILED=1
+  fi
+fi
+
+if [ -n "$TS_CHANGED" ]; then
+  printf "${YELLOW}[pre-commit]${NC} Checking TypeScript...\n"
+
+  if ! (cd typescript && pnpm lint 2>/dev/null); then
+    printf "${RED}[pre-commit]${NC} biome check failed\n"
+    FAILED=1
+  fi
+
+  if ! (cd typescript && pnpm typecheck 2>/dev/null); then
+    printf "${RED}[pre-commit]${NC} tsc --noEmit failed\n"
+    FAILED=1
+  fi
+fi
+
+if [ "$FAILED" -ne 0 ]; then
+  printf "\n${RED}[pre-commit]${NC} Checks failed. Fix issues or commit with --no-verify to bypass.\n"
+  exit 1
+fi
+
+printf "${GREEN}[pre-commit]${NC} All checks passed.\n"

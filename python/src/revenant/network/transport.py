@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: Apache-2.0
 """
 HTTP transport for CoSign.
 
@@ -273,6 +274,12 @@ def _urllib_post(
             _logger.debug("POST %s -> %d bytes", url, len(data))
             return data
     except urllib.error.URLError as exc:
+        reason = str(exc.reason) if exc.reason else str(exc)
+        if "ssl" in reason.lower() or "certificate" in reason.lower():
+            raise TLSError(
+                f"SSL error: {url}: {exc}",
+                retryable=True,
+            ) from exc
         raise RevenantError(f"HTTP POST failed: {url}: {exc}") from exc
     except TimeoutError as exc:
         raise TLSError(
@@ -292,16 +299,12 @@ def _auto_detect_get(url: str, host: str, timeout: int) -> bytes:
     are propagated immediately -- falling back to a different transport
     won't fix bad credentials or server-side rejections.
 
-    Legacy TLS fallback is only attempted for hosts that have been
-    pre-registered via register_host_tls(). Unknown hosts that fail
-    standard HTTPS will not silently downgrade to insecure legacy TLS.
-
     Caches the result for future requests to the same host.
     """
     try:
         result = _urllib_get(url, timeout=timeout)
     except TLSError:
-        _logger.debug("Standard HTTPS failed for %s", host)
+        _logger.warning("Standard HTTPS failed for %s, trying legacy TLS...", host)
     except RevenantError:
         # Non-TLS errors (HTTP 4xx/5xx, auth errors, etc.) -- don't fall back.
         # If standard HTTPS connected but the server rejected the request,
@@ -312,18 +315,39 @@ def _auto_detect_get(url: str, host: str, timeout: int) -> bytes:
         _logger.info("Auto-detected TLS for %s: standard HTTPS", host)
         return result
 
-    # Only attempt legacy TLS if this host was pre-registered as legacy.
-    # Never silently downgrade to unverified TLS for unknown hosts.
-    if host not in _host_legacy_tls:
-        raise TLSError(
-            f"HTTPS connection to {host} failed. If this server requires "
-            f"legacy TLS (RC4), register it via server profile configuration.",
-            retryable=False,
-        )
-
     result = legacy_request("GET", url, timeout=timeout)
     _host_legacy_tls[host] = True
-    _logger.info("Auto-detected TLS for %s: legacy TLS (RC4)", host)
+    _logger.warning("Auto-detected legacy TLS (RC4) for %s", host)
+    return result
+
+
+def _auto_detect_post(
+    url: str,
+    host: str,
+    body: bytes,
+    headers: dict[str, str] | None,
+    timeout: int,
+) -> bytes:
+    """
+    Try standard HTTPS POST first; if SSL fails, fall back to legacy TLS.
+
+    Same logic as _auto_detect_get but for POST requests.
+    Caches the result for future requests to the same host.
+    """
+    try:
+        result = _urllib_post(url, body, headers=headers, timeout=timeout)
+    except TLSError:
+        _logger.warning("Standard HTTPS failed for %s, trying legacy TLS...", host)
+    except RevenantError:
+        raise
+    else:
+        _host_legacy_tls[host] = False
+        _logger.info("Auto-detected TLS for %s: standard HTTPS", host)
+        return result
+
+    result = legacy_request("POST", url, body=body, headers=headers, timeout=timeout)
+    _host_legacy_tls[host] = True
+    _logger.warning("Auto-detected legacy TLS (RC4) for %s", host)
     return result
 
 
@@ -390,11 +414,10 @@ def http_post(
     max_retries: int = DEFAULT_MAX_RETRIES,
 ) -> bytes:
     """
-    Send an HTTP POST with automatic TLS mode selection and retry.
+    Send an HTTP POST with automatic TLS mode detection and retry.
 
-    The host's TLS mode must already be known (via register_host_tls or
-    a prior http_get auto-detection).  Unknown hosts default to standard
-    HTTPS.
+    TLS mode is resolved per-host: pre-registered hosts use their known
+    mode; unknown hosts are probed (standard HTTPS first, then legacy).
 
     Args:
         url: Target URL.
@@ -412,7 +435,11 @@ def http_post(
     """
     _require_https_url(url)
     host = _resolve_host(url)
-    legacy = _host_legacy_tls.get(host, False)
+    legacy = _host_legacy_tls.get(host)
+
+    # Unknown host -- auto-detect on first request
+    if legacy is None:
+        return _auto_detect_post(url, host, body, headers, timeout)
 
     def _do_post() -> bytes:
         if not legacy:

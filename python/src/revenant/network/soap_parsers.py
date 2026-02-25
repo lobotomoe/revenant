@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: Apache-2.0
 """SOAP response parsers for CoSign API."""
 
 from __future__ import annotations

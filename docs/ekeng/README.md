@@ -4,7 +4,7 @@ Everything specific to the Armenian Government's EKENG CoSign appliance
 (`ca.gov.am:8080`). The rest of the documentation describes generic CoSign
 SOAP behavior that applies to any appliance.
 
-EKENG is configured as the `ekeng` built-in profile in the Python client (`python/src/revenant/config/profiles.py`).
+EKENG is configured as the `ekeng` built-in profile in both clients ([`python/src/revenant/config/profiles.py`](../../python/src/revenant/config/profiles.py) and [`typescript/src/config/profiles.ts`](../../typescript/src/config/profiles.ts)).
 
 ## Server
 
@@ -85,7 +85,7 @@ FieldStatus      SignatureStatus="0"
 `SignedFieldInfo` also contains `Certificate` (base64 X.509), `GraphicImage`
 and `GraphicLogo` child elements (both empty/zero on this appliance).
 
-Signature verification is also done client-side (ByteRange hash check, CMS structure validation, pikepdf readability).
+Signature verification is also done client-side (ByteRange hash check, CMS structure validation, PDF readability via pikepdf/pdf-lib).
 
 ### Multi-signature verification
 

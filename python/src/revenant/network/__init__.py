@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: Apache-2.0
 """Network transport and SOAP protocol layer."""
 
 from __future__ import annotations

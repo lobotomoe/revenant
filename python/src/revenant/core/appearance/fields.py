@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: Apache-2.0
 """Display field extraction for PDF signature appearances.
 
 Resolves signer identity fields (name, email, org, date) from

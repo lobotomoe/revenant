@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: Apache-2.0
 """PDF structure analysis and incremental update assembly.
 
 Functions for reading existing PDF structure (finding objects, xref offsets)
@@ -10,6 +11,7 @@ High-level signing API is in builder.py.
 from __future__ import annotations
 
 import re
+import zlib
 
 from ...errors import PDFError
 from .. import require_pikepdf as _require_pikepdf
@@ -60,12 +62,14 @@ def find_page_obj_num(
         return page_obj_num, page_w, page_h, has_annots, existing_annots
 
 
-def find_prev_startxref(pdf_bytes: bytes) -> tuple[int, int, list[str]]:
+def find_prev_startxref(pdf_bytes: bytes) -> tuple[int, int, list[str], bool]:
     """Find the last startxref offset, max object number, and trailer entries.
 
     Returns:
-        (prev_xref, max_size, trailer_extra) where trailer_extra is a list
-        of raw trailer lines to carry forward (like /Info and /ID).
+        (prev_xref, max_size, trailer_extra, use_xref_stream) where
+        trailer_extra is a list of raw trailer lines to carry forward
+        (like /Info and /ID), and use_xref_stream indicates whether the
+        PDF uses cross-reference streams (PDF 1.5+).
     """
     # Find the LAST startxref in the file -- PDFs with incremental updates
     # have multiple startxref/%%EOF pairs; the last one is authoritative.
@@ -93,7 +97,11 @@ def find_prev_startxref(pdf_bytes: bytes) -> tuple[int, int, list[str]]:
     # from the previous trailer (except /Prev and /Size which are updated).
     trailer_extra = _extract_trailer_entries(pdf_bytes)
 
-    return prev_xref, max_size, trailer_extra
+    # Detect if source PDF uses XRef streams -- incremental updates must
+    # use the same format (ISO 32000-1 S7.5.8.4)
+    use_xref_stream = _detect_xref_streams(pdf_bytes, prev_xref)
+
+    return prev_xref, max_size, trailer_extra, use_xref_stream
 
 
 def _extract_trailer_entries(pdf_bytes: bytes) -> list[str]:
@@ -146,6 +154,7 @@ def assemble_incremental_update(
     root_obj_num: int,
     root_gen: int,
     trailer_extra: list[str],
+    use_xref_stream: bool = False,
 ) -> bytes:
     """Assemble the full PDF with incremental update appended."""
     # Ensure original PDF ends with \n after %%EOF
@@ -167,8 +176,22 @@ def assemble_incremental_update(
 
     all_objects = b"".join(objects_raw)
 
-    # Build xref table
+    # Build xref section (table or stream depending on source PDF format)
     xref_offset = update_start + len(all_objects)
+
+    if use_xref_stream:
+        xref_obj_num = new_size
+        xref_data = build_xref_stream(
+            xref_entries=xref_entries,
+            prev_xref=prev_xref,
+            root_obj_num=root_obj_num,
+            root_gen=root_gen,
+            trailer_extra=trailer_extra,
+            xref_offset=xref_offset,
+            xref_obj_num=xref_obj_num,
+        )
+        return base + all_objects + xref_data
+
     xref_data = build_xref_and_trailer(
         xref_entries=xref_entries,
         new_size=new_size,
@@ -286,3 +309,120 @@ def build_xref_and_trailer(
     xref_lines.append("")  # trailing newline
 
     return "\n".join(xref_lines).encode("latin-1")
+
+
+def build_xref_stream(
+    xref_entries: dict[int, int],
+    prev_xref: int,
+    root_obj_num: int,
+    root_gen: int,
+    trailer_extra: list[str],
+    xref_offset: int,
+    xref_obj_num: int,
+) -> bytes:
+    """Build a cross-reference stream for an incremental update (PDF 1.5+).
+
+    PDFs that use XRef streams require incremental updates to also use
+    XRef streams (ISO 32000-1 S7.5.8.4). This replaces both the xref
+    table and trailer with a single stream object.
+
+    Args:
+        xref_entries: Mapping of object number to byte offset.
+        prev_xref: Previous xref offset (/Prev value).
+        root_obj_num: Catalog object number for /Root reference.
+        root_gen: Catalog generation number.
+        trailer_extra: Extra trailer entries to carry forward (/Info, /ID).
+        xref_offset: Byte offset where this XRef stream object starts.
+        xref_obj_num: Object number for the XRef stream itself.
+
+    Returns:
+        Raw bytes of the XRef stream object, startxref, and %%EOF.
+    """
+    # Include the XRef stream object in its own cross-reference data
+    all_entries = dict(xref_entries)
+    all_entries[xref_obj_num] = xref_offset
+
+    # /Size = highest object number + 1
+    actual_size = xref_obj_num + 1
+
+    # Determine W (column widths for binary entries per ISO 32000-1 Table 17)
+    # Column 1: type (1 byte, value 1 = in-use uncompressed)
+    # Column 2: byte offset (variable width, big-endian)
+    # Column 3: generation number (1 byte, always 0 for new objects)
+    max_offset = max(all_entries.values())
+    w2 = _bytes_needed(max_offset)
+
+    # Build /Index subsections and binary stream data
+    sorted_nums = sorted(all_entries.keys())
+    groups = _group_consecutive(sorted_nums)
+    index_parts: list[str] = []
+    binary_parts = bytearray()
+
+    for group in groups:
+        index_parts.append(f"{group[0]} {len(group)}")
+        for obj_num in group:
+            offset = all_entries[obj_num]
+            binary_parts.append(1)  # type 1 = in-use, uncompressed
+            binary_parts.extend(offset.to_bytes(w2, byteorder="big"))
+            binary_parts.append(0)  # generation = 0
+
+    compressed = zlib.compress(bytes(binary_parts))
+
+    # Build the XRef stream object (replaces both xref table and trailer)
+    lines: list[str] = []
+    lines.append(f"{xref_obj_num} 0 obj")
+    lines.append("<<")
+    lines.append("  /Type /XRef")
+    lines.append(f"  /Size {actual_size}")
+    lines.append(f"  /Prev {prev_xref}")
+    lines.append(f"  /Root {root_obj_num} {root_gen} R")
+    lines.append(f"  /W [1 {w2} 1]")
+    lines.append(f"  /Index [{' '.join(index_parts)}]")
+    lines.append("  /Filter /FlateDecode")
+    lines.append(f"  /Length {len(compressed)}")
+    lines.extend(f"  {extra}" for extra in trailer_extra)
+    lines.append(">>")
+    lines.append("stream")
+
+    header = ("\n".join(lines) + "\n").encode("latin-1")
+    footer = f"\nendstream\nendobj\nstartxref\n{xref_offset}\n%%EOF\n".encode("latin-1")
+
+    return header + compressed + footer
+
+
+def _detect_xref_streams(pdf_bytes: bytes, startxref_offset: int) -> bool:
+    """Detect whether the PDF uses cross-reference streams (PDF 1.5+).
+
+    Checks the bytes at the last startxref offset: if they match an object
+    definition (N N obj) rather than ``xref``, the PDF uses XRef streams.
+    """
+    end = min(startxref_offset + 40, len(pdf_bytes))
+    chunk = pdf_bytes[startxref_offset:end]
+    return bool(re.match(rb"\s*\d+\s+\d+\s+obj\b", chunk))
+
+
+def _group_consecutive(sorted_nums: list[int]) -> list[list[int]]:
+    """Group sorted numbers into consecutive runs for xref subsections."""
+    if not sorted_nums:
+        return []
+    groups: list[list[int]] = []
+    current_group = [sorted_nums[0]]
+    for n in sorted_nums[1:]:
+        if n == current_group[-1] + 1:
+            current_group.append(n)
+        else:
+            groups.append(current_group)
+            current_group = [n]
+    groups.append(current_group)
+    return groups
+
+
+def _bytes_needed(value: int) -> int:
+    """Minimum bytes needed to represent a non-negative integer in big-endian."""
+    if value <= 0xFF:
+        return 1
+    if value <= 0xFFFF:
+        return 2
+    if value <= 0xFFFFFF:
+        return 3
+    return 4

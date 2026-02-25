@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: Apache-2.0
 # pyright: reportUnknownMemberType=false, reportUnknownVariableType=false, reportUnknownArgumentType=false
 """
 Signature verification and inspection.

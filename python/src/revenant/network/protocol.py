@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: Apache-2.0
 """
 Transport protocol abstraction for remote signing services.
 

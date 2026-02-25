@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: Apache-2.0
 """
 Signature field positioning and page geometry helpers.
 

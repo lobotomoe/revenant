@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: Apache-2.0
 """PDF signature field preparation.
 
 High-level API for preparing PDFs with empty signature fields,
@@ -110,7 +111,7 @@ def prepare_pdf_with_sig_field(
     page_obj_num, page_w, page_h, _has_annots, existing_annots = find_page_obj_num(
         pdf_bytes, root_obj_num, page
     )
-    prev_xref, prev_size, trailer_extra = find_prev_startxref(pdf_bytes)
+    prev_xref, prev_size, trailer_extra, use_xref_stream = find_prev_startxref(pdf_bytes)
 
     if visible:
         raw_objects, new_size = _prepare_visible(
@@ -152,6 +153,7 @@ def prepare_pdf_with_sig_field(
         root_obj_num=root_obj_num,
         root_gen=root_gen,
         trailer_extra=trailer_extra,
+        use_xref_stream=use_xref_stream,
     )
 
     # ── Patch the ByteRange and return offsets ─────────────────

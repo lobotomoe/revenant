@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: Apache-2.0
 """Generated GHEA Grapalat subset metrics. Do not edit manually.
 
 Created by scripts/prepare_font.py from:

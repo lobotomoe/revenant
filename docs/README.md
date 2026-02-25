@@ -2,7 +2,7 @@
 
 Technical documentation for the Revenant project — protocol details, implementation notes, and server-specific behavior.
 
-For installation and usage, see [`python/README.md`](../python/README.md).
+For installation and usage, see [`python/README.md`](../python/README.md) (Python) or [`typescript/README.md`](../typescript/README.md) (TypeScript/Node.js).
 
 ## Contents
 
@@ -22,7 +22,7 @@ These documents describe behavior common to any CoSign appliance:
 |---|---|
 | [ekeng/](ekeng/) | Armenian Government EKENG appliance: server details, TLS, PKI, e-keng validator requirements |
 
-EKENG is configured as a built-in server profile in [`python/src/revenant/config/profiles.py`](../python/src/revenant/config/profiles.py).
+EKENG is configured as a built-in server profile in [`python/src/revenant/config/profiles.py`](../python/src/revenant/config/profiles.py) and [`typescript/src/config/profiles.ts`](../typescript/src/config/profiles.ts).
 
 ### Build & Release
 
@@ -38,7 +38,7 @@ EKENG is configured as a built-in server profile in [`python/src/revenant/config
 
 ## Known limitations
 
-Protocol and server-side limitations that affect all clients. For Python client-specific limitations, see [`python/README.md`](../python/README.md#known-limitations).
+Protocol and server-side limitations that affect all clients. For client-specific limitations, see [`python/README.md`](../python/README.md#known-limitations) or [`typescript/README.md`](../typescript/README.md).
 
 - **SHA-1 only** — the server rejects SHA-256. SHA-1 is cryptographically broken (collision attacks are practical since 2017), but remains widely supported by PDF validators for legacy compatibility. This is a server-side limitation.
 - **Non-standard CMS OIDs** — the server returns `sha1WithRSAEncryption` as digestAlgorithm (wrong per RFC 5652). See [verification.md](verification.md).
@@ -47,8 +47,19 @@ Protocol and server-side limitations that affect all clients. For Python client-
 
 ## Dependencies
 
-- `pikepdf` — PDF reading (not writing). Brings in `qpdf`, `Pillow`, `lxml`.
-- `asn1crypto` — ASN.1/DER parsing for certificate extraction (PKCS#7, X.509). Pure Python.
-- `tlslite-ng` — pure-Python TLS for legacy servers (TLS 1.0 / RC4). Standard servers use `urllib`.
-- `defusedxml` — safe XML parsing (prevents XML bomb / billion laughs attacks on SOAP responses).
-- `openssl` — `verify` CLI command (optional, for detached signature verification).
+### Python
+
+- `pikepdf` -- PDF reading (not writing). Brings in `qpdf`, `Pillow`, `lxml`.
+- `asn1crypto` -- ASN.1/DER parsing for certificate extraction (PKCS#7, X.509). Pure Python.
+- `tlslite-ng` -- pure-Python TLS for legacy servers (TLS 1.0 / RC4). Standard servers use `urllib`.
+- `defusedxml` -- safe XML parsing (prevents XML bomb / billion laughs attacks on SOAP responses).
+- `openssl` -- `verify` CLI command (optional, for detached signature verification).
+
+### TypeScript/Node.js
+
+- `pdf-lib` -- PDF reading (page dimensions, object graph). Not used for writing.
+- `pkijs` / `asn1js` -- ASN.1/DER parsing for certificate and CMS inspection.
+- `node-forge` -- legacy TLS 1.0 + RC4 transport for EKENG.
+- `fast-xml-parser` -- XML parsing for SOAP responses.
+- `zod` -- runtime validation of external data.
+- `commander` -- CLI framework.

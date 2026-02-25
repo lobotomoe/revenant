@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: Apache-2.0
 """PDF preparation, verification, and incremental update assembly."""
 
 from .builder import compute_byterange_hash, insert_cms, prepare_pdf_with_sig_field

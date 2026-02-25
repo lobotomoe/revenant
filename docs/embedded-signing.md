@@ -6,7 +6,7 @@ How we embed CMS signatures directly into PDFs using the CoSign SOAP API.
 
 Since the server supports signing but not embedded PDF creation, the client does all PDF manipulation. The key requirement is **true incremental update** — the original PDF bytes must be preserved exactly, byte-for-byte. This is critical for validators that verify the uploaded signed file is the same document they issued (see [ekeng](ekeng/) for EKENG-specific validator requirements).
 
-1. **Read PDF with pikepdf** (read-only) — extract page dimensions, object numbers, existing annotations. pikepdf is never used to *save* the PDF.
+1. **Read PDF** (read-only) — extract page dimensions, object numbers, existing annotations. Python uses pikepdf, TypeScript uses pdf-lib. Neither is used to *save* the PDF.
 2. **Build new PDF objects as raw bytes**:
    - Signature dictionary (`/Type /Sig`, `/Filter /Adobe.PPKLite`, `/SubFilter /adbe.pkcs7.detached`)
    - Annotation widget (`/Type /Annot`, `/Subtype /Widget`, `/FT /Sig`) with coordinates
@@ -18,7 +18,7 @@ Since the server supports signing but not embedded PDF creation, the client does
 3. **Append raw incremental update** after the original `%%EOF`:
    - All new objects written as raw PDF syntax
    - Sig dict includes `/ByteRange` placeholder (fixed-width, patched in-place) and `/Contents <0000...0000>` — 8192 bytes reserved for CMS (16384 hex chars)
-   - New xref table referencing only the new/overridden objects
+   - New xref table (or XRef stream for PDF 1.5+ sources) referencing only the new/overridden objects
    - Trailer with `/Prev` pointing to original xref, carrying forward `/Info`, `/ID`, and other original trailer entries
 4. **Patch ByteRange** to actual offsets (in-place, same byte width)
 5. **Compute SHA-1** of everything except the `/Contents` hex string
@@ -29,7 +29,7 @@ Since the server supports signing but not embedded PDF creation, the client does
 
 ## Why true incremental update?
 
-Previous approach used pikepdf to add signature objects and then `pikepdf.save()` — but this **rewrites the entire PDF**: renumbers objects, changes the binary header comment, restructures internal content. The original bytes are destroyed even though the visual content is identical.
+An earlier Python approach used pikepdf to add signature objects and then `pikepdf.save()` — but this **rewrites the entire PDF**: renumbers objects, changes the binary header comment, restructures internal content. The original bytes are destroyed even though the visual content is identical.
 
 Document validators compare the uploaded signed file against the original they issued. They typically check:
 - That the original document bytes are preserved (by extracting bytes up to the first `%%EOF` and comparing a stored hash)
@@ -38,11 +38,11 @@ Document validators compare the uploaded signed file against the original they i
 
 When pikepdf rewrites the PDF, validators reject the file because the original bytes are destroyed. See [ekeng](ekeng/) for EKENG-specific validator behavior.
 
-The solution: use pikepdf **only for reading** (page dimensions, object graph), then build all new objects as raw PDF bytes and append them after the original content. The original bytes are never modified.
+The solution: use PDF libraries **only for reading** (page dimensions, object graph), then build all new objects as raw PDF bytes and append them after the original content. The original bytes are never modified.
 
 ## Object serialization
 
-When overriding existing objects (page, catalog), we need to faithfully reproduce their dictionary entries. We use `pikepdf.Object.unparse(resolved=True)` for this — it produces correct PDF syntax for all types including `null` (not Python `None`), arrays, dictionaries, names, strings, and numbers. Indirect references are serialized as `N G R`.
+When overriding existing objects (page, catalog), we need to faithfully reproduce their dictionary entries. In Python, we use `pikepdf.Object.unparse(resolved=True)` for this — it produces correct PDF syntax for all types including `null` (not Python `None`), arrays, dictionaries, names, strings, and numbers. Indirect references are serialized as `N G R`. The TypeScript client uses pdf-lib's object graph for the same purpose.
 
 ## PDF structure of signed file
 
@@ -125,7 +125,7 @@ Missing `/Info` or `/ID` in the incremental trailer causes validators to reject 
 
 The server ignores all `SAPISigFieldSettings` and `GraphicImageToSet` (see [soap-api.md](soap-api.md)), so the visual appearance is built entirely client-side in `core/appearance/` (fields, fonts, image, stream modules).
 
-The appearance uses a stacked layout driven by the profile's `sig_fields` configuration. Each field is extracted from signer info using regex and rendered top-to-bottom:
+The appearance uses a stacked layout driven by the profile's `sig_fields` configuration (Python: `core/appearance/`, TypeScript: `core/appearance/`). Each field is extracted from signer info using regex and rendered top-to-bottom:
 
 ```
 Without image:
@@ -155,17 +155,26 @@ The stream is a raw PDF content stream (BT/ET text operators, rectangle drawing)
 
 The page override preserves all existing annotations (e.g. link annotations) by reading them from the original page object and including them in the `/Annots` array alongside the new signature widget. This is important because TCPDF-generated PDFs often contain URI link annotations.
 
-## pikepdf usage
+## PDF library usage
 
-pikepdf is used **read-only** in the current implementation:
+Both clients use their respective PDF libraries **read-only**:
 
-- `pikepdf.open()` — read the PDF structure
-- `pdf.pages[n].obj` — get page object number and dimensions
-- `pdf.Root` — read catalog entries for override
-- `pikepdf.Object.unparse()` — serialize objects to PDF syntax
+### Python (pikepdf)
+
+- `pikepdf.open()` -- read the PDF structure
+- `pdf.pages[n].obj` -- get page object number and dimensions
+- `pdf.Root` -- read catalog entries for override
+- `pikepdf.Object.unparse()` -- serialize objects to PDF syntax
 - Page dimension extraction via `/MediaBox`, `/CropBox`
 
-pikepdf is **not** used for writing or saving. All output is constructed as raw bytes.
+### TypeScript (pdf-lib)
+
+- `PDFDocument.load()` -- read the PDF structure
+- `pdf.getPages()[n]` -- get page dimensions
+- `pdf.context` -- access object graph for catalog/page overrides
+- Cross-reference parsing and object number allocation
+
+Neither library is used for writing or saving. All output is constructed as raw bytes.
 
 ## Differences from CoSign desktop signatures
 
