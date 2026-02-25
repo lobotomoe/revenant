@@ -405,20 +405,11 @@ jobs:
 
       - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6
 
-      # macOS: Homebrew Python + Tk 9.0 (system Tk 8.6 has private API issues)
       - name: Set up Python (macOS)
         if: runner.os == 'macOS'
-        run: |
-          brew install python-tk@3.13
-          /opt/homebrew/bin/python3.13 -m venv /tmp/venv-tk9
-          echo "/tmp/venv-tk9/bin" >> "$GITHUB_PATH"
-
-      - uses: actions/cache@5a3ec84eff668545956fd18022155c47e93e2684 # v4
-        if: runner.os == 'macOS'
+        uses: ./.github/actions/setup-python-tk
         with:
-          path: ~/Library/Caches/pip
-          key: pip-build-test-mac-${{ hashFiles('.github/requirements/build-macos.txt') }}
-          restore-keys: pip-build-test-mac-
+          cache-key-prefix: pip-build-test-mac
 
       # Linux/Windows: standard setup-python
       - name: Set up Python

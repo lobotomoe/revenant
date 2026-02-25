@@ -387,20 +387,10 @@ jobs:
         with:
           persist-credentials: false
 
-      # Use Homebrew Python + python-tk (links against Tk 9.0) instead of
-      # actions/setup-python (python.org Python links against system Tk 8.6
-      # which contains private API _NSWindowDidOrderOnScreenNotification).
       - name: Set up Python with Tk 9.0
-        run: |
-          brew install python-tk@3.13
-          /opt/homebrew/bin/python3.13 -m venv /tmp/venv-tk9
-          echo "/tmp/venv-tk9/bin" >> "$GITHUB_PATH"
-
-      - uses: actions/cache@5a3ec84eff668545956fd18022155c47e93e2684 # v4
+        uses: ./.github/actions/setup-python-tk
         with:
-          path: ~/Library/Caches/pip
-          key: pip-mas-${{ hashFiles('.github/requirements/build-macos.txt') }}
-          restore-keys: pip-mas-
+          cache-key-prefix: pip-mas
 
       - name: Install dependencies
         run: |
