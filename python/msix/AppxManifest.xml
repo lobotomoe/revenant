@@ -7,7 +7,7 @@
     2. Pack MSIX:       python scripts/build_msix.py
 
   Prerequisites:
-    - Windows SDK (makeappx.exe, signtool.exe)
+    - Windows SDK (makeappx.exe)
 
   The Version attribute is updated automatically by build_msix.py from pyproject.toml.
   Microsoft signs the package upon Store publication - no developer certificate needed.

@@ -7,9 +7,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.0.0] - 2026-02-26
+
 ### Added
 
-- **TypeScript/Node.js client** (`revenant-sign` on npm) -- full-featured port of the Python client with CLI, library API, and 655 tests at 97%+ coverage
+- **TypeScript/Node.js client** (`revenant-sign` on npm) -- full-featured port of the Python client with CLI, library API, and 662 tests at 97%+ coverage
   - Dual ESM + CJS build via tsup
   - Embedded and detached PDF signing
   - Signature verification (embedded and detached CMS/PKCS#7)
@@ -18,6 +20,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - Legacy TLS 1.0 + RC4 transport for EKENG (pure JS via node-forge)
   - Armenian font support (GHEA Grapalat, GHEA Mariam, Noto Sans)
   - Signature image embedding (PNG/JPEG) with alpha channel support
+- Microsoft Store distribution (Revenant Sign) with Partner Center identity
+- Release pipeline now includes MAS .pkg in GitHub Releases
+
+### Changed
+
+- MSIX package renamed to RevenantSign.msix, display name updated to "Revenant Sign"
 
 ### Fixed
 
@@ -110,7 +118,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Pyright strict mode type checking with 0 errors
 - 96%+ test coverage (600+ tests)
 
-[Unreleased]: https://github.com/lobotomoe/revenant/compare/v0.2.6...HEAD
+[Unreleased]: https://github.com/lobotomoe/revenant/compare/v1.0.0...HEAD
+[1.0.0]: https://github.com/lobotomoe/revenant/compare/v0.2.6...v1.0.0
 [0.2.6]: https://github.com/lobotomoe/revenant/compare/v0.2.5...v0.2.6
 [0.2.5]: https://github.com/lobotomoe/revenant/compare/v0.2.4...v0.2.5
 [0.2.4]: https://github.com/lobotomoe/revenant/compare/v0.2.3...v0.2.4

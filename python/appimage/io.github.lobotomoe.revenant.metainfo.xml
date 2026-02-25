@@ -76,6 +76,16 @@
   </branding>
 
   <releases>
+    <release version="1.0.0" date="2026-02-26">
+      <description>
+        <p>First stable release. MS Store and MAS distribution.</p>
+        <ul>
+          <li>Configure Microsoft Store identity (Revenant Sign)</li>
+          <li>Release pipeline now includes MAS .pkg in GitHub Releases</li>
+          <li>TypeScript/Node.js client (revenant-sign on npm) with 662 tests at 97%+ coverage</li>
+        </ul>
+      </description>
+    </release>
     <release version="0.2.6" date="2026-02-26">
       <description>
         <p>MAS build fix and UI cleanup.</p>

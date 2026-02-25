@@ -209,9 +209,9 @@ def main():
     print("\nDone!")
     print(
         "\nNext steps:\n"
-        "  1. Sign with signtool: signtool sign /f cert.pfx /p <password> dist/RevenantSign.msix\n"
-        "  2. Test with WACK: appcert.exe reset && appcert.exe test -appxpackagepath dist/RevenantSign.msix\n"
-        "  3. Upload to Partner Center: https://partner.microsoft.com/dashboard"
+        "  1. Test with WACK: appcert.exe reset && appcert.exe test -appxpackagepath dist/RevenantSign.msix\n"
+        "  2. Upload to Partner Center: https://partner.microsoft.com/dashboard\n"
+        "     (Microsoft signs the package upon Store publication)"
     )
 
 
