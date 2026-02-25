@@ -631,6 +631,7 @@ jobs:
         with:
           packages-dir: python/dist/
           attestations: true
+          skip-existing: true
 
   publish-npm:
     name: Publish to npm
