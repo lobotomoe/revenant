@@ -454,18 +454,7 @@ jobs:
 
       - name: Verify no private API in bundled Tk (macOS)
         if: runner.os == 'macOS'
-        run: |
-          found=0
-          while IFS= read -r bin; do
-            matches=$(nm -u "$bin" 2>/dev/null | grep 'NSWindowDidOrderOnScreen' || true)
-            if [ -n "$matches" ]; then
-              echo "::error::Private API symbol in $bin"
-              echo "$matches"
-              found=1
-            fi
-          done < <(find dist/Revenant.app/Contents -type f \( -name 'libtk*' -o -name 'Tk' \))
-          if [ "$found" -eq 1 ]; then exit 1; fi
-          echo "Verification passed: no private API symbols in bundled Tk"
+        uses: ./.github/actions/verify-no-private-api
 
       - name: Test CLI binary (Unix)
         if: runner.os != 'Windows'

@@ -1,0 +1,28 @@
+name: Verify no private API in bundled Tk
+description: >
+  Scan bundled Tk binaries for private Apple API symbols that cause
+  Mac App Store rejection (Guideline 2.5.1).
+
+inputs:
+  app-path:
+    description: Path to the .app bundle to scan
+    required: false
+    default: dist/Revenant.app
+
+runs:
+  using: composite
+  steps:
+    - name: Scan bundled Tk for private API symbols
+      shell: bash
+      run: |
+        found=0
+        while IFS= read -r bin; do
+          matches=$(nm -u "$bin" 2>/dev/null | grep 'NSWindowDidOrderOnScreen' || true)
+          if [ -n "$matches" ]; then
+            echo "::error::Private API symbol in $bin"
+            echo "$matches"
+            found=1
+          fi
+        done < <(find "${{ inputs.app-path }}/Contents" -type f \( -name 'libtk*' -o -name 'Tk' \))
+        if [ "$found" -eq 1 ]; then exit 1; fi
+        echo "Verification passed: no private API symbols in bundled Tk"
