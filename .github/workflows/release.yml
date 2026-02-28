@@ -761,7 +761,7 @@ jobs:
 
       - name: Update formula in tap repository
         env:
-          GH_TOKEN: ${{ secrets.HOMEBREW_TAP_TOKEN }}
+          GH_TOKEN: ${{ secrets.DIST_TAP_TOKEN }}
         run: |
           VERSION="${GITHUB_REF_NAME#v}"
           SHA256=$(sha256sum revenant-cli-macos-arm64 | awk '{print $1}')
@@ -792,6 +792,82 @@ jobs:
 
           CONTENT=$(base64 -w 0 /tmp/revenant.rb)
           gh api repos/lobotomoe/homebrew-revenant/contents/Formula/revenant.rb \
+            --method PUT \
+            --field message="revenant $VERSION" \
+            --field content="$CONTENT" \
+            --field sha="$FILE_SHA"
+
+  update-scoop:
+    name: Update Scoop Bucket
+    needs: release
+    if: ${{ !contains(github.ref_name, '-') }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    permissions:
+      contents: read
+
+    steps:
+      - uses: step-security/harden-runner@5ef0c079ce82195b2a36a210272d6b661572d83e # v2
+        with:
+          egress-policy: audit
+
+      - name: Download Windows ZIP
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          gh release download "$GITHUB_REF_NAME" \
+            --repo "$GITHUB_REPOSITORY" \
+            --pattern "revenant-windows-x64.zip" \
+            --dir .
+
+      - name: Update manifest in bucket repository
+        env:
+          GH_TOKEN: ${{ secrets.DIST_TAP_TOKEN }}
+        run: |
+          VERSION="${GITHUB_REF_NAME#v}"
+          SHA256=$(sha256sum revenant-windows-x64.zip | awk '{print $1}')
+          FILE_SHA=$(gh api repos/lobotomoe/scoop-revenant/contents/bucket/revenant.json --jq '.sha')
+
+          cat > /tmp/revenant.json << 'MANIFEST'
+          {
+              "version": "VERSION_PLACEHOLDER",
+              "description": "Electronic document signing with ARX CoSign (SOAP/DSS)",
+              "homepage": "https://github.com/lobotomoe/revenant",
+              "license": "Apache-2.0",
+              "architecture": {
+                  "64bit": {
+                      "url": "https://github.com/lobotomoe/revenant/releases/download/vVERSION_PLACEHOLDER/revenant-windows-x64.zip",
+                      "hash": "HASH_PLACEHOLDER"
+                  }
+              },
+              "bin": [
+                  "revenant.exe",
+                  "revenant-gui.exe"
+              ],
+              "shortcuts": [
+                  [
+                      "revenant-gui.exe",
+                      "Revenant Sign"
+                  ]
+              ],
+              "checkver": {
+                  "github": "https://github.com/lobotomoe/revenant"
+              },
+              "autoupdate": {
+                  "architecture": {
+                      "64bit": {
+                          "url": "https://github.com/lobotomoe/revenant/releases/download/v$version/revenant-windows-x64.zip"
+                      }
+                  }
+              }
+          }
+          MANIFEST
+
+          sed -i "s/VERSION_PLACEHOLDER/$VERSION/g" /tmp/revenant.json
+          sed -i "s/HASH_PLACEHOLDER/$SHA256/g" /tmp/revenant.json
+
+          CONTENT=$(base64 -w 0 /tmp/revenant.json)
+          gh api repos/lobotomoe/scoop-revenant/contents/bucket/revenant.json \
             --method PUT \
             --field message="revenant $VERSION" \
             --field content="$CONTENT" \
