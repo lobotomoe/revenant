@@ -39,22 +39,28 @@ The Armenian Government's EKENG CoSign appliance doesn't care about DocuSign's p
 ### Python
 
 ```bash
-pip install revenant        # PyPI (all platforms)
-snap install revenant       # Snap Store (Linux)
-brew install lobotomoe/revenant/revenant  # Homebrew (macOS)
-scoop bucket add revenant https://github.com/lobotomoe/scoop-revenant  # Scoop (Windows)
-scoop install revenant
+pip install revenant                        # PyPI (all platforms)
+brew install lobotomoe/revenant/revenant    # Homebrew (macOS)
+snap install revenant                       # Snap Store (Linux)
 ```
 
 [![Get it from the Snap Store](https://snapcraft.io/en/dark/install.svg)](https://snapcraft.io/revenant)
+
+For detailed usage, see [`python/`](python/README.md).
+
+### Windows
+
+```powershell
+winget install --source msstore 9NVH62M20DS3    # WinGet
+scoop bucket add revenant https://github.com/lobotomoe/scoop-revenant
+scoop install revenant                           # Scoop
+```
 
 <a href="https://apps.microsoft.com/detail/9NVH62M20DS3?referrer=appbadge&mode=full" target="_blank" rel="noopener noreferrer">
   <img src="https://get.microsoft.com/images/en-us%20dark.svg" width="200" alt="Get it from Microsoft Store"/>
 </a>
 
 Or download binaries from [GitHub Releases](https://github.com/lobotomoe/revenant/releases).
-
-For detailed usage, see [`python/`](python/README.md).
 
 ### TypeScript / Node.js
 
