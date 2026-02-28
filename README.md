@@ -13,6 +13,7 @@
 [![TypeScript: strict](https://img.shields.io/badge/TypeScript-strict-blue)](https://www.typescriptlang.org/)
 [![License: Apache 2.0](https://img.shields.io/badge/license-Apache%202.0-blue.svg)](LICENSE)
 [![OpenSSF Scorecard](https://api.scorecard.dev/projects/github.com/lobotomoe/revenant/badge)](https://scorecard.dev/viewer/?uri=github.com/lobotomoe/revenant)
+[![OpenSSF Best Practices](https://www.bestpractices.dev/projects/12008/badge)](https://www.bestpractices.dev/projects/12008)
 
 Cross-platform clients for [DocuSign Signature Appliance (DSA)](https://www.docusign.com/products/hybrid-cloud-appliances) (formerly ARX CoSign) electronic signatures via the SOAP API (OASIS DSS standard).
 
