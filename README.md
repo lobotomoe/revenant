@@ -36,20 +36,21 @@ The Armenian Government's EKENG CoSign appliance doesn't care about DocuSign's p
 
 ## Install
 
-### Python
+### Desktop app
 
+**macOS**
 ```bash
-pip install revenant                        # PyPI (all platforms)
-brew install lobotomoe/revenant/revenant    # Homebrew (macOS)
-snap install revenant                       # Snap Store (Linux)
+brew install lobotomoe/revenant/revenant
+```
+
+**Linux**
+```bash
+snap install revenant
 ```
 
 [![Get it from the Snap Store](https://snapcraft.io/en/dark/install.svg)](https://snapcraft.io/revenant)
 
-For detailed usage, see [`python/`](python/README.md).
-
-### Windows
-
+**Windows**
 ```powershell
 winget install --source msstore 9NVH62M20DS3    # WinGet
 scoop bucket add revenant https://github.com/lobotomoe/scoop-revenant
@@ -62,14 +63,17 @@ scoop install revenant                           # Scoop
 
 Or download binaries from [GitHub Releases](https://github.com/lobotomoe/revenant/releases).
 
-### TypeScript / Node.js
+### Libraries
 
+**Python** ([docs](python/README.md))
 ```bash
-npm install revenant-sign   # npm
-pnpm add revenant-sign      # pnpm
+pip install revenant
 ```
 
-For detailed usage, see [`typescript/`](typescript/README.md).
+**TypeScript / Node.js** ([docs](typescript/README.md))
+```bash
+npm install revenant-sign
+```
 
 ## Compatibility
 
