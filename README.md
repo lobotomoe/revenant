@@ -67,7 +67,8 @@ Or download binaries from [GitHub Releases](https://github.com/lobotomoe/revenan
 
 **Python** ([docs](python/README.md))
 ```bash
-pip install revenant
+pipx install revenant    # recommended
+pip install revenant     # or inside a venv
 ```
 
 **TypeScript / Node.js** ([docs](typescript/README.md))
