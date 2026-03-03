@@ -406,6 +406,8 @@ jobs:
 
       - name: Build with py2app
         run: python scripts/build.py mac --no-dmg
+        env:
+          BUILD_NUMBER: ${{ github.run_number }}
 
       - name: Patch private API symbols in bundled Tk
         uses: ./.github/actions/patch-tk-private-api

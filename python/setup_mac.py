@@ -13,6 +13,7 @@ because py2app reads install_requires from it and fails. Use the build
 script: python scripts/build.py mac
 """
 
+import os
 import re
 import subprocess
 import sys
@@ -27,6 +28,10 @@ if not _toml_path.exists():
 _pyproject = _toml_path.read_text(encoding="utf-8")
 _version_match = re.search(r'^version\s*=\s*"([^"]+)"', _pyproject, re.MULTILINE)
 VERSION = _version_match.group(1) if _version_match else "0.0.0"
+
+# Build number for CFBundleVersion (must increment for each App Store upload).
+# CI sets BUILD_NUMBER from github.run_number; local builds default to "1".
+BUILD_NUMBER = os.environ.get("BUILD_NUMBER", "1")
 
 APP = ["scripts/gui_entry.py"]
 
@@ -90,7 +95,7 @@ OPTIONS = {
         "CFBundleName": "Revenant",
         "CFBundleIdentifier": "io.github.lobotomoe.revenant",
         "CFBundleShortVersionString": VERSION,
-        "CFBundleVersion": VERSION,
+        "CFBundleVersion": f"{VERSION}.{BUILD_NUMBER}",
         "CFBundlePackageType": "APPL",
         "NSHumanReadableCopyright": "Copyright 2026 Aleksandr Kraiz. Apache License 2.0.",
         "NSHighResolutionCapable": True,
