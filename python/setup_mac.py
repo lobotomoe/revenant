@@ -95,7 +95,7 @@ OPTIONS = {
         "CFBundleName": "Revenant",
         "CFBundleIdentifier": "io.github.lobotomoe.revenant",
         "CFBundleShortVersionString": VERSION,
-        "CFBundleVersion": f"{VERSION}.{BUILD_NUMBER}",
+        "CFBundleVersion": BUILD_NUMBER,
         "CFBundlePackageType": "APPL",
         "NSHumanReadableCopyright": "Copyright 2026 Aleksandr Kraiz. Apache License 2.0.",
         "NSHighResolutionCapable": True,
