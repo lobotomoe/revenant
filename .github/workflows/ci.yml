@@ -457,6 +457,10 @@ jobs:
         if: runner.os == 'macOS'
         run: python scripts/build.py mac --no-dmg
 
+      - name: Patch private API symbols in bundled Tk (macOS)
+        if: runner.os == 'macOS'
+        uses: ./.github/actions/patch-tk-private-api
+
       - name: Verify no private API in bundled Tk (macOS)
         if: runner.os == 'macOS'
         uses: ./.github/actions/verify-no-private-api

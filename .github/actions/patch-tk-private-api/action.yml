@@ -1,0 +1,66 @@
+name: Patch private API symbols in bundled Tk
+description: >
+  Replace private Apple API symbol names in bundled Tk dylibs with harmless
+  same-length alternatives to avoid Mac App Store rejection (Guideline 2.5.1).
+  The symbols are declared as extern in Tk source (tkMacOSXWindowEvent.c) but
+  never used at runtime (code behind #if 0). Must run AFTER py2app but BEFORE
+  codesigning. Upstream: https://core.tcl-lang.org/tk/tktview/a9969f7ffd966229c4e6
+  NOTE: libtcl9.0.dylib also contains deprecated dyld symbols
+  (NSAddressOfSymbol, NSLookupSymbolInImage, NSLinkModule, etc.)
+  behind #ifdef TCL_LOAD_FROM_MEMORY in unix/tclLoadDyld.c.
+  Apple has not rejected for these yet, but if they do, add them
+  to the SYMBOLS array below or rebuild Tcl without TCL_LOAD_FROM_MEMORY.
+
+inputs:
+  app-path:
+    description: Path to the .app bundle to patch
+    required: false
+    default: dist/Revenant.app
+
+runs:
+  using: composite
+  steps:
+    - name: Patch private API symbol names in Tk dylibs
+      shell: bash
+      run: |
+        SYMBOLS=(
+          "_NSWindowDidOrderOnScreenNotification"
+          "_NSWindowWillOrderOnScreenNotification"
+        )
+        REPLACEMENTS=(
+          "_XXWindowDidOrderOnScreenNotification"
+          "_XXWindowWillOrderOnScreenNotification"
+        )
+
+        patched=0
+        while IFS= read -r bin; do
+          for i in "${!SYMBOLS[@]}"; do
+            sym="${SYMBOLS[$i]}"
+            rep="${REPLACEMENTS[$i]}"
+            if LC_ALL=C grep -q "$sym" "$bin" 2>/dev/null; then
+              echo "Patching $sym -> $rep in $(basename "$bin")"
+              LC_ALL=C perl -pi -e "s/\Q${sym}\E/${rep}/g" "$bin"
+              patched=1
+            fi
+          done
+        done < <(find "${{ inputs.app-path }}/Contents/Frameworks" -type f -name '*.dylib')
+
+        if [ "$patched" -eq 0 ]; then
+          echo "::warning::No private API symbols found to patch"
+        fi
+
+        # Verify no private API symbols remain
+        remaining=0
+        while IFS= read -r bin; do
+          matches=$(nm -u "$bin" 2>/dev/null | grep 'NSWindow.*OrderO.*ScreenNotification' || true)
+          if [ -n "$matches" ]; then
+            echo "::error::Private API symbol still present in $(basename "$bin") after patching:"
+            echo "$matches"
+            remaining=1
+          fi
+        done < <(find "${{ inputs.app-path }}/Contents/Frameworks" -type f -name '*.dylib')
+
+        if [ "$remaining" -eq 1 ]; then
+          exit 1
+        fi
+        echo "Private API symbols successfully patched"

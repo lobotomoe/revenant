@@ -407,6 +407,9 @@ jobs:
       - name: Build with py2app
         run: python scripts/build.py mac --no-dmg
 
+      - name: Patch private API symbols in bundled Tk
+        uses: ./.github/actions/patch-tk-private-api
+
       - name: Verify no private API in bundled Tk
         uses: ./.github/actions/verify-no-private-api
 
