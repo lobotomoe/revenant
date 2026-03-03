@@ -460,10 +460,14 @@ jobs:
       - name: Patch private API symbols in bundled Tk (macOS)
         if: runner.os == 'macOS'
         uses: ./.github/actions/patch-tk-private-api
+        with:
+          app-path: python/dist/Revenant.app
 
       - name: Verify no private API in bundled Tk (macOS)
         if: runner.os == 'macOS'
         uses: ./.github/actions/verify-no-private-api
+        with:
+          app-path: python/dist/Revenant.app
 
       - name: Test CLI binary (Unix)
         if: runner.os != 'Windows'
