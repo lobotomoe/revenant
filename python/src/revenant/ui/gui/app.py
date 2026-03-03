@@ -444,8 +444,6 @@ def main() -> None:
     # macOS: system menu integration + keyboard shortcut fix for non-Latin layouts
     if platform.system() == "Darwin":
         root.createcommand("tkAboutDialog", lambda: show_about(root))
-        root.createcommand("::tk::mac::ShowHelp", lambda: show_about(root))
-        root.createcommand("::tk::mac::ShowPreferences", lambda: None)
         _build_macos_menubar(root)
         bind_macos_shortcuts(root)
 
