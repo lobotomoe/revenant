@@ -183,7 +183,9 @@ def build_py2app():
         py_ver = f"python{sys.version_info.major}.{sys.version_info.minor}"
         tkinter_dst = app_dst / "Contents" / "Resources" / "lib" / py_ver / "tkinter"
         if tkinter_src.exists() and not tkinter_dst.exists():
-            print(f"\nCopying tkinter from {tkinter_src} (py2app missed it due to Python.framework path)")
+            print(
+                f"\nCopying tkinter from {tkinter_src} (py2app missed it due to Python.framework path)"
+            )
             shutil.copytree(str(tkinter_src), str(tkinter_dst))
 
     print("\npy2app build complete.")
