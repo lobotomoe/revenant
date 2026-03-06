@@ -91,9 +91,10 @@ runs:
         cd /tmp/tk-build
 
         # Use the same configure flags as the Homebrew tcl-tk formula.
+        # Tk's configure script lives in unix/ (not the source root).
         # --with-tcl points to the already-installed Homebrew Tcl so we
         # only need to rebuild the Tk dylib, not Tcl itself.
-        /tmp/tk-src/configure \
+        /tmp/tk-src/unix/configure \
           --prefix="${BREW_TCL}" \
           --includedir="${BREW_TCL}/include/tcl-tk" \
           --disable-zipfs \
