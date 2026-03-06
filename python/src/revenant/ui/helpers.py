@@ -222,11 +222,24 @@ def atomic_write(path: Path, data: bytes) -> None:
     Prevents partial writes from leaving corrupt output files if
     the process is interrupted mid-write (e.g., disk full, Ctrl-C).
 
+    On sandboxed macOS (MAS/TestFlight) the Save Panel grants write access
+    only to the specific chosen file, not to creating temp files in the same
+    directory.  In that case we fall back to a direct write.
+
     Args:
         path: Target file path.
         data: Bytes to write.
     """
-    fd, tmp_path = tempfile.mkstemp(dir=path.parent, suffix=".tmp")
+    try:
+        fd, tmp_path = tempfile.mkstemp(dir=path.parent, suffix=".tmp")
+    except PermissionError:
+        # Sandbox: can only write to the exact path from the Save Panel.
+        with open(path, "wb") as f:
+            f.write(data)
+            f.flush()
+            os.fsync(f.fileno())
+        return
+
     tmp = Path(tmp_path)
     try:
         os.write(fd, data)
