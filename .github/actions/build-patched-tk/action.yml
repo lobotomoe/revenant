@@ -145,7 +145,7 @@ runs:
         fi
         TARGET="${BREW_TCL}/lib/$(basename "${PATCHED}")"
         echo "Installing ${PATCHED} → ${TARGET}"
-        cp "${PATCHED}" "${TARGET}"
+        sudo cp "${PATCHED}" "${TARGET}"
         echo "Installed patched $(basename "${TARGET}")"
 
         # Sanity-check: verify no private API remains in the installed dylib
