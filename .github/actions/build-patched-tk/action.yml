@@ -111,7 +111,7 @@ runs:
           --with-tcl="${BREW_TCL}/lib" \
           CPPFLAGS="-I${BREW_TCL}/include/tcl-tk" \
           CFLAGS="-arch arm64 -mmacosx-version-min=12.0 -O2" \
-          LDFLAGS="-arch arm64"
+          LDFLAGS="-arch arm64 -L$(brew --prefix libtommath)/lib"
 
         make -j"$(sysctl -n hw.ncpu)"
 
