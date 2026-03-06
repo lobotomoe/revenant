@@ -1,8 +1,9 @@
 name: Set up Python with Tk 9.0
 description: >
-  Install Homebrew Python + python-tk@3.13 (linked to Tk 9.0) and create
-  a venv. System Tk 8.6 contains private API _NSWindowDidOrderOnScreenNotification
-  which causes Mac App Store rejection (Guideline 2.5.1).
+  Install Homebrew Python + python-tk@3.13 (linked to Tk 9.0), patch the Tk
+  dylib to remove private API references (NSWindowDidOrderOnScreenNotification /
+  NSWindowWillOrderOnScreenNotification) that cause Mac App Store rejection
+  (Guideline 2.5.1), and create a venv ready for py2app.
 
 inputs:
   cache-key-prefix:
@@ -20,6 +21,9 @@ runs:
         PYTHON="$(brew --prefix python@3.13)/bin/python3.13"
         "$PYTHON" -m venv /tmp/venv-tk9
         echo "/tmp/venv-tk9/bin" >> "$GITHUB_PATH"
+
+    - name: Build and install patched Tk dylib
+      uses: ./.github/actions/build-patched-tk
 
     - name: Cache pip downloads
       uses: actions/cache@5a3ec84eff668545956fd18022155c47e93e2684 # v4

@@ -1,0 +1,146 @@
+name: Build Tk from source (private API fix)
+description: >
+  Clone Tk 9.0.x at the installed tcl-tk version, remove the
+  NSWindowDidOrderOnScreenNotification and NSWindowWillOrderOnScreenNotification
+  references from tkMacOSXWindowEvent.c, build the patched dylib, and replace
+  the Homebrew libtcl9tk9.0.dylib before py2app bundles it.
+
+  These are private macOS APIs that trigger MAS rejection (Guideline 2.5.1).
+  The fix (moving the code to #if 0) is merged in Tk main but not backported
+  to the 9.0.x release branch.
+  Upstream: https://core.tcl-lang.org/tk/tktview/a9969f7ffd966229c4e6
+
+  The patched dylib is cached by tcl-tk version so subsequent CI runs are fast.
+
+inputs:
+  cache-key-prefix:
+    description: Prefix for the Tk build cache key
+    required: false
+    default: patched-tk
+
+runs:
+  using: composite
+  steps:
+    - name: Get tcl-tk version
+      id: version
+      shell: bash
+      run: |
+        TK_VER=$(brew info --json=v1 tcl-tk | python3 -c "
+        import json, sys
+        data = json.load(sys.stdin)
+        print(data[0]['installed'][0]['version'])
+        ")
+        echo "tk_version=${TK_VER}" >> "$GITHUB_OUTPUT"
+        echo "Detected tcl-tk version: ${TK_VER}"
+
+    - name: Cache patched Tk dylib
+      id: cache
+      uses: actions/cache@5a3ec84eff668545956fd18022155c47e93e2684 # v4
+      with:
+        path: /tmp/patched-tk
+        key: ${{ inputs.cache-key-prefix }}-${{ steps.version.outputs.tk_version }}-arm64
+
+    - name: Clone Tk source
+      if: steps.cache.outputs.cache-hit != 'true'
+      shell: bash
+      run: |
+        set -euo pipefail
+        TK_VER="${{ steps.version.outputs.tk_version }}"
+        TK_TAG="core-$(echo "${TK_VER}" | tr '.' '-')"
+        echo "Cloning tcltk/tk at tag ${TK_TAG}"
+        rm -rf /tmp/tk-src
+        git clone --depth 1 --branch "${TK_TAG}" \
+          https://github.com/tcltk/tk /tmp/tk-src
+
+    - name: Patch private API references
+      if: steps.cache.outputs.cache-hit != 'true'
+      shell: bash
+      run: |
+        set -euo pipefail
+        FILE="/tmp/tk-src/macosx/tkMacOSXWindowEvent.c"
+
+        # Remove extern declarations (lines 37-38 in 9.0.3) and the two
+        # observe() calls (lines 446-447 in 9.0.3) that register for these
+        # private notifications.  The same change is already in Tk main
+        # (moved behind #if 0); we apply it to the release branch.
+        sed -i '' \
+          '/NSWindowWillOrderOnScreenNotification/d;/NSWindowDidOrderOnScreenNotification/d' \
+          "${FILE}"
+
+        if grep -q 'NSWindowDidOrderOnScreenNotification\|NSWindowWillOrderOnScreenNotification' \
+             "${FILE}"; then
+          echo "ERROR: private API references still present after patch" >&2
+          grep -n 'NSWindowOrderOnScreen' "${FILE}" >&2
+          exit 1
+        fi
+        echo "Patch applied — 0 private API references remain in $(basename "${FILE}")"
+
+    - name: Build patched Tk
+      if: steps.cache.outputs.cache-hit != 'true'
+      shell: bash
+      run: |
+        set -euo pipefail
+        BREW_TCL="$(brew --prefix tcl-tk)"
+
+        rm -rf /tmp/tk-build
+        mkdir /tmp/tk-build
+        cd /tmp/tk-build
+
+        # Use the same configure flags as the Homebrew tcl-tk formula.
+        # --with-tcl points to the already-installed Homebrew Tcl so we
+        # only need to rebuild the Tk dylib, not Tcl itself.
+        /tmp/tk-src/configure \
+          --prefix="${BREW_TCL}" \
+          --includedir="${BREW_TCL}/include/tcl-tk" \
+          --disable-zipfs \
+          --enable-man-suffix \
+          --enable-64bit \
+          --with-system-libtommath \
+          --enable-aqua=yes \
+          --without-x \
+          --with-tcl="${BREW_TCL}/lib" \
+          CFLAGS="-arch arm64 -mmacosx-version-min=12.0 -O2" \
+          LDFLAGS="-arch arm64"
+
+        make -j"$(sysctl -n hw.ncpu)"
+
+        # The Tk build produces libtcl9tk9.0.dylib (TK_LIB_FILE in tkConfig.sh)
+        DYLIB=$(find . -maxdepth 2 -name "libtcl*tk*.dylib" | head -1)
+        if [ -z "${DYLIB}" ]; then
+          echo "ERROR: Tk dylib not found after build" >&2
+          find . -name "*.dylib" >&2
+          exit 1
+        fi
+        echo "Built: ${DYLIB}"
+
+        # The install ID must match the Homebrew path so that py2app's
+        # install_name_tool pass recognises and relocates it correctly.
+        BREW_ID="${BREW_TCL}/lib/$(basename "${DYLIB}")"
+        install_name_tool -id "${BREW_ID}" "${DYLIB}"
+
+        mkdir -p /tmp/patched-tk
+        cp "${DYLIB}" /tmp/patched-tk/
+        echo "Cached to /tmp/patched-tk/$(basename "${DYLIB}")"
+
+    - name: Install patched Tk dylib
+      shell: bash
+      run: |
+        set -euo pipefail
+        BREW_TCL="$(brew --prefix tcl-tk)"
+        PATCHED=$(ls /tmp/patched-tk/libtcl*tk*.dylib 2>/dev/null | head -1)
+        if [ -z "${PATCHED}" ]; then
+          echo "ERROR: patched dylib not found in /tmp/patched-tk/" >&2
+          exit 1
+        fi
+        TARGET="${BREW_TCL}/lib/$(basename "${PATCHED}")"
+        echo "Installing ${PATCHED} → ${TARGET}"
+        cp "${PATCHED}" "${TARGET}"
+        echo "Installed patched $(basename "${TARGET}")"
+
+        # Sanity-check: verify no private API remains in the installed dylib
+        if nm -u "${TARGET}" 2>/dev/null | \
+             grep -q 'NSWindow.*OrderO.*ScreenNotification'; then
+          echo "ERROR: private API symbols still present in installed dylib" >&2
+          exit 1
+        fi
+        echo "Verified: no private API symbols in installed dylib"

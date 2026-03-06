@@ -1,160 +1,23 @@
 name: Patch private API symbols in bundled Tk
 description: >
-  Replace private Apple API symbol names in bundled Tk dylibs with harmless
-  same-length alternatives to avoid Mac App Store rejection (Guideline 2.5.1).
-  The symbols are declared as extern in Tk source (tkMacOSXWindowEvent.c) but
-  never used at runtime (code behind #if 0). Must run AFTER py2app but BEFORE
-  codesigning. Upstream: https://core.tcl-lang.org/tk/tktview/a9969f7ffd966229c4e6
-  NOTE: libtcl9.0.dylib also contains deprecated dyld symbols
-  (NSAddressOfSymbol, NSLookupSymbolInImage, NSLinkModule, etc.)
-  behind #ifdef TCL_LOAD_FROM_MEMORY in unix/tclLoadDyld.c.
-  Apple has not rejected for these yet, but if they do, add them
-  to the SYMBOLS array below or rebuild Tcl without TCL_LOAD_FROM_MEMORY.
+  DEPRECATED — no longer needed.  Private API symbols are now removed at
+  build time by the build-patched-tk action, which compiles Tk from source
+  with the NSWindowDidOrderOnScreenNotification /
+  NSWindowWillOrderOnScreenNotification references deleted before the dylib
+  is built.  This action is retained as a no-op so that any workflow steps
+  that still reference it do not break.
+  Upstream: https://core.tcl-lang.org/tk/tktview/a9969f7ffd966229c4e6
 
 inputs:
   app-path:
-    description: Path to the .app bundle to patch
+    description: Path to the .app bundle (unused)
     required: false
     default: dist/Revenant.app
 
 runs:
   using: composite
   steps:
-    - name: Patch private API symbol names in Tk dylibs
+    - name: No-op (private API already removed at build time)
       shell: bash
       run: |
-        SYMBOLS=(
-          "_NSWindowDidOrderOnScreenNotification"
-          "_NSWindowWillOrderOnScreenNotification"
-        )
-        REPLACEMENTS=(
-          "_XXWindowDidOrderOnScreenNotification"
-          "_XXWindowWillOrderOnScreenNotification"
-        )
-
-        patched=0
-        while IFS= read -r bin; do
-          for i in "${!SYMBOLS[@]}"; do
-            sym="${SYMBOLS[$i]}"
-            rep="${REPLACEMENTS[$i]}"
-            if LC_ALL=C grep -q "$sym" "$bin" 2>/dev/null; then
-              echo "Patching $sym -> $rep in $(basename "$bin")"
-              LC_ALL=C perl -pi -e "s/\Q${sym}\E/${rep}/g" "$bin"
-              patched=1
-            fi
-          done
-        done < <(find "${{ inputs.app-path }}/Contents/Frameworks" -type f -name '*.dylib')
-
-        if [ "$patched" -eq 0 ]; then
-          echo "::warning::No private API symbols found to patch"
-        fi
-
-    - name: Mark renamed symbols as weak imports
-      shell: python3 {0}
-      env:
-        APP_PATH: ${{ inputs.app-path }}
-      run: |
-        """
-        After renaming _NSWindow* -> _XXWindow*, the chained-fixups import table
-        still marks them as strong (weak_import=0).  dyld then looks for
-        _XXWindow* in AppKit, fails, and refuses to load libtcl9tk9.0.dylib.
-
-        Fix: set weak_import=1 for the renamed entries.  dyld will silently set
-        the pointer to NULL instead of aborting -- safe because the Tk code that
-        uses these symbols is behind #if 0 and never executes.
-
-        Mach-O chained-fixups import entry layout (DYLD_CHAINED_IMPORT, 4 bytes):
-          bits [7:0]  = lib_ordinal
-          bit  [8]    = weak_import
-          bits [31:9] = name_offset  (into symbols area)
-        """
-        import os
-        import struct
-        from pathlib import Path
-
-        APP_PATH = Path(os.environ["APP_PATH"])
-
-        RENAMED = {
-            b"_XXWindowDidOrderOnScreenNotification",
-            b"_XXWindowWillOrderOnScreenNotification",
-        }
-
-        LC_DYLD_CHAINED_FIXUPS = 0x80000034
-        ENTRY_SIZES = {1: 4, 2: 8, 3: 16}
-
-
-        def make_weak_imports(path: Path) -> int:
-            data = bytearray(path.read_bytes())
-            magic = struct.unpack_from("<I", data, 0)[0]
-            if magic != 0xFEEDFACF:  # MH_MAGIC_64
-                return 0
-
-            ncmds = struct.unpack_from("<I", data, 16)[0]
-            lc_off = 32  # sizeof(mach_header_64)
-            cf_data_off = None
-
-            for _ in range(ncmds):
-                cmd, cmdsize = struct.unpack_from("<II", data, lc_off)
-                if cmd == LC_DYLD_CHAINED_FIXUPS:
-                    cf_data_off = struct.unpack_from("<I", data, lc_off + 8)[0]
-                    break
-                lc_off += cmdsize
-
-            if cf_data_off is None:
-                return 0
-
-            # dyld_chained_fixups_header: 7 x uint32
-            _, _, imports_offset, symbols_offset, imports_count, imports_format, _ = (
-                struct.unpack_from("<7I", data, cf_data_off)
-            )
-            entry_size = ENTRY_SIZES.get(imports_format)
-            if entry_size is None:
-                return 0
-
-            imports_abs = cf_data_off + imports_offset
-            symbols_abs = cf_data_off + symbols_offset
-            patched = 0
-
-            for i in range(imports_count):
-                entry_off = imports_abs + i * entry_size
-                entry_val = struct.unpack_from("<I", data, entry_off)[0]
-                name_offset = (entry_val >> 9) & 0x7FFFFF
-                name_abs = symbols_abs + name_offset
-                name = bytes(data[name_abs : data.index(0, name_abs)])
-                if name in RENAMED and not ((entry_val >> 8) & 1):
-                    struct.pack_into("<I", data, entry_off, entry_val | 0x100)
-                    print(f"  weak import: {name.decode()}")
-                    patched += 1
-
-            if patched:
-                path.write_bytes(data)
-            return patched
-
-
-        total = 0
-        for dylib in (APP_PATH / "Contents" / "Frameworks").glob("*.dylib"):
-            n = make_weak_imports(dylib)
-            if n:
-                print(f"Patched {n} symbol(s) in {dylib.name}")
-                total += n
-
-        if total == 0:
-            print("No weak import changes needed")
-        else:
-            print(f"Done: {total} symbol(s) made weak")
-
-        # Verify no private API symbols remain
-        remaining=0
-        while IFS= read -r bin; do
-          matches=$(nm -u "$bin" 2>/dev/null | grep 'NSWindow.*OrderO.*ScreenNotification' || true)
-          if [ -n "$matches" ]; then
-            echo "::error::Private API symbol still present in $(basename "$bin") after patching:"
-            echo "$matches"
-            remaining=1
-          fi
-        done < <(find "${{ inputs.app-path }}/Contents/Frameworks" -type f -name '*.dylib')
-
-        if [ "$remaining" -eq 1 ]; then
-          exit 1
-        fi
-        echo "Private API symbols successfully patched"
+        echo "patch-tk-private-api: no-op — Tk dylib was built without private API symbols."

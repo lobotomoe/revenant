@@ -409,11 +409,6 @@ jobs:
         env:
           BUILD_NUMBER: ${{ github.run_number }}
 
-      - name: Patch private API symbols in bundled Tk
-        uses: ./.github/actions/patch-tk-private-api
-        with:
-          app-path: python/dist/Revenant.app
-
       - name: Verify no private API in bundled Tk
         uses: ./.github/actions/verify-no-private-api
         with:
