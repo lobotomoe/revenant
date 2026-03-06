@@ -94,16 +94,22 @@ runs:
         # Tk's configure script lives in unix/ (not the source root).
         # --with-tcl points to the already-installed Homebrew Tcl so we
         # only need to rebuild the Tk dylib, not Tcl itself.
+        #
+        # CPPFLAGS: tclConfig.sh from a Homebrew bottle contains hardcoded
+        # include paths from the Homebrew build server (/private/tmp/tcl-tk-*/),
+        # which do not exist on this runner. Without an explicit -I the compiler
+        # falls back to the Xcode SDK tcl.h (Tcl 8.6) and fails with
+        # "Tk 9.0 must be compiled with tcl.h from Tcl 9.0 or better".
         /tmp/tk-src/unix/configure \
           --prefix="${BREW_TCL}" \
           --includedir="${BREW_TCL}/include/tcl-tk" \
           --disable-zipfs \
           --enable-man-suffix \
           --enable-64bit \
-          --with-system-libtommath \
           --enable-aqua=yes \
           --without-x \
           --with-tcl="${BREW_TCL}/lib" \
+          CPPFLAGS="-I${BREW_TCL}/include/tcl-tk" \
           CFLAGS="-arch arm64 -mmacosx-version-min=12.0 -O2" \
           LDFLAGS="-arch arm64"
 
