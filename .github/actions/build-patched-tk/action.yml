@@ -1,9 +1,10 @@
 name: Build Tk from source (private API fix)
 description: >
-  Clone Tk 9.0.x at the installed tcl-tk version, remove the
-  NSWindowDidOrderOnScreenNotification and NSWindowWillOrderOnScreenNotification
-  references from tkMacOSXWindowEvent.c, build the patched dylib, and replace
-  the Homebrew libtcl9tk9.0.dylib before py2app bundles it.
+  Download the Tk 9.0.x source tarball (same as Homebrew uses) at the installed
+  tcl-tk version, remove the NSWindowDidOrderOnScreenNotification and
+  NSWindowWillOrderOnScreenNotification references from tkMacOSXWindowEvent.c,
+  build the patched dylib, and replace the Homebrew libtcl9tk9.0.dylib before
+  py2app bundles it.
 
   These are private macOS APIs that trigger MAS rejection (Guideline 2.5.1).
   The fix (moving the code to #if 0) is merged in Tk main but not backported
@@ -40,17 +41,20 @@ runs:
         path: /tmp/patched-tk
         key: ${{ inputs.cache-key-prefix }}-${{ steps.version.outputs.tk_version }}-arm64
 
-    - name: Clone Tk source
+    - name: Download Tk source tarball
       if: steps.cache.outputs.cache-hit != 'true'
       shell: bash
       run: |
         set -euo pipefail
         TK_VER="${{ steps.version.outputs.tk_version }}"
-        TK_TAG="core-$(echo "${TK_VER}" | tr '.' '-')"
-        echo "Cloning tcltk/tk at tag ${TK_TAG}"
-        rm -rf /tmp/tk-src
-        git clone --depth 1 --branch "${TK_TAG}" \
-          https://github.com/tcltk/tk /tmp/tk-src
+        TARBALL_URL="https://prdownloads.sourceforge.net/tcl/tk${TK_VER}-src.tar.gz"
+        echo "Downloading Tk ${TK_VER} source from ${TARBALL_URL}"
+        rm -rf /tmp/tk-src /tmp/tk-src.tar.gz
+        curl -fsSL "${TARBALL_URL}" -o /tmp/tk-src.tar.gz
+        tar xzf /tmp/tk-src.tar.gz -C /tmp/
+        mv "/tmp/tk${TK_VER}" /tmp/tk-src
+        rm /tmp/tk-src.tar.gz
+        echo "Extracted to /tmp/tk-src"
 
     - name: Patch private API references
       if: steps.cache.outputs.cache-hit != 'true'
