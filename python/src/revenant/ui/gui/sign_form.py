@@ -275,6 +275,52 @@ class SignForm:
         """Update the credential storage label to reflect current state."""
         self._storage_var.set(get_credential_storage_info())
 
+    def confirm_output_for_sandbox(self) -> bool:
+        """Ensure sandbox write permission for the output file.
+
+        When the output path was auto-generated (not chosen via Browse), the
+        macOS sandbox has not granted write access to that path.  Show a Save
+        Panel pre-filled with the auto-generated name so the user confirms the
+        location — the system save panel is what grants the write permission.
+
+        Returns True if the caller should proceed, False if user cancelled.
+        """
+        if not self._auto_output:
+            # Path was explicitly chosen via Browse — already has permission.
+            return True
+
+        from pathlib import Path
+        from tkinter import filedialog
+
+        current = self._output_path.get().strip()
+        is_detached = self._signing_mode.get() == "detached"
+        initial_dir = str(Path(current).parent) if current else ""
+        initial_file = Path(current).name if current else ""
+
+        if is_detached:
+            path = filedialog.asksaveasfilename(
+                title="Save signature as",
+                initialdir=initial_dir,
+                initialfile=initial_file,
+                defaultextension=".p7s",
+                filetypes=[("PKCS#7 signature", "*.p7s"), ("All files", "*.*")],
+            )
+        else:
+            path = filedialog.asksaveasfilename(
+                title="Save signed PDF as",
+                initialdir=initial_dir,
+                initialfile=initial_file,
+                defaultextension=".pdf",
+                filetypes=[("PDF files", "*.pdf")],
+            )
+
+        if not path:
+            return False
+
+        self._output_path.set(path)
+        self._auto_output = ""  # Now user-confirmed
+        return True
+
     # ── Form state handlers ──────────────────────────────────────
 
     @staticmethod

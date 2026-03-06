@@ -229,6 +229,12 @@ class RevenantGUI:
         if self._sign_form is None:
             return
 
+        # On sandboxed builds (MAS/TestFlight) the system only grants write
+        # access to files the user explicitly selects through a Save Panel.
+        # If the output path was auto-generated we must show one now.
+        if not self._sign_form.confirm_output_for_sandbox():
+            return
+
         def _prompt_and_refresh() -> tuple[str, str] | None:
             result = login_dialog(self.root)
             if result is not None and self._sign_form is not None:
