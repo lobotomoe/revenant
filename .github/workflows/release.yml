@@ -93,8 +93,10 @@ jobs:
           # checksummed releases of the script), but the runner is ephemeral.
           arch -x86_64 /bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/HEAD/install.sh)" </dev/null
 
-          # Install x86_64 Python 3.13 with Tk support
+          # Install x86_64 Python 3.13 with Tk support (--overwrite because
+          # the runner may already have symlinks in /usr/local/bin from setup-python)
           arch -x86_64 /usr/local/bin/brew install python-tk@3.13
+          arch -x86_64 /usr/local/bin/brew link --overwrite python@3.13
 
           # Create x86_64 venv and put it on PATH
           X64_PYTHON="/usr/local/opt/python@3.13/bin/python3.13"
@@ -309,8 +311,10 @@ jobs:
           # Install x86_64 Homebrew to /usr/local (see comment in build job)
           arch -x86_64 /bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/HEAD/install.sh)" </dev/null
 
-          # Install x86_64 Python + Tk
+          # Install x86_64 Python + Tk (--overwrite because the runner
+          # may already have symlinks in /usr/local/bin from setup-python)
           arch -x86_64 /usr/local/bin/brew install python-tk@3.13
+          arch -x86_64 /usr/local/bin/brew link --overwrite python@3.13
 
           # Create x86_64 venv
           X64_PYTHON="/usr/local/opt/python@3.13/bin/python3.13"
