@@ -106,6 +106,21 @@ runs:
         set -euo pipefail
         BREW="${{ inputs.brew-path }}"
         BREW_TCL="$($BREW --prefix tcl-tk)"
+        TARGET_ARCH="${{ steps.arch.outputs.arch }}"
+
+        # tclConfig.sh from a Homebrew bottle embeds the architecture it
+        # was built with (e.g. -arch arm64).  When cross-building for a
+        # different arch via Rosetta, Tk's configure inherits those flags
+        # and the linker tries to produce a fat binary it cannot satisfy.
+        # Fix: replace any wrong -arch flags in the Tcl config.
+        TCL_CONFIG="${BREW_TCL}/lib/tclConfig.sh"
+        if [ "$TARGET_ARCH" = "x86_64" ]; then
+          sed -i '' "s/-arch arm64/-arch x86_64/g" "$TCL_CONFIG"
+          echo "Patched tclConfig.sh: replaced -arch arm64 with -arch x86_64"
+        elif [ "$TARGET_ARCH" = "arm64" ]; then
+          sed -i '' "s/-arch x86_64/-arch arm64/g" "$TCL_CONFIG"
+          echo "Patched tclConfig.sh: replaced -arch x86_64 with -arch arm64"
+        fi
 
         rm -rf /tmp/tk-build
         mkdir /tmp/tk-build
