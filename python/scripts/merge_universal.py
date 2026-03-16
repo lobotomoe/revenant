@@ -51,9 +51,7 @@ def lipo_create(arm64: Path, x64: Path, output: Path) -> None:
         timeout=LIPO_TIMEOUT,
     )
     if result.returncode != 0:
-        raise RuntimeError(
-            f"lipo failed for {output.name}: {result.stderr.strip()}"
-        )
+        raise RuntimeError(f"lipo failed for {output.name}: {result.stderr.strip()}")
 
 
 def merge_app_bundles(arm64_app: Path, x64_app: Path, output_app: Path) -> None:
