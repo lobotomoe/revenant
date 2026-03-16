@@ -18,15 +18,35 @@ inputs:
     description: Prefix for the Tk build cache key
     required: false
     default: patched-tk
+  arch:
+    description: Target architecture (arm64 or x86_64). Defaults to runner native arch.
+    required: false
+    default: ""
+  brew-path:
+    description: Path to brew binary (e.g. /usr/local/bin/brew for x86_64 Rosetta builds).
+    required: false
+    default: brew
 
 runs:
   using: composite
   steps:
+    - name: Detect target architecture
+      id: arch
+      shell: bash
+      run: |
+        ARCH="${{ inputs.arch }}"
+        if [ -z "$ARCH" ]; then
+          ARCH="$(uname -m)"
+        fi
+        echo "arch=${ARCH}" >> "$GITHUB_OUTPUT"
+        echo "Target architecture: ${ARCH}"
+
     - name: Get tcl-tk version
       id: version
       shell: bash
       run: |
-        TK_VER=$(brew info --json=v1 tcl-tk | python3 -c "
+        BREW="${{ inputs.brew-path }}"
+        TK_VER=$($BREW info --json=v1 tcl-tk | python3 -c "
         import json, sys
         data = json.load(sys.stdin)
         print(data[0]['installed'][0]['version'])
@@ -39,7 +59,7 @@ runs:
       uses: actions/cache@5a3ec84eff668545956fd18022155c47e93e2684 # v4
       with:
         path: /tmp/patched-tk
-        key: ${{ inputs.cache-key-prefix }}-${{ steps.version.outputs.tk_version }}-arm64
+        key: ${{ inputs.cache-key-prefix }}-${{ steps.version.outputs.tk_version }}-${{ steps.arch.outputs.arch }}
 
     - name: Download Tk source tarball
       if: steps.cache.outputs.cache-hit != 'true'
@@ -84,7 +104,8 @@ runs:
       shell: bash
       run: |
         set -euo pipefail
-        BREW_TCL="$(brew --prefix tcl-tk)"
+        BREW="${{ inputs.brew-path }}"
+        BREW_TCL="$($BREW --prefix tcl-tk)"
 
         rm -rf /tmp/tk-build
         mkdir /tmp/tk-build
@@ -110,8 +131,8 @@ runs:
           --without-x \
           --with-tcl="${BREW_TCL}/lib" \
           CPPFLAGS="-I${BREW_TCL}/include/tcl-tk" \
-          CFLAGS="-arch arm64 -mmacosx-version-min=12.0 -O2" \
-          LDFLAGS="-arch arm64 -L$(brew --prefix libtommath)/lib"
+          CFLAGS="-arch ${{ steps.arch.outputs.arch }} -mmacosx-version-min=12.0 -O2" \
+          LDFLAGS="-arch ${{ steps.arch.outputs.arch }} -L$($BREW --prefix libtommath)/lib"
 
         make -j"$(sysctl -n hw.ncpu)"
 
@@ -137,7 +158,8 @@ runs:
       shell: bash
       run: |
         set -euo pipefail
-        BREW_TCL="$(brew --prefix tcl-tk)"
+        BREW="${{ inputs.brew-path }}"
+        BREW_TCL="$($BREW --prefix tcl-tk)"
         PATCHED=$(ls /tmp/patched-tk/libtcl*tk*.dylib 2>/dev/null | head -1)
         if [ -z "${PATCHED}" ]; then
           echo "ERROR: patched dylib not found in /tmp/patched-tk/" >&2
