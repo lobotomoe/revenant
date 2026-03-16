@@ -114,6 +114,8 @@ def merge_app_bundles(arm64_app: Path, x64_app: Path, output_app: Path) -> None:
             continue
         rel = x64_file.relative_to(x64_app)
         if not (output_app / rel).exists():
+            if is_macho(x64_file):
+                raise RuntimeError(f"x64-only Mach-O file has no arm64 counterpart: {rel}")
             out_file = output_app / rel
             out_file.parent.mkdir(parents=True, exist_ok=True)
             shutil.copy2(x64_file, out_file)
