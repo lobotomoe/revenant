@@ -34,12 +34,12 @@ def is_macho(path: Path) -> bool:
     try:
         with open(path, "rb") as f:
             magic_bytes = f.read(4)
-        if len(magic_bytes) < 4:
-            return False
-        magic = struct.unpack(">I", magic_bytes)[0]
-        return magic in MACHO_MAGICS
-    except (OSError, struct.error):
+    except OSError:
         return False
+    if len(magic_bytes) < 4:
+        return False
+    magic = struct.unpack(">I", magic_bytes)[0]
+    return magic in MACHO_MAGICS
 
 
 def lipo_create(arm64: Path, x64: Path, output: Path) -> None:
