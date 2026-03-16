@@ -71,6 +71,15 @@ def merge_app_bundles(arm64_app: Path, x64_app: Path, output_app: Path) -> None:
     copied_count = 0
 
     for arm64_file in sorted(arm64_app.rglob("*")):
+        # Handle symlinks first (including directory symlinks in .framework bundles)
+        if arm64_file.is_symlink():
+            rel = arm64_file.relative_to(arm64_app)
+            out_file = output_app / rel
+            out_file.parent.mkdir(parents=True, exist_ok=True)
+            link_target = arm64_file.readlink()
+            out_file.symlink_to(link_target)
+            continue
+
         if arm64_file.is_dir():
             continue
 
@@ -79,33 +88,32 @@ def merge_app_bundles(arm64_app: Path, x64_app: Path, output_app: Path) -> None:
         out_file = output_app / rel
         out_file.parent.mkdir(parents=True, exist_ok=True)
 
-        # Symlinks: preserve as-is
-        if arm64_file.is_symlink():
-            link_target = arm64_file.readlink()
-            out_file.symlink_to(link_target)
-            continue
-
         if is_macho(arm64_file):
             if not x64_file.exists():
-                print(f"  WARNING: no x64 counterpart for {rel}, copying arm64 only")
-                shutil.copy2(arm64_file, out_file)
-            else:
-                lipo_create(arm64_file, x64_file, out_file)
-                # Preserve permissions (executable bit)
-                out_file.chmod(arm64_file.stat().st_mode)
-                macho_count += 1
+                raise RuntimeError(f"Missing x64 counterpart for Mach-O file: {rel}")
+            lipo_create(arm64_file, x64_file, out_file)
+            out_file.chmod(arm64_file.stat().st_mode)
+            macho_count += 1
         else:
             shutil.copy2(arm64_file, out_file)
             copied_count += 1
 
     # Check for x64-only files (files that exist in x64 but not in arm64)
     for x64_file in x64_app.rglob("*"):
+        # Preserve x64-only symlinks (including directory symlinks)
+        if x64_file.is_symlink():
+            rel = x64_file.relative_to(x64_app)
+            if not (output_app / rel).exists():
+                out_file = output_app / rel
+                out_file.parent.mkdir(parents=True, exist_ok=True)
+                out_file.symlink_to(x64_file.readlink())
+                print(f"  WARNING: x64-only symlink included: {rel}")
+            continue
+
         if x64_file.is_dir():
             continue
         rel = x64_file.relative_to(x64_app)
-        if not (output_app / rel).exists() and not x64_file.is_symlink():
-            # x64 has a file arm64 doesn't -- could be a platform-specific
-            # dependency. Warn but include it.
+        if not (output_app / rel).exists():
             out_file = output_app / rel
             out_file.parent.mkdir(parents=True, exist_ok=True)
             shutil.copy2(x64_file, out_file)
