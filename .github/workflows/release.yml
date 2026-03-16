@@ -93,10 +93,15 @@ jobs:
           # checksummed releases of the script), but the runner is ephemeral.
           arch -x86_64 /bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/HEAD/install.sh)" </dev/null
 
-          # Install x86_64 Python 3.13 with Tk support (--overwrite because
-          # the runner may already have symlinks in /usr/local/bin from setup-python)
+          # The runner image ships Python 3.13 symlinks in /usr/local/bin
+          # pointing at /Library/Frameworks/Python.framework (arm64).
+          # Remove them so Homebrew x86_64 python@3.13 can link cleanly.
+          for f in /usr/local/bin/python3.13* /usr/local/bin/pip3.13* \
+                   /usr/local/bin/idle3.13* /usr/local/bin/pydoc3.13*; do
+            [ -L "$f" ] && rm "$f"
+          done
+
           arch -x86_64 /usr/local/bin/brew install python-tk@3.13
-          arch -x86_64 /usr/local/bin/brew link --overwrite python@3.13
 
           # Create x86_64 venv and put it on PATH
           X64_PYTHON="/usr/local/opt/python@3.13/bin/python3.13"
@@ -311,10 +316,13 @@ jobs:
           # Install x86_64 Homebrew to /usr/local (see comment in build job)
           arch -x86_64 /bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/HEAD/install.sh)" </dev/null
 
-          # Install x86_64 Python + Tk (--overwrite because the runner
-          # may already have symlinks in /usr/local/bin from setup-python)
+          # Remove pre-existing Python 3.13 symlinks (see comment in build job)
+          for f in /usr/local/bin/python3.13* /usr/local/bin/pip3.13* \
+                   /usr/local/bin/idle3.13* /usr/local/bin/pydoc3.13*; do
+            [ -L "$f" ] && rm "$f"
+          done
+
           arch -x86_64 /usr/local/bin/brew install python-tk@3.13
-          arch -x86_64 /usr/local/bin/brew link --overwrite python@3.13
 
           # Create x86_64 venv
           X64_PYTHON="/usr/local/opt/python@3.13/bin/python3.13"
