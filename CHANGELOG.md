@@ -7,6 +7,20 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.1.0] - 2026-03-16
+
+### Added
+
+- **Universal macOS binaries** (arm64 + x86_64) -- Intel Mac users can now install from the Mac App Store, Homebrew, and DMG
+- Mac App Store badge in README
+- `merge_universal.py` script for lipo-merging .app bundles and CLI binaries
+
+### Changed
+
+- Homebrew formula no longer requires `arch: :arm64`
+- Release pipeline builds on both `macos-latest` (arm64) and `macos-15-intel` (x86_64), merges with `lipo`
+- Release artifacts renamed from `*-macos-arm64` to `*-macos-universal`
+
 ## [1.0.0] - 2026-02-26
 
 ### Added
@@ -118,7 +132,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Pyright strict mode type checking with 0 errors
 - 96%+ test coverage (600+ tests)
 
-[Unreleased]: https://github.com/lobotomoe/revenant/compare/v1.0.0...HEAD
+[Unreleased]: https://github.com/lobotomoe/revenant/compare/v1.1.0...HEAD
+[1.1.0]: https://github.com/lobotomoe/revenant/compare/v1.0.0...v1.1.0
 [1.0.0]: https://github.com/lobotomoe/revenant/compare/v0.2.6...v1.0.0
 [0.2.6]: https://github.com/lobotomoe/revenant/compare/v0.2.5...v0.2.6
 [0.2.5]: https://github.com/lobotomoe/revenant/compare/v0.2.4...v0.2.5
