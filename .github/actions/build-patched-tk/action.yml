@@ -106,21 +106,6 @@ runs:
         set -euo pipefail
         BREW="${{ inputs.brew-path }}"
         BREW_TCL="$($BREW --prefix tcl-tk)"
-        TARGET_ARCH="${{ steps.arch.outputs.arch }}"
-
-        # tclConfig.sh from a Homebrew bottle embeds the architecture it
-        # was built with (e.g. -arch arm64).  When cross-building for a
-        # different arch via Rosetta, Tk's configure inherits those flags
-        # and the linker tries to produce a fat binary it cannot satisfy.
-        # Fix: replace any wrong -arch flags in the Tcl config.
-        TCL_CONFIG="${BREW_TCL}/lib/tclConfig.sh"
-        if [ "$TARGET_ARCH" = "x86_64" ]; then
-          sed -i '' "s/-arch arm64/-arch x86_64/g" "$TCL_CONFIG"
-          echo "Patched tclConfig.sh: replaced -arch arm64 with -arch x86_64"
-        elif [ "$TARGET_ARCH" = "arm64" ]; then
-          sed -i '' "s/-arch x86_64/-arch arm64/g" "$TCL_CONFIG"
-          echo "Patched tclConfig.sh: replaced -arch x86_64 with -arch arm64"
-        fi
 
         rm -rf /tmp/tk-build
         mkdir /tmp/tk-build
@@ -136,17 +121,7 @@ runs:
         # which do not exist on this runner. Without an explicit -I the compiler
         # falls back to the Xcode SDK tcl.h (Tcl 8.6) and fails with
         # "Tk 9.0 must be compiled with tcl.h from Tcl 9.0 or better".
-        # When cross-building (e.g. x86_64 on arm64 runner), run configure
-        # and make under the target arch so autoconf detects the correct host
-        # and the compiler defaults to the right architecture.
-        ARCH_PREFIX=""
-        NATIVE_ARCH="$(uname -m)"
-        if [ "$TARGET_ARCH" != "$NATIVE_ARCH" ]; then
-          ARCH_PREFIX="arch -$TARGET_ARCH"
-          echo "Cross-building: running configure/make under arch -$TARGET_ARCH"
-        fi
-
-        $ARCH_PREFIX /tmp/tk-src/unix/configure \
+        /tmp/tk-src/unix/configure \
           --prefix="${BREW_TCL}" \
           --includedir="${BREW_TCL}/include/tcl-tk" \
           --disable-zipfs \
@@ -156,10 +131,10 @@ runs:
           --without-x \
           --with-tcl="${BREW_TCL}/lib" \
           CPPFLAGS="-I${BREW_TCL}/include/tcl-tk" \
-          CFLAGS="-arch ${TARGET_ARCH} -mmacosx-version-min=12.0 -O2" \
-          LDFLAGS="-arch ${TARGET_ARCH} -L$($BREW --prefix libtommath)/lib"
+          CFLAGS="-arch ${{ steps.arch.outputs.arch }} -mmacosx-version-min=12.0 -O2" \
+          LDFLAGS="-arch ${{ steps.arch.outputs.arch }} -L$($BREW --prefix libtommath)/lib"
 
-        $ARCH_PREFIX make -j"$(sysctl -n hw.ncpu)"
+        make -j"$(sysctl -n hw.ncpu)"
 
         # The Tk build produces libtcl9tk9.0.dylib (TK_LIB_FILE in tkConfig.sh)
         DYLIB=$(find . -maxdepth 2 -name "libtcl*tk*.dylib" | head -1)
