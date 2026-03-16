@@ -10,6 +10,10 @@ inputs:
     description: Prefix for the pip cache key (must be unique per job)
     required: false
     default: pip-mac
+  arch:
+    description: Target architecture for Tk build (arm64 or x86_64). Defaults to runner native.
+    required: false
+    default: ""
 
 runs:
   using: composite
@@ -24,6 +28,8 @@ runs:
 
     - name: Build and install patched Tk dylib
       uses: ./.github/actions/build-patched-tk
+      with:
+        arch: ${{ inputs.arch }}
 
     - name: Cache pip downloads
       uses: actions/cache@5a3ec84eff668545956fd18022155c47e93e2684 # v4

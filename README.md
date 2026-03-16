@@ -44,6 +44,10 @@ The Armenian Government's EKENG CoSign appliance doesn't care about DocuSign's p
 brew install lobotomoe/revenant/revenant
 ```
 
+<a href="https://apps.apple.com/app/revenant-pdf-signer/id6759206299" target="_blank" rel="noopener noreferrer">
+  <img src="https://tools.applemediaservices.com/api/badges/download-on-the-mac-app-store/black/en-us" width="200" alt="Download on the Mac App Store"/>
+</a>
+
 **Linux**
 ```bash
 snap install revenant

@@ -37,6 +37,11 @@ jobs:
             platform: macos-arm64
             cli_artifact: revenant
             gui_artifact: Revenant.dmg
+          - os: macos-15
+            platform: macos-x64
+            cli_artifact: revenant
+            gui_artifact: Revenant.dmg
+            rosetta: true
           - os: ubuntu-latest
             platform: linux-x64
             cli_artifact: revenant
@@ -65,12 +70,44 @@ jobs:
         with:
           persist-credentials: false
 
-      - name: Set up Python
+      - name: Set up Python (native)
+        if: "!matrix.rosetta"
         uses: actions/setup-python@a309ff8b426b58ec0e2a45f0f869d46889d02405 # v6
         with:
           python-version: "3.13"
           cache: pip
           cache-dependency-path: python/pyproject.toml
+
+      # -- macOS x86_64 via Rosetta 2 on arm64 runner --------------------
+      - name: Set up Rosetta and x86_64 Python
+        if: matrix.rosetta
+        shell: bash
+        run: |
+          # Install Rosetta 2 (may already be present)
+          softwareupdate --install-rosetta --agree-to-license 2>/dev/null || true
+
+          # Install x86_64 Homebrew to /usr/local.
+          # The arm64 runner only has arm64 Homebrew at /opt/homebrew;
+          # we need a separate x86_64 prefix for Rosetta builds.
+          # Pinning the installer isn't practical (Homebrew doesn't publish
+          # checksummed releases of the script), but the runner is ephemeral.
+          arch -x86_64 /bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/HEAD/install.sh)" </dev/null
+
+          # Install x86_64 Python 3.13 with Tk support
+          arch -x86_64 /usr/local/bin/brew install python-tk@3.13
+
+          # Create x86_64 venv and put it on PATH
+          X64_PYTHON="/usr/local/opt/python@3.13/bin/python3.13"
+          arch -x86_64 "$X64_PYTHON" -m venv /tmp/venv-x64
+          echo "/tmp/venv-x64/bin" >> "$GITHUB_PATH"
+
+          # Verify architecture
+          ARCH=$(/tmp/venv-x64/bin/python -c "import platform; print(platform.machine())")
+          echo "Python architecture: $ARCH"
+          if [ "$ARCH" != "x86_64" ]; then
+            echo "ERROR: Expected x86_64 Python, got $ARCH" >&2
+            exit 1
+          fi
 
       - name: Install system dependencies (Linux)
         if: runner.os == 'Linux'
@@ -80,10 +117,6 @@ jobs:
           # PyInstaller expects /usr/share/tcltk/tcl8 but Ubuntu 24.04
           # only ships tcl8.6/; create the directory to suppress the warning.
           sudo mkdir -p /usr/share/tcltk/tcl8
-
-      - name: Install system dependencies (macOS)
-        if: runner.os == 'macOS'
-        run: brew install create-dmg
 
       - name: Install dependencies
         shell: bash
@@ -97,162 +130,37 @@ jobs:
           fi
           pip install --no-deps -e .
 
-      # -- macOS: import signing certificate ----------------------------
-      - name: Import code-signing certificate
-        if: runner.os == 'macOS' && env.MACOS_SIGN
-        uses: apple-actions/import-codesign-certs@b610f78488812c1e56b20e6df63ec42d833f2d14 # v6
-        with:
-          p12-file-base64: ${{ secrets.MACOS_CERTIFICATE_BASE64 }}
-          p12-password: ${{ secrets.MACOS_CERTIFICATE_PASSWORD }}
-
       # Windows: sequential (Nuitka cache conflicts), Linux: parallel
       - name: Build CLI + GUI
         if: runner.os != 'macOS'
         run: python scripts/build.py all
 
-      # macOS: CLI via PyInstaller, GUI via py2app (different toolchains)
+      # macOS: CLI via PyInstaller, GUI via py2app (unsigned -- signing
+      # happens in the merge-macos-universal job after lipo merge)
       - name: Build CLI (macOS)
         if: runner.os == 'macOS'
         run: python scripts/build.py cli
 
-      # macOS with signing: build .app without DMG (sign first, then DMG)
-      - name: Build GUI (macOS, signed)
-        if: runner.os == 'macOS' && env.MACOS_SIGN
+      - name: Build GUI (macOS)
+        if: runner.os == 'macOS'
         run: python scripts/build.py mac --no-dmg
 
-      # macOS without signing secrets: build .app + DMG
-      - name: Build GUI (macOS, unsigned)
-        if: runner.os == 'macOS' && !env.MACOS_SIGN
-        run: python scripts/build.py mac
+      # -- macOS: upload unsigned .app for universal merge ----------------
+      - name: Upload unsigned .app bundle
+        if: runner.os == 'macOS'
+        uses: actions/upload-artifact@bbbca2ddaa5d8feaa63e36b76fdaad77386f024f # v7.0.0
+        with:
+          name: app-unsigned-${{ matrix.platform }}
+          path: python/dist/Revenant.app
+          if-no-files-found: error
 
-      # -- macOS: codesign binaries -------------------------------------
-      - name: Codesign .app bundle
-        if: runner.os == 'macOS' && env.MACOS_SIGN
-        run: |
-          IDENTITY="Developer ID Application: ${{ secrets.APPLE_IDENTITY }}"
-
-          # Sign all embedded .so, .dylib files and framework binaries (Tcl, Tk, Python)
-          find "dist/Revenant.app/Contents" \
-            \( -name '*.dylib' -o -name '*.so' -o -name '*.o' \) \
-            -exec codesign --force --timestamp --options runtime \
-              --sign "$IDENTITY" {} \;
-
-          # Sign framework main binaries (Tcl, Tk, Python -- no file extension)
-          find "dist/Revenant.app/Contents/Frameworks" \
-            -type f ! -name '*.*' | while read -r bin; do
-            if file "$bin" | grep -q "Mach-O"; then
-              echo "  signing framework binary: $bin"
-              codesign --force --timestamp --options runtime \
-                --sign "$IDENTITY" "$bin"
-            fi
-          done
-
-          # Sign Python interpreter in MacOS/
-          if [ -f "dist/Revenant.app/Contents/MacOS/python" ]; then
-            codesign --force --timestamp --options runtime \
-              --entitlements entitlements.plist \
-              --sign "$IDENTITY" \
-              "dist/Revenant.app/Contents/MacOS/python"
-          fi
-
-          # Sign the main executable with entitlements
-          codesign --force --timestamp --options runtime \
-            --entitlements entitlements.plist \
-            --sign "$IDENTITY" \
-            "dist/Revenant.app/Contents/MacOS/Revenant"
-
-          # Sign the outer .app bundle
-          codesign --force --timestamp --options runtime \
-            --sign "$IDENTITY" \
-            "dist/Revenant.app"
-
-          # Verify
-          codesign --verify --deep --strict "dist/Revenant.app"
-          echo "Code signature verified."
-
-      - name: Codesign CLI binary
-        if: runner.os == 'macOS' && env.MACOS_SIGN
-        run: |
-          codesign --force --timestamp --options runtime \
-            --entitlements entitlements.plist \
-            --sign "Developer ID Application: ${{ secrets.APPLE_IDENTITY }}" \
-            dist/revenant
-
-          codesign --verify --strict dist/revenant
-
-      # Create DMG from the signed .app
-      - name: Create DMG (signed)
-        if: runner.os == 'macOS' && env.MACOS_SIGN
-        run: python scripts/build.py dmg
-
-      - name: Codesign DMG
-        if: runner.os == 'macOS' && env.MACOS_SIGN
-        run: |
-          codesign --force --timestamp \
-            --sign "Developer ID Application: ${{ secrets.APPLE_IDENTITY }}" \
-            dist/Revenant.dmg
-          codesign --verify --strict dist/Revenant.dmg
-          echo "DMG code signature verified."
-
-      # -- macOS: notarize ----------------------------------------------
-      - name: Decode App Store Connect API key
-        if: runner.os == 'macOS' && env.MACOS_NOTARIZE
-        env:
-          API_KEY_BASE64: ${{ secrets.APPSTORE_API_KEY_BASE64 }}
-          API_KEY_ID: ${{ secrets.APPSTORE_API_KEY_ID }}
-        run: |
-          mkdir -p ~/private_keys
-          echo "$API_KEY_BASE64" | base64 --decode > ~/private_keys/AuthKey_${API_KEY_ID}.p8
-
-      - name: Notarize DMG
-        if: runner.os == 'macOS' && env.MACOS_NOTARIZE
-        env:
-          API_KEY_ID: ${{ secrets.APPSTORE_API_KEY_ID }}
-          API_ISSUER_ID: ${{ secrets.APPSTORE_API_ISSUER_ID }}
-        run: |
-          SUBMIT_OUT=$(xcrun notarytool submit dist/Revenant.dmg \
-            --key ~/private_keys/AuthKey_${API_KEY_ID}.p8 \
-            --key-id "$API_KEY_ID" \
-            --issuer "$API_ISSUER_ID" \
-            --wait 2>&1) || true
-          echo "$SUBMIT_OUT"
-
-          SUBMISSION_ID=$(echo "$SUBMIT_OUT" | grep '  id:' | head -1 | awk '{print $2}')
-
-          if echo "$SUBMIT_OUT" | grep -q "status: Invalid"; then
-            echo "::error::Notarization failed. Fetching detailed log..."
-            xcrun notarytool log "$SUBMISSION_ID" \
-              --key ~/private_keys/AuthKey_${API_KEY_ID}.p8 \
-              --key-id "$API_KEY_ID" \
-              --issuer "$API_ISSUER_ID" \
-              developer_log.json
-            cat developer_log.json
-            exit 1
-          fi
-
-          xcrun stapler staple dist/Revenant.dmg
-          echo "DMG notarized and stapled."
-
-      - name: Notarize CLI binary
-        if: runner.os == 'macOS' && env.MACOS_NOTARIZE
-        env:
-          API_KEY_ID: ${{ secrets.APPSTORE_API_KEY_ID }}
-          API_ISSUER_ID: ${{ secrets.APPSTORE_API_ISSUER_ID }}
-        run: |
-          ditto -c -k --keepParent dist/revenant dist/revenant-cli.zip
-
-          xcrun notarytool submit dist/revenant-cli.zip \
-            --key ~/private_keys/AuthKey_${API_KEY_ID}.p8 \
-            --key-id "$API_KEY_ID" \
-            --issuer "$API_ISSUER_ID" \
-            --wait
-
-          rm dist/revenant-cli.zip
-          echo "CLI binary notarized."
-
-      - name: Clean up signing keys
-        if: runner.os == 'macOS' && env.MACOS_NOTARIZE && always()
-        run: rm -rf ~/private_keys
+      - name: Upload unsigned CLI binary
+        if: runner.os == 'macOS'
+        uses: actions/upload-artifact@bbbca2ddaa5d8feaa63e36b76fdaad77386f024f # v7.0.0
+        with:
+          name: cli-unsigned-${{ matrix.platform }}
+          path: python/dist/revenant
+          if-no-files-found: error
 
       # -- Build AppImage (Linux) ---------------------------------------
       - name: Build AppImage (Linux)
@@ -310,9 +218,9 @@ jobs:
             -DestinationPath dist\revenant-${{ matrix.platform }}.zip
           Write-Host "Created revenant-${{ matrix.platform }}.zip"
 
-      # -- Rename artifacts ---------------------------------------------
+      # -- Rename artifacts (Linux/Windows only -- macOS uploaded above) --
       - name: Rename CLI artifact
-        if: "!matrix.standalone"
+        if: runner.os == 'Linux'
         shell: bash
         run: |
           cd dist
@@ -320,18 +228,9 @@ jobs:
             mv revenant revenant-cli-${{ matrix.platform }}
           fi
 
-      - name: Rename DMG artifact (macOS)
-        if: contains(matrix.platform, 'macos')
-        shell: bash
-        run: |
-          cd dist
-          if [ -f "Revenant.dmg" ]; then
-            mv Revenant.dmg Revenant-gui-${{ matrix.platform }}.dmg
-          fi
-
-      # -- Upload artifacts ---------------------------------------------
+      # -- Upload artifacts (Linux/Windows) ------------------------------
       - name: Upload CLI artifact
-        if: "!matrix.standalone"
+        if: runner.os == 'Linux'
         uses: actions/upload-artifact@bbbca2ddaa5d8feaa63e36b76fdaad77386f024f # v7.0.0
         with:
           name: cli-${{ matrix.platform }}
@@ -347,13 +246,11 @@ jobs:
           if-no-files-found: error
 
       - name: Upload GUI artifact
-        if: matrix.gui_artifact != '' && !matrix.standalone
+        if: runner.os == 'Linux'
         uses: actions/upload-artifact@bbbca2ddaa5d8feaa63e36b76fdaad77386f024f # v7.0.0
         with:
           name: gui-${{ matrix.platform }}
-          path: |
-            python/dist/Revenant-gui-${{ matrix.platform }}.dmg
-            python/dist/${{ matrix.gui_artifact }}
+          path: python/dist/${{ matrix.gui_artifact }}
           if-no-files-found: error
 
       - name: Upload MSIX artifact
@@ -365,8 +262,311 @@ jobs:
           if-no-files-found: error
 
   build-mac:
-    name: Build macOS (MAS)
+    name: Build macOS MAS (${{ matrix.arch }})
     needs: ci
+    runs-on: ${{ matrix.runner }}
+    timeout-minutes: 30
+    permissions:
+      contents: read
+    defaults:
+      run:
+        working-directory: python
+
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - runner: macos-latest
+            arch: arm64
+            rosetta: false
+          - runner: macos-15
+            arch: x86_64
+            rosetta: true
+
+    steps:
+      - uses: step-security/harden-runner@a90bcbc6539c36a85cdfeb73f7e2f433735f215b # v2
+        with:
+          egress-policy: audit
+
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6
+        with:
+          persist-credentials: false
+
+      # -- arm64: native Homebrew Python with Tk 9.0 -----------------------
+      - name: Set up Python with Tk 9.0 (arm64)
+        if: "!matrix.rosetta"
+        uses: ./.github/actions/setup-python-tk
+        with:
+          cache-key-prefix: pip-mas-${{ matrix.arch }}
+
+      # -- x86_64: Rosetta + x86_64 Homebrew Python with Tk ----------------
+      - name: Set up Rosetta and x86_64 Python with Tk
+        if: matrix.rosetta
+        shell: bash
+        run: |
+          softwareupdate --install-rosetta --agree-to-license 2>/dev/null || true
+
+          # Install x86_64 Homebrew to /usr/local (see comment in build job)
+          arch -x86_64 /bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/HEAD/install.sh)" </dev/null
+
+          # Install x86_64 Python + Tk
+          arch -x86_64 /usr/local/bin/brew install python-tk@3.13
+
+          # Create x86_64 venv
+          X64_PYTHON="/usr/local/opt/python@3.13/bin/python3.13"
+          arch -x86_64 "$X64_PYTHON" -m venv /tmp/venv-x64
+          echo "/tmp/venv-x64/bin" >> "$GITHUB_PATH"
+
+      - name: Build and install patched Tk (x86_64)
+        if: matrix.rosetta
+        uses: ./.github/actions/build-patched-tk
+        with:
+          cache-key-prefix: patched-tk-mas
+          arch: x86_64
+          brew-path: /usr/local/bin/brew
+
+      - name: Install dependencies
+        run: |
+          pip install --require-hashes --no-deps -r ../.github/requirements/build-macos.txt
+          pip install --no-deps -e .
+
+      - name: Build with py2app
+        run: python scripts/build.py mac --no-dmg
+        env:
+          BUILD_NUMBER: ${{ github.run_number }}
+
+      - name: Verify no private API in bundled Tk
+        uses: ./.github/actions/verify-no-private-api
+        with:
+          app-path: python/dist/Revenant.app
+
+      - name: Upload MAS unsigned .app
+        uses: actions/upload-artifact@bbbca2ddaa5d8feaa63e36b76fdaad77386f024f # v7.0.0
+        with:
+          name: mas-unsigned-${{ matrix.arch }}
+          path: python/dist/Revenant.app
+          if-no-files-found: error
+
+  # -- Merge macOS universal binaries (Developer ID) -------------------
+  merge-macos-universal:
+    name: Merge macOS Universal (DevID)
+    needs: build
+    runs-on: macos-latest
+    timeout-minutes: 30
+    permissions:
+      contents: read
+    defaults:
+      run:
+        working-directory: python
+
+    env:
+      MACOS_SIGN: ${{ secrets.MACOS_CERTIFICATE_BASE64 != '' && 'true' || '' }}
+      MACOS_NOTARIZE: ${{ secrets.APPSTORE_API_KEY_BASE64 != '' && 'true' || '' }}
+
+    steps:
+      - uses: step-security/harden-runner@a90bcbc6539c36a85cdfeb73f7e2f433735f215b # v2
+        with:
+          egress-policy: audit
+
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6
+        with:
+          persist-credentials: false
+
+      - name: Install system dependencies
+        run: brew install create-dmg
+
+      - name: Download arm64 .app
+        uses: actions/download-artifact@70fc10c6e5e1ce46ad2ea6f2b72d43f7d47b13c3 # v8.0.0
+        with:
+          name: app-unsigned-macos-arm64
+          path: /tmp/arm64-app
+
+      - name: Download x64 .app
+        uses: actions/download-artifact@70fc10c6e5e1ce46ad2ea6f2b72d43f7d47b13c3 # v8.0.0
+        with:
+          name: app-unsigned-macos-x64
+          path: /tmp/x64-app
+
+      - name: Download arm64 CLI
+        uses: actions/download-artifact@70fc10c6e5e1ce46ad2ea6f2b72d43f7d47b13c3 # v8.0.0
+        with:
+          name: cli-unsigned-macos-arm64
+          path: /tmp/arm64-cli
+
+      - name: Download x64 CLI
+        uses: actions/download-artifact@70fc10c6e5e1ce46ad2ea6f2b72d43f7d47b13c3 # v8.0.0
+        with:
+          name: cli-unsigned-macos-x64
+          path: /tmp/x64-cli
+
+      - name: Merge universal .app bundle
+        run: |
+          python scripts/merge_universal.py \
+            /tmp/arm64-app/Revenant.app \
+            /tmp/x64-app/Revenant.app \
+            dist/Revenant.app
+
+      - name: Merge universal CLI binary
+        run: |
+          mkdir -p dist
+          python scripts/merge_universal.py --cli \
+            /tmp/arm64-cli/revenant \
+            /tmp/x64-cli/revenant \
+            dist/revenant
+
+      # -- Codesign universal binaries -----------------------------------
+      - name: Import code-signing certificate
+        if: env.MACOS_SIGN
+        uses: apple-actions/import-codesign-certs@b610f78488812c1e56b20e6df63ec42d833f2d14 # v6
+        with:
+          p12-file-base64: ${{ secrets.MACOS_CERTIFICATE_BASE64 }}
+          p12-password: ${{ secrets.MACOS_CERTIFICATE_PASSWORD }}
+
+      - name: Codesign .app bundle
+        if: env.MACOS_SIGN
+        run: |
+          IDENTITY="Developer ID Application: ${{ secrets.APPLE_IDENTITY }}"
+
+          find "dist/Revenant.app/Contents" \
+            \( -name '*.dylib' -o -name '*.so' -o -name '*.o' \) \
+            -exec codesign --force --timestamp --options runtime \
+              --sign "$IDENTITY" {} \;
+
+          find "dist/Revenant.app/Contents/Frameworks" \
+            -type f ! -name '*.*' | while read -r bin; do
+            if file "$bin" | grep -q "Mach-O"; then
+              echo "  signing framework binary: $bin"
+              codesign --force --timestamp --options runtime \
+                --sign "$IDENTITY" "$bin"
+            fi
+          done
+
+          if [ -f "dist/Revenant.app/Contents/MacOS/python" ]; then
+            codesign --force --timestamp --options runtime \
+              --entitlements entitlements.plist \
+              --sign "$IDENTITY" \
+              "dist/Revenant.app/Contents/MacOS/python"
+          fi
+
+          codesign --force --timestamp --options runtime \
+            --entitlements entitlements.plist \
+            --sign "$IDENTITY" \
+            "dist/Revenant.app/Contents/MacOS/Revenant"
+
+          codesign --force --timestamp --options runtime \
+            --sign "$IDENTITY" \
+            "dist/Revenant.app"
+
+          codesign --verify --deep --strict "dist/Revenant.app"
+          echo "Code signature verified."
+
+      - name: Codesign CLI binary
+        if: env.MACOS_SIGN
+        run: |
+          codesign --force --timestamp --options runtime \
+            --entitlements entitlements.plist \
+            --sign "Developer ID Application: ${{ secrets.APPLE_IDENTITY }}" \
+            dist/revenant
+          codesign --verify --strict dist/revenant
+
+      # -- Create and sign DMG -------------------------------------------
+      - name: Create DMG
+        run: python scripts/build.py dmg
+
+      - name: Codesign DMG
+        if: env.MACOS_SIGN
+        run: |
+          codesign --force --timestamp \
+            --sign "Developer ID Application: ${{ secrets.APPLE_IDENTITY }}" \
+            dist/Revenant.dmg
+          codesign --verify --strict dist/Revenant.dmg
+          echo "DMG code signature verified."
+
+      # -- Notarize -------------------------------------------------------
+      - name: Decode App Store Connect API key
+        if: env.MACOS_NOTARIZE
+        env:
+          API_KEY_BASE64: ${{ secrets.APPSTORE_API_KEY_BASE64 }}
+          API_KEY_ID: ${{ secrets.APPSTORE_API_KEY_ID }}
+        run: |
+          mkdir -p ~/private_keys
+          echo "$API_KEY_BASE64" | base64 --decode > ~/private_keys/AuthKey_${API_KEY_ID}.p8
+
+      - name: Notarize DMG
+        if: env.MACOS_NOTARIZE
+        env:
+          API_KEY_ID: ${{ secrets.APPSTORE_API_KEY_ID }}
+          API_ISSUER_ID: ${{ secrets.APPSTORE_API_ISSUER_ID }}
+        run: |
+          SUBMIT_OUT=$(xcrun notarytool submit dist/Revenant.dmg \
+            --key ~/private_keys/AuthKey_${API_KEY_ID}.p8 \
+            --key-id "$API_KEY_ID" \
+            --issuer "$API_ISSUER_ID" \
+            --wait 2>&1) || true
+          echo "$SUBMIT_OUT"
+
+          SUBMISSION_ID=$(echo "$SUBMIT_OUT" | grep '  id:' | head -1 | awk '{print $2}')
+
+          if echo "$SUBMIT_OUT" | grep -q "status: Invalid"; then
+            echo "::error::Notarization failed. Fetching detailed log..."
+            xcrun notarytool log "$SUBMISSION_ID" \
+              --key ~/private_keys/AuthKey_${API_KEY_ID}.p8 \
+              --key-id "$API_KEY_ID" \
+              --issuer "$API_ISSUER_ID" \
+              developer_log.json
+            cat developer_log.json
+            exit 1
+          fi
+
+          xcrun stapler staple dist/Revenant.dmg
+          echo "DMG notarized and stapled."
+
+      - name: Notarize CLI binary
+        if: env.MACOS_NOTARIZE
+        env:
+          API_KEY_ID: ${{ secrets.APPSTORE_API_KEY_ID }}
+          API_ISSUER_ID: ${{ secrets.APPSTORE_API_ISSUER_ID }}
+        run: |
+          ditto -c -k --keepParent dist/revenant dist/revenant-cli.zip
+
+          xcrun notarytool submit dist/revenant-cli.zip \
+            --key ~/private_keys/AuthKey_${API_KEY_ID}.p8 \
+            --key-id "$API_KEY_ID" \
+            --issuer "$API_ISSUER_ID" \
+            --wait
+
+          rm dist/revenant-cli.zip
+          echo "CLI binary notarized."
+
+      - name: Clean up signing keys
+        if: env.MACOS_NOTARIZE && always()
+        run: rm -rf ~/private_keys
+
+      # -- Rename and upload final artifacts ------------------------------
+      - name: Rename artifacts
+        run: |
+          cd dist
+          mv revenant revenant-cli-macos-universal
+          mv Revenant.dmg Revenant-gui-macos-universal.dmg
+
+      - name: Upload CLI artifact
+        uses: actions/upload-artifact@bbbca2ddaa5d8feaa63e36b76fdaad77386f024f # v7.0.0
+        with:
+          name: cli-macos-universal
+          path: python/dist/revenant-cli-macos-universal
+          if-no-files-found: error
+
+      - name: Upload GUI artifact
+        uses: actions/upload-artifact@bbbca2ddaa5d8feaa63e36b76fdaad77386f024f # v7.0.0
+        with:
+          name: gui-macos-universal
+          path: python/dist/Revenant-gui-macos-universal.dmg
+          if-no-files-found: error
+
+  # -- Merge macOS universal binaries (MAS) ----------------------------
+  merge-macos-mas:
+    name: Merge macOS Universal (MAS)
+    needs: build-mac
     runs-on: macos-latest
     timeout-minutes: 30
     permissions:
@@ -387,15 +587,25 @@ jobs:
         with:
           persist-credentials: false
 
-      - name: Set up Python with Tk 9.0
-        uses: ./.github/actions/setup-python-tk
+      - name: Download arm64 MAS .app
+        uses: actions/download-artifact@70fc10c6e5e1ce46ad2ea6f2b72d43f7d47b13c3 # v8.0.0
         with:
-          cache-key-prefix: pip-mas
+          name: mas-unsigned-arm64
+          path: /tmp/arm64-app
 
-      - name: Install dependencies
+      - name: Download x64 MAS .app
+        uses: actions/download-artifact@70fc10c6e5e1ce46ad2ea6f2b72d43f7d47b13c3 # v8.0.0
+        with:
+          name: mas-unsigned-x86_64
+          path: /tmp/x64-app
+
+      - name: Merge universal .app bundle
         run: |
-          pip install --require-hashes --no-deps -r ../.github/requirements/build-macos.txt
-          pip install --no-deps -e .
+          mkdir -p dist
+          python scripts/merge_universal.py \
+            /tmp/arm64-app/Revenant.app \
+            /tmp/x64-app/Revenant.app \
+            dist/Revenant.app
 
       - name: Import MAS signing certificate
         if: env.MAS_SIGN
@@ -403,16 +613,6 @@ jobs:
         with:
           p12-file-base64: ${{ secrets.MAS_CERTIFICATE_BASE64 }}
           p12-password: ${{ secrets.MAS_CERTIFICATE_PASSWORD }}
-
-      - name: Build with py2app
-        run: python scripts/build.py mac --no-dmg
-        env:
-          BUILD_NUMBER: ${{ github.run_number }}
-
-      - name: Verify no private API in bundled Tk
-        uses: ./.github/actions/verify-no-private-api
-        with:
-          app-path: python/dist/Revenant.app
 
       # -- Embed provisioning profile ----------------------------------
       - name: Embed provisioning profile
@@ -428,14 +628,11 @@ jobs:
         run: |
           IDENTITY="3rd Party Mac Developer Application: ${{ secrets.APPLE_IDENTITY }}"
 
-          # Sign all embedded .so, .dylib files and framework binaries (Tcl, Tk, Python)
           find "dist/Revenant.app/Contents" \
             \( -name '*.dylib' -o -name '*.so' -o -name '*.o' \) \
             -exec codesign --force --timestamp --options runtime \
               --sign "$IDENTITY" {} \;
 
-          # Sign framework main binaries (Tcl, Tk, Python -- no file extension)
-          # Use nested entitlements (no application-identifier) to avoid ITMS-90885
           find "dist/Revenant.app/Contents/Frameworks" \
             -type f ! -name '*.*' | while read -r bin; do
             if file "$bin" | grep -q "Mach-O"; then
@@ -446,7 +643,6 @@ jobs:
             fi
           done
 
-          # Sign Python interpreter in MacOS/
           if [ -f "dist/Revenant.app/Contents/MacOS/python" ]; then
             codesign --force --timestamp --options runtime \
               --entitlements entitlements-sandbox-nested.plist \
@@ -454,13 +650,11 @@ jobs:
               "dist/Revenant.app/Contents/MacOS/python"
           fi
 
-          # Sign the main executable with sandbox entitlements
           codesign --force --timestamp --options runtime \
             --entitlements entitlements-sandbox.plist \
             --sign "$IDENTITY" \
             "dist/Revenant.app/Contents/MacOS/Revenant"
 
-          # Sign the outer .app bundle (must include entitlements to preserve sandbox)
           codesign --force --timestamp --options runtime \
             --entitlements entitlements-sandbox.plist \
             --sign "$IDENTITY" \
@@ -482,13 +676,13 @@ jobs:
         if: env.MAS_SIGN
         uses: actions/upload-artifact@bbbca2ddaa5d8feaa63e36b76fdaad77386f024f # v7.0.0
         with:
-          name: mas-macos-arm64
+          name: mas-macos-universal
           path: python/dist/Revenant-MAS.pkg
           if-no-files-found: error
 
   release:
     name: Create Release
-    needs: [build, build-mac]
+    needs: [build, merge-macos-universal, merge-macos-mas]
     runs-on: ubuntu-latest
     timeout-minutes: 15
     permissions:
@@ -505,14 +699,19 @@ jobs:
         with:
           persist-credentials: false
 
-      - name: Download all artifacts
+      - name: Download release artifacts
         uses: actions/download-artifact@70fc10c6e5e1ce46ad2ea6f2b72d43f7d47b13c3 # v8.0.0
         with:
           path: artifacts
           merge-multiple: true
 
-      - name: List artifacts
-        run: ls -la artifacts/
+      # Remove intermediate unsigned artifacts (uploaded for the merge jobs
+      # but not intended for the GitHub Release)
+      - name: Clean up intermediate artifacts
+        run: |
+          cd artifacts
+          rm -rf Revenant.app revenant
+          ls -la
 
       - name: Generate checksums
         run: |
@@ -754,13 +953,13 @@ jobs:
         with:
           egress-policy: audit
 
-      - name: Download macOS ARM64 CLI binary
+      - name: Download macOS universal CLI binary
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           gh release download "$GITHUB_REF_NAME" \
             --repo "$GITHUB_REPOSITORY" \
-            --pattern "revenant-cli-macos-arm64" \
+            --pattern "revenant-cli-macos-universal" \
             --dir .
 
       - name: Update formula in tap repository
@@ -768,7 +967,7 @@ jobs:
           GH_TOKEN: ${{ secrets.DIST_TAP_TOKEN }}
         run: |
           VERSION="${GITHUB_REF_NAME#v}"
-          SHA256=$(sha256sum revenant-cli-macos-arm64 | awk '{print $1}')
+          SHA256=$(sha256sum revenant-cli-macos-universal | awk '{print $1}')
           FILE_SHA=$(gh api repos/lobotomoe/homebrew-revenant/contents/Formula/revenant.rb --jq '.sha')
 
           cat > /tmp/revenant.rb << RUBY
@@ -778,14 +977,13 @@ jobs:
             license "Apache-2.0"
             version "$VERSION"
 
-            url "https://github.com/lobotomoe/revenant/releases/download/v#{version}/revenant-cli-macos-arm64"
+            url "https://github.com/lobotomoe/revenant/releases/download/v#{version}/revenant-cli-macos-universal"
             sha256 "$SHA256"
 
             depends_on :macos
-            depends_on arch: :arm64
 
             def install
-              bin.install "revenant-cli-macos-arm64" => "revenant"
+              bin.install "revenant-cli-macos-universal" => "revenant"
             end
 
             test do
