@@ -86,7 +86,11 @@ jobs:
           # Install Rosetta 2 (may already be present)
           softwareupdate --install-rosetta --agree-to-license 2>/dev/null || true
 
-          # Install x86_64 Homebrew to /usr/local
+          # Install x86_64 Homebrew to /usr/local.
+          # The arm64 runner only has arm64 Homebrew at /opt/homebrew;
+          # we need a separate x86_64 prefix for Rosetta builds.
+          # Pinning the installer isn't practical (Homebrew doesn't publish
+          # checksummed releases of the script), but the runner is ephemeral.
           arch -x86_64 /bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/HEAD/install.sh)" </dev/null
 
           # Install x86_64 Python 3.13 with Tk support
@@ -302,7 +306,7 @@ jobs:
         run: |
           softwareupdate --install-rosetta --agree-to-license 2>/dev/null || true
 
-          # Install x86_64 Homebrew to /usr/local
+          # Install x86_64 Homebrew to /usr/local (see comment in build job)
           arch -x86_64 /bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/HEAD/install.sh)" </dev/null
 
           # Install x86_64 Python + Tk
@@ -467,7 +471,6 @@ jobs:
 
       # -- Create and sign DMG -------------------------------------------
       - name: Create DMG
-        if: env.MACOS_SIGN
         run: python scripts/build.py dmg
 
       - name: Codesign DMG
@@ -696,14 +699,19 @@ jobs:
         with:
           persist-credentials: false
 
-      - name: Download all artifacts
+      - name: Download release artifacts
         uses: actions/download-artifact@70fc10c6e5e1ce46ad2ea6f2b72d43f7d47b13c3 # v8.0.0
         with:
           path: artifacts
           merge-multiple: true
 
-      - name: List artifacts
-        run: ls -la artifacts/
+      # Remove intermediate unsigned artifacts (uploaded for the merge jobs
+      # but not intended for the GitHub Release)
+      - name: Clean up intermediate artifacts
+        run: |
+          cd artifacts
+          rm -rf Revenant.app revenant
+          ls -la
 
       - name: Generate checksums
         run: |

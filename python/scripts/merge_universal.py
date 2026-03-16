@@ -22,8 +22,10 @@ MACHO_MAGICS = {
     0xFEEDFACF,  # MH_MAGIC_64 (64-bit)
     0xCEFAEDFE,  # MH_CIGAM (32-bit, swapped)
     0xCFFAEDFE,  # MH_CIGAM_64 (64-bit, swapped)
-    0xCAFEBABE,  # FAT_MAGIC (universal, but shouldn't appear in single-arch)
+    0xCAFEBABE,  # FAT_MAGIC (universal)
     0xBEBAFECA,  # FAT_CIGAM (universal, swapped)
+    0xCAFEBABF,  # FAT_MAGIC_64
+    0xBFBAFECA,  # FAT_CIGAM_64 (swapped)
 }
 
 LIPO_TIMEOUT = 30
