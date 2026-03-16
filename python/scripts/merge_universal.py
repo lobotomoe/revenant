@@ -44,42 +44,29 @@ def is_macho(path: Path) -> bool:
     return magic in MACHO_MAGICS
 
 
-def get_archs(path: Path) -> set[str]:
-    """Get the set of architectures in a Mach-O binary."""
-    result = subprocess.run(
-        ["lipo", "-archs", str(path)],
-        capture_output=True,
-        text=True,
-        timeout=LIPO_TIMEOUT,
-    )
-    if result.returncode != 0:
-        return set()
-    return set(result.stdout.strip().split())
-
-
 def lipo_create(arm64: Path, x64: Path, output: Path) -> None:
     """Create a universal binary from arm64 and x64 inputs.
 
-    If both files contain the same architecture (e.g. a pure-Python C
-    extension whose wheel is arch-independent), copy one instead of
-    failing on lipo.
+    If both files have the same architecture (e.g. a pure-Python C
+    extension shipped as a single-arch wheel on both platforms),
+    falls back to copying one file.
     """
-    arm64_archs = get_archs(arm64)
-    x64_archs = get_archs(x64)
-
-    # Same architectures — files are identical, just copy
-    if arm64_archs == x64_archs:
-        shutil.copy2(arm64, output)
-        return
-
     result = subprocess.run(
         ["lipo", "-create", str(arm64), str(x64), "-output", str(output)],
         capture_output=True,
         text=True,
         timeout=LIPO_TIMEOUT,
     )
-    if result.returncode != 0:
-        raise RuntimeError(f"lipo failed for {output.name}: {result.stderr.strip()}")
+    if result.returncode == 0:
+        return
+
+    # "have the same architectures ... and can't be in the same fat output file"
+    if "same architectures" in result.stderr:
+        shutil.copy2(arm64, output)
+        print(f"  same-arch, copied: {output.name}")
+        return
+
+    raise RuntimeError(f"lipo failed for {output.name}: {result.stderr.strip()}")
 
 
 def merge_app_bundles(arm64_app: Path, x64_app: Path, output_app: Path) -> None:
