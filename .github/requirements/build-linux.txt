@@ -1,24 +1,22 @@
 altgraph==0.17.5 \
     --hash=sha256:c87b395dd12fabde9c99573a9749d67da8d29ef9de0125c7f536699b4a9bc9e7 \
     --hash=sha256:f3a22400bce1b0c701683820ac4f3b159cd301acab067c51c653e06961600597
-    # via
-    #   macholib
-    #   pyinstaller
+    # via pyinstaller
 asn1crypto==1.5.1 \
     --hash=sha256:13ae38502be632115abf8a24cbe5f4da52e3b5231990aff31123c805306ccb9c \
     --hash=sha256:db4e40728b728508912cbb3d44f19ce188f218e9eba635821bb4b68564f8fd67
-    # via -r .github/requirements/build-linux.in
+    # via -r build-linux.in
 defusedxml==0.7.1 \
     --hash=sha256:1bb3032db185915b62d7c6209c5a8792be6a32ab2fedacc84e01b52c51aa3e69 \
     --hash=sha256:a352e7e428770286cc899e2542b6cdaedb2b4953ff269a210103ec58f6198a61
-    # via -r .github/requirements/build-linux.in
+    # via -r build-linux.in
 deprecated==1.3.1 \
     --hash=sha256:597bfef186b6f60181535a29fbe44865ce137a5079f295b479886c82729d5f3f \
     --hash=sha256:b1b50e0ff0c1fddaa5708a2c6b0a6588bb09b892825ab2b214ac9ea9d92a5223
     # via pikepdf
-ecdsa==0.19.1 \
-    --hash=sha256:30638e27cf77b7e15c4c4cc1973720149e1033827cfd00661ca5c8cc0cdb24c3 \
-    --hash=sha256:478cba7b62555866fcb3bb3fe985e06decbdb68ef55713c4e5ab98c57d508e61
+ecdsa==0.19.2 \
+    --hash=sha256:62635b0ac1ca2e027f82122b5b81cb706edc38cd91c63dda28e4f3455a2bf930 \
+    --hash=sha256:840f5dc5e375c68f36c1a7a5b9caad28f95daa65185c9253c0c08dd952bb7399
     # via tlslite-ng
 lxml==6.0.2 \
     --hash=sha256:058027e261afed589eddcfe530fcc6f3402d7fd7e89bfd0532df82ebc1563dba \
@@ -162,10 +160,6 @@ lxml==6.0.2 \
     --hash=sha256:fbc74f42c3525ac4ffa4b89cbdd00057b6196bcefe8bce794abd42d33a018092 \
     --hash=sha256:fe659f6b5d10fb5a17f00a50eb903eb277a71ee35df4615db573c069bcf967ac
     # via pikepdf
-macholib==1.16.4 ; sys_platform == 'darwin' \
-    --hash=sha256:da1a3fa8266e30f0ce7e97c6a54eefaae8edd1e5f86f3eb8b95457cae90265ea \
-    --hash=sha256:f408c93ab2e995cd2c46e34fe328b130404be143469e41bc366c807448979362
-    # via pyinstaller
 packaging==26.0 \
     --hash=sha256:00243ae351a257117b6a241061796684b084ed1c516a08c48a3f7e147a9d80b4 \
     --hash=sha256:b36f1fef9334a5588b4166f8bcd26a14e521f2b55e6b9de3aaa80d3ff7a37529
@@ -173,10 +167,6 @@ packaging==26.0 \
     #   pikepdf
     #   pyinstaller
     #   pyinstaller-hooks-contrib
-pefile==2024.8.26 ; sys_platform == 'win32' \
-    --hash=sha256:3ff6c5d8b43e8c37bb6e6dd5085658d658a7a0bdcd20b6a07b1fcfc1c4e9d632 \
-    --hash=sha256:76f8b485dcd3b1bb8166f1128d395fa3d87af26360c2358fb75b80019b957c6f
-    # via pyinstaller
 pikepdf==10.3.0 \
     --hash=sha256:105d1a39f5fdc21a23b792d736a6090e7f58f558771a8c9be8f664ba6e564794 \
     --hash=sha256:12f078955ccba83547ea297b980997d8cdf9ccd36796465c3866f778cbbee9ef \
@@ -214,7 +204,7 @@ pikepdf==10.3.0 \
     --hash=sha256:f7a4d43c0fe21b76d78eccc1025bea1d61606b9f4489ac1a3ebaf76157716067 \
     --hash=sha256:fa3e4b32a2c1d15bb57e91ee3896c19b3c8145d46c26fbac8747efe7cb5ce3bd \
     --hash=sha256:fc7b47340e705c4c61eedb49849c9e7952ed3d5781e26c26ddb2f2480765a3e3
-    # via -r .github/requirements/build-linux.in
+    # via -r build-linux.in
 pillow==12.1.1 \
     --hash=sha256:02f84dfad02693676692746df05b89cf25597560db2857363a208e393429f5e9 \
     --hash=sha256:0330d233c1a0ead844fc097a7d16c0abff4c12e856c0b325f231820fee1f39da \
@@ -321,21 +311,11 @@ pyinstaller==6.19.0 \
     --hash=sha256:da6d5c6391ccefe73554b9fa29b86001c8e378e0f20c2a4004f836ba537eff63 \
     --hash=sha256:e649ba6bd1b0b89b210ad92adb5fbdc8a42dd2c5ca4f72ef3a0bfec83a424b83 \
     --hash=sha256:ec73aeb8bd9b7f2f1240d328a4542e90b3c6e6fbc106014778431c616592a865
-    # via -r .github/requirements/build-linux.in
+    # via -r build-linux.in
 pyinstaller-hooks-contrib==2026.1 \
     --hash=sha256:66ad4888ba67de6f3cfd7ef554f9dd1a4389e2eb19f84d7129a5a6818e3f2180 \
     --hash=sha256:a5f0891a1e81e92406ab917d9e76adfd7a2b68415ee2e35c950a7b3910bc361b
     # via pyinstaller
-pywin32-ctypes==0.2.3 ; sys_platform == 'win32' \
-    --hash=sha256:8a1513379d709975552d202d942d9837758905c8d01eb82b8bcc30918929e7b8 \
-    --hash=sha256:d162dc04946d704503b2edc4d55f3dba5c1d539ead017afa00142c38b9885755
-    # via pyinstaller
-setuptools==82.0.0 \
-    --hash=sha256:22e0a2d69474c6ae4feb01951cb69d515ed23728cf96d05513d36e42b62b37cb \
-    --hash=sha256:70b18734b607bd1da571d097d236cfcfacaf01de45717d59e6e04b96877532e0
-    # via
-    #   pyinstaller
-    #   pyinstaller-hooks-contrib
 six==1.17.0 \
     --hash=sha256:4721f391ed90541fddacab5acf947aa0d3dc7d27b2e1e8eda2be8970586c3274 \
     --hash=sha256:ff70335d468e7eb6ec65b95b99d3a2836546063f63acc5171de367e834932a81
@@ -343,7 +323,7 @@ six==1.17.0 \
 tlslite-ng==0.8.2 \
     --hash=sha256:9ac377526c60a7d6e7625bd49e7a5ae551b12b0465b07d691342c64a0b3e8440 \
     --hash=sha256:bc17945ab48c7a2ecb16ae9d4b32cf976bfd67d7db74c0fedc093f9094e49ae5
-    # via -r .github/requirements/build-linux.in
+    # via -r build-linux.in
 wrapt==2.1.1 \
     --hash=sha256:05c0db35ccffd7480143e62df1e829d101c7b86944ae3be7e4869a7efa621f53 \
     --hash=sha256:0bb7207130ce6486727baa85373503bf3334cc28016f6928a0fa7e19d7ecdc06 \

@@ -1,18 +1,18 @@
 asn1crypto==1.5.1 \
     --hash=sha256:13ae38502be632115abf8a24cbe5f4da52e3b5231990aff31123c805306ccb9c \
     --hash=sha256:db4e40728b728508912cbb3d44f19ce188f218e9eba635821bb4b68564f8fd67
-    # via -r .github/requirements/build-windows.in
+    # via -r build-windows.in
 defusedxml==0.7.1 \
     --hash=sha256:1bb3032db185915b62d7c6209c5a8792be6a32ab2fedacc84e01b52c51aa3e69 \
     --hash=sha256:a352e7e428770286cc899e2542b6cdaedb2b4953ff269a210103ec58f6198a61
-    # via -r .github/requirements/build-windows.in
+    # via -r build-windows.in
 deprecated==1.3.1 \
     --hash=sha256:597bfef186b6f60181535a29fbe44865ce137a5079f295b479886c82729d5f3f \
     --hash=sha256:b1b50e0ff0c1fddaa5708a2c6b0a6588bb09b892825ab2b214ac9ea9d92a5223
     # via pikepdf
-ecdsa==0.19.1 \
-    --hash=sha256:30638e27cf77b7e15c4c4cc1973720149e1033827cfd00661ca5c8cc0cdb24c3 \
-    --hash=sha256:478cba7b62555866fcb3bb3fe985e06decbdb68ef55713c4e5ab98c57d508e61
+ecdsa==0.19.2 \
+    --hash=sha256:62635b0ac1ca2e027f82122b5b81cb706edc38cd91c63dda28e4f3455a2bf930 \
+    --hash=sha256:840f5dc5e375c68f36c1a7a5b9caad28f95daa65185c9253c0c08dd952bb7399
     # via tlslite-ng
 lxml==6.0.2 \
     --hash=sha256:058027e261afed589eddcfe530fcc6f3402d7fd7e89bfd0532df82ebc1563dba \
@@ -158,11 +158,11 @@ lxml==6.0.2 \
     # via pikepdf
 nuitka==4.0.1 \
     --hash=sha256:8a8dedd549049a145e1545206a082bfbe0bc610457a71d837e560e7cf015635c
-    # via -r .github/requirements/build-windows.in
+    # via -r build-windows.in
 ordered-set==4.1.0 \
     --hash=sha256:046e1132c71fcf3330438a539928932caf51ddbc582496833e23de611de14562 \
     --hash=sha256:694a8e44c87657c59292ede72891eb91d34131f6531463aab3009191c77364a8
-    # via -r .github/requirements/build-windows.in
+    # via -r build-windows.in
 packaging==26.0 \
     --hash=sha256:00243ae351a257117b6a241061796684b084ed1c516a08c48a3f7e147a9d80b4 \
     --hash=sha256:b36f1fef9334a5588b4166f8bcd26a14e521f2b55e6b9de3aaa80d3ff7a37529
@@ -204,7 +204,7 @@ pikepdf==10.3.0 \
     --hash=sha256:f7a4d43c0fe21b76d78eccc1025bea1d61606b9f4489ac1a3ebaf76157716067 \
     --hash=sha256:fa3e4b32a2c1d15bb57e91ee3896c19b3c8145d46c26fbac8747efe7cb5ce3bd \
     --hash=sha256:fc7b47340e705c4c61eedb49849c9e7952ed3d5781e26c26ddb2f2480765a3e3
-    # via -r .github/requirements/build-windows.in
+    # via -r build-windows.in
 pillow==12.1.1 \
     --hash=sha256:02f84dfad02693676692746df05b89cf25597560db2857363a208e393429f5e9 \
     --hash=sha256:0330d233c1a0ead844fc097a7d16c0abff4c12e856c0b325f231820fee1f39da \
@@ -305,7 +305,7 @@ six==1.17.0 \
 tlslite-ng==0.8.2 \
     --hash=sha256:9ac377526c60a7d6e7625bd49e7a5ae551b12b0465b07d691342c64a0b3e8440 \
     --hash=sha256:bc17945ab48c7a2ecb16ae9d4b32cf976bfd67d7db74c0fedc093f9094e49ae5
-    # via -r .github/requirements/build-windows.in
+    # via -r build-windows.in
 wrapt==2.1.1 \
     --hash=sha256:05c0db35ccffd7480143e62df1e829d101c7b86944ae3be7e4869a7efa621f53 \
     --hash=sha256:0bb7207130ce6486727baa85373503bf3334cc28016f6928a0fa7e19d7ecdc06 \
@@ -482,4 +482,4 @@ zstandard==0.25.0 \
     --hash=sha256:f67e8f1a324a900e75b5e28ffb152bcac9fbed1cc7b43f99cd90f395c4375344 \
     --hash=sha256:fd7a5004eb1980d3cefe26b2685bcb0b17989901a70a1040d1ac86f1d898c551 \
     --hash=sha256:ffef5a74088f1e09947aecf91011136665152e0b4b359c42be3373897fb39b01
-    # via -r .github/requirements/build-windows.in
+    # via -r build-windows.in
