@@ -61,7 +61,7 @@ jobs:
       WINDOWS_SIGN: ${{ secrets.WINDOWS_CERTIFICATE_BASE64 != '' && 'true' || '' }}
 
     steps:
-      - uses: step-security/harden-runner@fa2e9d605c4eeb9fcad4c99c224cee0c6c7f3594 # v2
+      - uses: step-security/harden-runner@fe104658747b27e96e4f7e80cd0a94068e53901d # v2.16.1
         with:
           egress-policy: audit
 
@@ -254,7 +254,7 @@ jobs:
             arch: x86_64
 
     steps:
-      - uses: step-security/harden-runner@fa2e9d605c4eeb9fcad4c99c224cee0c6c7f3594 # v2
+      - uses: step-security/harden-runner@fe104658747b27e96e4f7e80cd0a94068e53901d # v2.16.1
         with:
           egress-policy: audit
 
@@ -309,7 +309,7 @@ jobs:
       MACOS_NOTARIZE: ${{ secrets.APPSTORE_API_KEY_BASE64 != '' && 'true' || '' }}
 
     steps:
-      - uses: step-security/harden-runner@fa2e9d605c4eeb9fcad4c99c224cee0c6c7f3594 # v2
+      - uses: step-security/harden-runner@fe104658747b27e96e4f7e80cd0a94068e53901d # v2.16.1
         with:
           egress-policy: audit
 
@@ -529,7 +529,7 @@ jobs:
       MAS_SIGN: ${{ secrets.MAS_CERTIFICATE_BASE64 != '' && 'true' || '' }}
 
     steps:
-      - uses: step-security/harden-runner@fa2e9d605c4eeb9fcad4c99c224cee0c6c7f3594 # v2
+      - uses: step-security/harden-runner@fe104658747b27e96e4f7e80cd0a94068e53901d # v2.16.1
         with:
           egress-policy: audit
 
@@ -646,7 +646,7 @@ jobs:
       attestations: write
 
     steps:
-      - uses: step-security/harden-runner@fa2e9d605c4eeb9fcad4c99c224cee0c6c7f3594 # v2
+      - uses: step-security/harden-runner@fe104658747b27e96e4f7e80cd0a94068e53901d # v2.16.1
         with:
           egress-policy: audit
 
@@ -709,7 +709,7 @@ jobs:
       id-token: write
 
     steps:
-      - uses: step-security/harden-runner@fa2e9d605c4eeb9fcad4c99c224cee0c6c7f3594 # v2
+      - uses: step-security/harden-runner@fe104658747b27e96e4f7e80cd0a94068e53901d # v2.16.1
         with:
           egress-policy: audit
 
@@ -757,7 +757,7 @@ jobs:
       id-token: write
 
     steps:
-      - uses: step-security/harden-runner@fa2e9d605c4eeb9fcad4c99c224cee0c6c7f3594 # v2
+      - uses: step-security/harden-runner@fe104658747b27e96e4f7e80cd0a94068e53901d # v2.16.1
         with:
           egress-policy: audit
 
@@ -806,7 +806,7 @@ jobs:
         working-directory: typescript
 
     steps:
-      - uses: step-security/harden-runner@fa2e9d605c4eeb9fcad4c99c224cee0c6c7f3594 # v2
+      - uses: step-security/harden-runner@fe104658747b27e96e4f7e80cd0a94068e53901d # v2.16.1
         with:
           egress-policy: audit
 
@@ -857,7 +857,7 @@ jobs:
         working-directory: typescript
 
     steps:
-      - uses: step-security/harden-runner@fa2e9d605c4eeb9fcad4c99c224cee0c6c7f3594 # v2
+      - uses: step-security/harden-runner@fe104658747b27e96e4f7e80cd0a94068e53901d # v2.16.1
         with:
           egress-policy: audit
 
@@ -904,7 +904,7 @@ jobs:
       contents: read
 
     steps:
-      - uses: step-security/harden-runner@fa2e9d605c4eeb9fcad4c99c224cee0c6c7f3594 # v2
+      - uses: step-security/harden-runner@fe104658747b27e96e4f7e80cd0a94068e53901d # v2.16.1
         with:
           egress-policy: audit
 
@@ -964,7 +964,7 @@ jobs:
       contents: read
 
     steps:
-      - uses: step-security/harden-runner@fa2e9d605c4eeb9fcad4c99c224cee0c6c7f3594 # v2
+      - uses: step-security/harden-runner@fe104658747b27e96e4f7e80cd0a94068e53901d # v2.16.1
         with:
           egress-policy: audit
 
