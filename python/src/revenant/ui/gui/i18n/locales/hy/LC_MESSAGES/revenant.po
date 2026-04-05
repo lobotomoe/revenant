@@ -1,0 +1,572 @@
+# Revenant GUI -- Armenian translation
+# SPDX-License-Identifier: Apache-2.0
+#
+msgid ""
+msgstr ""
+"Content-Type: text/plain; charset=UTF-8\n"
+"Content-Transfer-Encoding: 8bit\n"
+"Language: hy\n"
+
+msgid ""
+"  Note: cryptographic verification requires the original PDF.\n"
+"  Add the PDF to verify the signature integrity."
+msgstr ""
+"  Ծածկագրական ստուգումը պահանջում է բնօրինակ PDF-ը։\n"
+"  Ավելացրեք PDF-ը ստորագրության ամբողջականությունը ստուգելու համար։"
+
+msgid "(no signer)"
+msgstr "(ստորագրող չկա)"
+
+msgid "About Revenant"
+msgstr "Revenant-ի մասին"
+
+msgid "Account"
+msgstr "Հաշիվ"
+
+msgid "All files"
+msgstr "Բոլոր ֆայլերը"
+
+msgid "All {count} signatures VALID"
+msgstr "Բոլոր {count} ստորագրությունները ՎԱՎԵՐ են"
+
+msgid "Auth failed: {error}"
+msgstr "Նույնականացումը ձախողվեց. {error}"
+
+msgid "Authentication failed: {error}"
+msgstr "Վավերացումը ձախողվեց. {error}"
+
+msgid "Author: Aleksandr Kraiz"
+msgstr "Հեղինակ՝ Aleksandr Kraiz"
+
+msgid "Back"
+msgstr "Հետ"
+
+msgid "Browse..."
+msgstr "Թերթել..."
+
+msgid "Cancel"
+msgstr "Չեղարկել"
+
+msgid "Cannot read file: {error}"
+msgstr "Չհաջողվեց կարդալ ֆայլը. {error}"
+
+msgid "Certificate inspection"
+msgstr "Վկայագրի ստուգում"
+
+msgid "Certificate: {status}"
+msgstr "Վկայագիր. {status}"
+
+msgid "Choose Server"
+msgstr "Ընտրել սերվեր"
+
+msgid "Clearing saved credentials..."
+msgstr "Պահված հավատարմագրերը ջնջվում են..."
+
+msgid "Close Window"
+msgstr "Փակել պատուհանը"
+
+msgid "Complete"
+msgstr "Ավարտված"
+
+msgid "Connect"
+msgstr "Միանալ"
+
+msgid "Connect to Server"
+msgstr "Միանալ սերվերին"
+
+msgid ""
+"Connect to a server\n"
+"to sign documents."
+msgstr ""
+"Միացեք սերվերին՝\n"
+"փաստաթղթեր ստորագրելու համար։"
+
+msgid "Connected ({info})"
+msgstr "Միացված է ({info})"
+
+msgid "Connecting to {url}..."
+msgstr "Միանում ենք {url}-ին..."
+
+msgid "Copy"
+msgstr "Պատճենել"
+
+msgid "Could not determine identity from server."
+msgstr "Չհաջողվեց սերվերից որոշել ստորագրողի ինքնությունը։"
+
+msgid ""
+"Could not read password from system keychain.\n"
+"Please re-enter your password."
+msgstr ""
+"Չհաջողվեց կարդալ գաղտնաբառը համակարգային պահոցից։\n"
+"Խնդրում ենք կրկին մուտքագրել գաղտնաբառը։"
+
+msgid ""
+"Could not save password to system keychain\n"
+"(access was denied or unavailable).\n"
+"\n"
+"Your password was saved to the config file instead.\n"
+"To use secure storage, allow keychain access\n"
+"when prompted."
+msgstr ""
+"Չհաջողվեց պահել գաղտնաբառը համակարգային պահոցում\n"
+"(մուտքը մերժված է կամ անհասանելի)։\n"
+"\n"
+"Գաղտնաբառը պահվեց կազմաձևման ֆայլում։\n"
+"Ապահով պահոց օգտագործելու համար\n"
+"թույլ տվեք մուտք, երբ հարցնեն։"
+
+msgid "Credentials"
+msgstr "Հավատարմագրեր"
+
+msgid ""
+"Cross-platform client for ARX CoSign\n"
+"electronic signatures."
+msgstr ""
+"Բազմապլատֆորմ հաճախորդ ARX CoSign\n"
+"էլեկտրոնային ստորագրությունների համար։"
+
+msgid "Custom server"
+msgstr "Հատուկ սերվեր"
+
+msgid "Cut"
+msgstr "Կտրել"
+
+msgid "Detached (.p7s)"
+msgstr "Անջատված (.p7s)"
+
+msgid "Detached signature"
+msgstr "Անջատված ստորագրություն"
+
+msgid "Disconnect"
+msgstr "Անջատվել"
+
+msgid "Disconnect from {name}?"
+msgstr "Անջատվե՞լ {name}-ից։"
+
+msgid "Disconnecting..."
+msgstr "Անջատվում ենք..."
+
+msgid "Discovering signer identity..."
+msgstr "Ստորագրողի ինքնությունը որոշվում է..."
+
+msgid "Edit"
+msgstr "Խմբագրել"
+
+msgid "Email"
+msgstr "Էլ. փոստ"
+
+msgid "Email:"
+msgstr "Էլ. փոստ."
+
+msgid "Embedded"
+msgstr "Ներդրված"
+
+msgid "Embedded signatures"
+msgstr "Ներդրված ստորագրություններ"
+
+msgid "Enter a server URL."
+msgstr "Մուտքագրեք սերվերի URL-ը։"
+
+msgid "Enter manually..."
+msgstr "Մուտքագրել ձեռքով..."
+
+msgid "Enter signer identity:"
+msgstr "Մուտքագրեք ստորագրողի տվյալները."
+
+msgid "Error: {error}"
+msgstr "Սխալ. {error}"
+
+msgid "FAILED"
+msgstr "ԱՆՎԱՎԵՐ"
+
+msgid "Failed"
+msgstr "Ձախողում"
+
+msgid "Failed: {info}"
+msgstr "Ձախողվեց. {info}"
+
+msgid "File"
+msgstr "Ֆայլ"
+
+msgid ""
+"File already exists:\n"
+"{filename}\n"
+"\n"
+"Overwrite?"
+msgstr ""
+"Ֆայլն արդեն գոյություն ունի.\n"
+"{filename}\n"
+"\n"
+"Վերագրե՞լ։"
+
+msgid ""
+"File not found:\n"
+"{path}"
+msgstr ""
+"Ֆայլը չի գտնվել.\n"
+"{path}"
+
+msgid "Font:"
+msgstr "Տառատեսակ."
+
+msgid "GitHub"
+msgstr "GitHub"
+
+msgid "Image (opt):"
+msgstr "Պատկեր (ըստ ցանկության)."
+
+msgid "Images"
+msgstr "Պատկերներ"
+
+msgid "Inspecting signature..."
+msgstr "Ստորագրությունը ստուգվում է..."
+
+msgid "Invisible signature"
+msgstr "Անտեսանելի ստորագրություն"
+
+msgid "License: Apache 2.0"
+msgstr "Լիցենզիա. Apache 2.0"
+
+msgid "Loading credentials..."
+msgstr "Հավատարմագրերը բեռնվում են..."
+
+msgid "Loading saved credentials..."
+msgstr "Պահված հավատարմագրերը բեռնվում են..."
+
+msgid "Log In"
+msgstr "Մուտք գործել"
+
+msgid "Log Out"
+msgstr "Ելք"
+
+msgid ""
+"Log out?\n"
+"Server connection will be preserved."
+msgstr ""
+"Ելե՞լ հաշվից։\n"
+"Սերվերի կապը կպահպանվի։"
+
+msgid "Logging out..."
+msgstr "Ելք կատարվում է..."
+
+msgid "Login"
+msgstr "Մուտք"
+
+msgid "Name"
+msgstr "Անուն"
+
+msgid "Name (required):"
+msgstr "Անուն (պարտադիր)."
+
+msgid "Name is required."
+msgstr "Անունը պարտադիր է։"
+
+msgid "Next"
+msgstr "Հաջորդ"
+
+msgid "No server configured"
+msgstr "Սերվեր կազմաձևված չէ"
+
+msgid ""
+"No server configured.\n"
+"Click 'Setup...' to configure."
+msgstr ""
+"Սերվեր կազմաձևված չէ։\n"
+"Կազմաձևելու համար սեղմեք «Կարգավորել...»։"
+
+msgid "OK"
+msgstr "OK"
+
+msgid "Org"
+msgstr "Կազմ."
+
+msgid "Organization"
+msgstr "Կազմակերպություն"
+
+msgid "Organization:"
+msgstr "Կազմակերպություն."
+
+msgid "Output (opt):"
+msgstr "Ելքային ֆայլ (ըստ ցանկության)."
+
+msgid ""
+"Output path must be absolute.\n"
+"Use 'Browse...' to select a location."
+msgstr ""
+"Ելքային ճանապարհը պետք է բացարձակ լինի։\n"
+"Տեղ ընտրելու համար սեղմեք «Թերթել...»։"
+
+msgid "PDF file:"
+msgstr "PDF ֆայլ:"
+
+msgid "PDF files"
+msgstr "PDF ֆայլեր"
+
+msgid "PKCS#7 signature"
+msgstr "PKCS#7 ստորագրություն"
+
+msgid "PKCS#7 signatures"
+msgstr "PKCS#7 ստորագրություններ"
+
+msgid "Page:"
+msgstr "Էջ."
+
+msgid "Password:"
+msgstr "Գաղտնաբառ."
+
+msgid "Paste"
+msgstr "Տեղադրել"
+
+msgid ""
+"Permission denied:\n"
+"{path}\n"
+"\n"
+"Try saving to a different location\n"
+"using 'Browse...'."
+msgstr ""
+"Մուտքն արգելված է.\n"
+"{path}\n"
+"\n"
+"Փորձեք պահել այլ տեղ՝\n"
+"«Թերթել...» կոճակի միջոցով։"
+
+msgid ""
+"Permission denied:\n"
+"{path}\n"
+"\n"
+"Try selecting the file again using 'Browse...'."
+msgstr ""
+"Մուտքն արգելված է.\n"
+"{path}\n"
+"\n"
+"Փորձեք կրկին ընտրել ֆայլը «Թերթել...» կոճակի միջոցով։"
+
+msgid "Please select a PDF file."
+msgstr "Խնդրում ենք ընտրել PDF ֆայլ։"
+
+msgid "Please select a file to verify."
+msgstr "Խնդրում ենք ընտրել ստուգման ֆայլ։"
+
+msgid "Position:"
+msgstr "Դիրք."
+
+msgid "Ready"
+msgstr "Պատրաստ"
+
+msgid "Report a Bug"
+msgstr "Հաղորդել սխալի մասին"
+
+msgid "Retry"
+msgstr "Կրկնել"
+
+msgid "Save"
+msgstr "Պահել"
+
+msgid "Save credentials"
+msgstr "Պահել հավատարմագրերը"
+
+msgid "Save credentials (username/password)"
+msgstr "Պահել հավատարմագրերը (օգտանուն/գաղտնաբառ)"
+
+msgid "Save signature as"
+msgstr "Ստորագրությունը պահել որպես"
+
+msgid "Save signed PDF as"
+msgstr "Ստորագրված PDF-ը պահել որպես"
+
+msgid "Saving credentials..."
+msgstr "Հավատարմագրերը պահվում են..."
+
+msgid "Select All"
+msgstr "Ընտրել բոլորը"
+
+msgid "Select PDF"
+msgstr "Ընտրել PDF"
+
+msgid "Select PDF to verify"
+msgstr "Ընտրել PDF ստուգման համար"
+
+msgid "Select a CoSign server:"
+msgstr "Ընտրեք CoSign սերվեր."
+
+msgid ""
+"Select a PDF file and click Verify to check signatures.\n"
+"\n"
+"Modes:\n"
+"  PDF only -- verify embedded signatures\n"
+"  PDF + .p7s -- verify detached signature\n"
+"  .p7s only -- inspect certificate (no crypto verification)"
+msgstr ""
+"Ընտրեք PDF ֆայլ և սեղմեք «Ստուգել»՝ ստորագրությունները ստուգելու համար։\n"
+"\n"
+"Ռեժիմներ.\n"
+"  Միայն PDF -- ներդրված ստորագրությունների ստուգում\n"
+"  PDF + .p7s -- անջատված ստորագրության ստուգում\n"
+"  Միայն .p7s -- վկայագրի դիտում (առանց ծածկագրային ստուգման)"
+
+msgid "Select a server."
+msgstr "Ընտրեք սերվեր։"
+
+msgid "Select signature file"
+msgstr "Ընտրել ստորագրության ֆայլ"
+
+msgid "Select signature image"
+msgstr "Ընտրել ստորագրության պատկեր"
+
+msgid ""
+"Server connected.\n"
+"Log in to sign documents."
+msgstr ""
+"Սերվերն միացված է։\n"
+"Մուտք գործեք՝ փաստաթղթեր ստորագրելու համար։"
+
+msgid "Server error: {error}"
+msgstr "Սերվերի սխալ. {error}"
+
+msgid "Server verification"
+msgstr "Սերվերային ստուգում"
+
+msgid "Setup complete! Summary:"
+msgstr "Կարգավորումն ավարտված է։ Ամփոփում."
+
+msgid "Sign"
+msgstr "Ստորագրել"
+
+msgid "Sign (Detached)"
+msgstr "Ստորագրել (անջատված)"
+
+msgid "Sign PDF"
+msgstr "Ստորագրել PDF"
+
+msgid "Signature"
+msgstr "Ստորագրություն"
+
+msgid "Signature (.p7s):"
+msgstr "Ստորագրություն (.p7s)."
+
+msgid "Signature FAILED"
+msgstr "Ստորագրությունն ԱՆՎԱՎԵՐ է"
+
+msgid "Signature VALID"
+msgstr "Ստորագրությունն ՎԱՎԵՐ է"
+
+msgid "Signature {current}/{total} ({signer})"
+msgstr "Ստորագրություն {current}/{total} ({signer})"
+
+msgid "Signed! -> {filename} ({size})"
+msgstr "Ստորագրված է։ -> {filename} ({size})"
+
+msgid "Signed: {time}"
+msgstr "Ստորագրված. {time}"
+
+msgid "Signer Identity"
+msgstr "Ստորագրող ինքնություն"
+
+msgid "Signer identity found:"
+msgstr "Ստորագրողի ինքնությունը հայտնաբերվածծ է."
+
+msgid "Signer identity is required. Click 'Enter manually...' to provide it."
+msgstr "Ստորագրողի ինքնությունը պարտադիր և. Սեղմեք «Մուտքագրել ձեռքով...»:"
+
+msgid "Signer identity is required. Retry the connection or go back to fix credentials."
+msgstr "Ստորագրողի ինքնությունը պարտադիր և. Կրկնելև կապը կամ հետ գնացեք Հավատարմագրերը շուկելու համար."
+
+msgid "Signer: {name}"
+msgstr "Ստորագրող. {name}"
+
+msgid "Signing..."
+msgstr "Ստորագրում է..."
+
+msgid "Step {current} of {total}"
+msgstr "քայլ {current} ից {total}"
+
+msgid "Storage: {storage}"
+msgstr "պահոց. {storage}"
+
+msgid "TLS error: {error}"
+msgstr "TLS սխալ.. {error}"
+
+msgid "Telegram"
+msgstr "Telegram"
+
+msgid ""
+"This PDF is {size_mb} MB.\n"
+"\n"
+"Files over 30 MB may take a long time to sign\n"
+"or fail on the server.\n"
+"\n"
+"Continue?"
+msgstr ""
+"Այս PDF-ը {size_mb} ՄԲ է:\n"
+"\n"
+"30 ՄԲ-ից մեծ ֆայլերի ստորագրումը կարող է երկար տևել\n"
+"կամ ձախողվել սերվերում:\n"
+"\n"
+"Շարունակե՞լ:"
+
+msgid ""
+"This will also remove your credentials\n"
+"and signer identity."
+msgstr ""
+"Սա նաև կջնջի ձեր հավատարմագրերը\n"
+"և ստորագրողի ինքնությունը:"
+
+msgid "URL:"
+msgstr "URL:"
+
+msgid "Unavailable: {error}"
+msgstr "Անհասանելի. {error}"
+
+msgid "Undo"
+msgstr "Հետարկել"
+
+msgid "Unexpected error: {error}"
+msgstr "Անսպասելի սխալ.. {error}"
+
+msgid "Username and password are required."
+msgstr "Օգտանունն և Գաղտնաբառն պարտադիր ևն."
+
+msgid "Username:"
+msgstr "Օգտանուն:"
+
+msgid "Username: {username}"
+msgstr "Օգտանուն: {username}"
+
+msgid "VALID"
+msgstr "ՎԱՎԵՐ"
+
+msgid "Verify"
+msgstr "Ստուգել"
+
+msgid "Verify Signature"
+msgstr "Ստուգել Ստորագրությունը"
+
+msgid "Verifying detached signature..."
+msgstr "Անջատված ստորագրությունն ստուգվում է..."
+
+msgid "Verifying embedded signatures..."
+msgstr "Ներդրված ստորագրություններն ստուգվում են..."
+
+msgid "Verifying..."
+msgstr "ստուգվում է..."
+
+msgid "Version {version}"
+msgstr "Տարբերակ {version}"
+
+msgid "Warning: account locks after {max_attempts} failed attempts!"
+msgstr "զգուշացում. Հաշիվը կարգելափակվում է {max_attempts} անհաջող փորձից հետո."
+
+msgid "Settings"
+msgstr "Կարգավորումներ"
+
+msgid "Language:"
+msgstr "Լեզվա:"
+
+msgid "System"
+msgstr "Համակարգ"
+
+msgid "Restart the app to apply the new language."
+msgstr "Վերագորկեցեք ծրագիրը նոր լեզվայի կարարելով համար."
+
+msgid "{failed} of {total} signature(s) FAILED"
+msgstr "{total}-ից {failed} ստորագրություն ՁԱԽՈՂՎԵԼ Է"

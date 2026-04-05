@@ -25,13 +25,15 @@ if TYPE_CHECKING:
 from ...config import (
     get_active_profile,
     get_config_layer,
+    get_language,
     get_server_config,
     get_signer_info,
     logout,
     reset_all,
 )
 from .connect_dialog import ConnectDialog
-from .dialogs import about_footer, login_dialog, show_about
+from .dialogs import about_footer, login_dialog, show_about, show_settings
+from .i18n import _
 from .setup import LoginDialog
 from .sign_form import SignForm, build_server_only, build_unconfigured
 from .utils import bind_macos_shortcuts, check_tkinter, enable_dpi_awareness
@@ -78,15 +80,15 @@ class ServerBar:
         """Update display based on current config layer."""
         layer = get_config_layer()
         if layer == 0:
-            self._label_var.set("No server configured")
+            self._label_var.set(_("No server configured"))
             self._label.configure(foreground="gray", font=("", 10))
-            self._btn.configure(text="Connect", command=self._on_connect_action)
+            self._btn.configure(text=_("Connect"), command=self._on_connect_action)
         else:
             profile = get_active_profile()
             name = profile.display_name if profile else "Server"
             self._label_var.set(name)
             self._label.configure(foreground="", font=("", 10, "bold"))
-            self._btn.configure(text="Disconnect", command=self._on_disconnect_action)
+            self._btn.configure(text=_("Disconnect"), command=self._on_disconnect_action)
 
 
 # ── Main Application ────────────────────────────────────────────────
@@ -112,7 +114,7 @@ class RevenantGUI:
         self.page = tk.StringVar(value="last")
         self.font_key = tk.StringVar(value="noto-sans")
         self.invisible = tk.BooleanVar(value=False)
-        self.status_text = tk.StringVar(value="Ready")
+        self.status_text = tk.StringVar(value=_("Ready"))
         self._signer_info = get_signer_info()
         self._content_frame: tk.Widget | None = None
         self._sign_form: SignForm | None = None
@@ -175,11 +177,11 @@ class RevenantGUI:
         notebook.grid(row=1, column=0, sticky="nsew", pady=(4, 0))
 
         self._sign_tab = ttk.Frame(notebook)
-        notebook.add(self._sign_tab, text="Sign")
+        notebook.add(self._sign_tab, text=_("Sign"))
         self._refresh_sign_tab()
 
         verify_tab = ttk.Frame(notebook)
-        notebook.add(verify_tab, text="Verify")
+        notebook.add(verify_tab, text=_("Verify"))
         from .verify import VerifyPanel
 
         self._verify_panel = VerifyPanel(verify_tab, self.root)
@@ -196,7 +198,7 @@ class RevenantGUI:
 
         if layer == 2:
             self._signer_info = get_signer_info()
-            self.status_text.set("Ready")
+            self.status_text.set(_("Ready"))
             self._sign_form = SignForm(
                 self._sign_tab,
                 self.root,
@@ -280,16 +282,17 @@ class RevenantGUI:
 
         if layer == 2:
             msg = (
-                f"Disconnect from {name}?\n\n"
-                "This will also remove your credentials\nand signer identity."
+                _("Disconnect from {name}?").format(name=name)
+                + "\n\n"
+                + _("This will also remove your credentials\nand signer identity.")
             )
         else:
-            msg = f"Disconnect from {name}?"
+            msg = _("Disconnect from {name}?").format(name=name)
 
         if not messagebox.askyesno("Revenant", msg):
             return
 
-        self.status_text.set("Disconnecting...")
+        self.status_text.set(_("Disconnecting..."))
         self.root.update_idletasks()
         reset_all()
         if self._server_bar is not None:
@@ -312,9 +315,9 @@ class RevenantGUI:
         """Clear credentials and identity, keeping server config."""
         from tkinter import messagebox
 
-        if not messagebox.askyesno("Revenant", "Log out?\nServer connection will be preserved."):
+        if not messagebox.askyesno("Revenant", _("Log out?\nServer connection will be preserved.")):
             return
-        self.status_text.set("Logging out...")
+        self.status_text.set(_("Logging out..."))
         self.root.update_idletasks()
         logout()
         if self._server_bar is not None:
@@ -373,35 +376,35 @@ def _build_macos_menubar(root: tk.Tk) -> None:
 
     # -- File --
     file_menu = tk.Menu(menubar, tearoff=0)
-    file_menu.add_command(label="Close Window", accelerator="Cmd+W", command=root.destroy)
-    menubar.add_cascade(label="File", menu=file_menu)
+    file_menu.add_command(label=_("Close Window"), accelerator="Cmd+W", command=root.destroy)
+    menubar.add_cascade(label=_("File"), menu=file_menu)
 
     # -- Edit --
     edit_menu = tk.Menu(menubar, tearoff=0)
     edit_menu.add_command(
-        label="Undo",
+        label=_("Undo"),
         accelerator="Cmd+Z",
         command=lambda: _send_virtual_event("<<Undo>>"),
     )
     edit_menu.add_separator()
     edit_menu.add_command(
-        label="Cut",
+        label=_("Cut"),
         accelerator="Cmd+X",
         command=lambda: _send_virtual_event("<<Cut>>"),
     )
     edit_menu.add_command(
-        label="Copy",
+        label=_("Copy"),
         accelerator="Cmd+C",
         command=lambda: _send_virtual_event("<<Copy>>"),
     )
     edit_menu.add_command(
-        label="Paste",
+        label=_("Paste"),
         accelerator="Cmd+V",
         command=lambda: _send_virtual_event("<<Paste>>"),
     )
     edit_menu.add_separator()
-    edit_menu.add_command(label="Select All", accelerator="Cmd+A", command=_select_all)
-    menubar.add_cascade(label="Edit", menu=edit_menu)
+    edit_menu.add_command(label=_("Select All"), accelerator="Cmd+A", command=_select_all)
+    menubar.add_cascade(label=_("Edit"), menu=edit_menu)
 
     root.config(menu=menubar)
 
@@ -419,6 +422,11 @@ def main() -> None:
     if not ok:
         print(f"ERROR: {err}", file=sys.stderr)
         sys.exit(1)
+
+    # Initialize translations before any UI is created
+    from .i18n import init_locale
+
+    init_locale(get_language())
 
     # Windows: must be called before tk.Tk() so the OS reports real DPI
     enable_dpi_awareness()
@@ -450,6 +458,7 @@ def main() -> None:
     # macOS: system menu integration + keyboard shortcut fix for non-Latin layouts
     if platform.system() == "Darwin":
         root.createcommand("tkAboutDialog", lambda: show_about(root))
+        root.createcommand("::tk::mac::ShowPreferences", lambda: show_settings(root))
         _build_macos_menubar(root)
         bind_macos_shortcuts(root)
 

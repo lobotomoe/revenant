@@ -11,6 +11,9 @@
 *.p7s
 *.log
 
+# Compiled translations (built from .po files)
+*.mo
+
 # macOS
 .DS_Store
 

@@ -16,11 +16,13 @@ __all__ = [
     "CONFIG_FILE",
     "get_active_profile",
     "get_config_layer",
+    "get_language",
     "get_server_config",
     "get_signer_info",
     "get_signer_name",
     "logout",
     "reset_all",
+    "save_language",
     "save_server_config",
     "save_signer_info",
 ]
@@ -191,7 +193,13 @@ def reset_all() -> None:
 
     clear_credentials()
     clear_session_credentials()
-    save_config({})
+    # Preserve language preference across resets
+    config = load_raw_config()
+    preserved: dict[str, object] = {}
+    lang = config.get("language")
+    if lang is not None:
+        preserved["language"] = lang
+    save_config(preserved)
 
 
 # Identity keys cleared on logout (credentials handled by clear_credentials)
@@ -219,6 +227,29 @@ def logout() -> None:
             changed = True
     if changed:
         save_config(config)
+
+
+# ── Language preference ──────────────────────────────────────────────
+
+
+def get_language() -> str:
+    """Get the saved language preference.
+
+    Returns:
+        Locale code ('en', 'ru', 'hy') or 'system' (default).
+    """
+    config = load_config()
+    return config.get("language", "system")
+
+
+def save_language(language: str) -> None:
+    """Save language preference to config."""
+    config = load_raw_config()
+    if language == "system":
+        config.pop("language", None)
+    else:
+        config["language"] = language
+    save_config(config)
 
 
 # ── Layer detection ──────────────────────────────────────────────────

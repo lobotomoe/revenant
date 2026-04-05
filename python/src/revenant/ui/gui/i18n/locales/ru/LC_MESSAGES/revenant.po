@@ -1,0 +1,572 @@
+# Revenant GUI -- Russian translation
+# SPDX-License-Identifier: Apache-2.0
+#
+msgid ""
+msgstr ""
+"Content-Type: text/plain; charset=UTF-8\n"
+"Content-Transfer-Encoding: 8bit\n"
+"Language: ru\n"
+
+msgid ""
+"  Note: cryptographic verification requires the original PDF.\n"
+"  Add the PDF to verify the signature integrity."
+msgstr ""
+"  Криптографическая проверка требует оригинальный PDF.\n"
+"  Добавьте PDF для проверки целостности подписи."
+
+msgid "(no signer)"
+msgstr "(нет подписанта)"
+
+msgid "About Revenant"
+msgstr "О Revenant"
+
+msgid "Account"
+msgstr "Учётная запись"
+
+msgid "All files"
+msgstr "Все файлы"
+
+msgid "All {count} signatures VALID"
+msgstr "Все {count} подписей действительны"
+
+msgid "Auth failed: {error}"
+msgstr "Ошибка авторизации: {error}"
+
+msgid "Authentication failed: {error}"
+msgstr "Ошибка аутентификации: {error}"
+
+msgid "Author: Aleksandr Kraiz"
+msgstr "Автор: Aleksandr Kraiz"
+
+msgid "Back"
+msgstr "Назад"
+
+msgid "Browse..."
+msgstr "Обзор..."
+
+msgid "Cancel"
+msgstr "Отмена"
+
+msgid "Cannot read file: {error}"
+msgstr "Не удалось прочитать файл: {error}"
+
+msgid "Certificate inspection"
+msgstr "Проверка сертификата"
+
+msgid "Certificate: {status}"
+msgstr "Сертификат: {status}"
+
+msgid "Choose Server"
+msgstr "Выбор сервера"
+
+msgid "Clearing saved credentials..."
+msgstr "Удаление сохранённых данных..."
+
+msgid "Close Window"
+msgstr "Закрыть окно"
+
+msgid "Complete"
+msgstr "Готово"
+
+msgid "Connect"
+msgstr "Подключиться"
+
+msgid "Connect to Server"
+msgstr "Подключение к серверу"
+
+msgid ""
+"Connect to a server\n"
+"to sign documents."
+msgstr ""
+"Подключитесь к серверу,\n"
+"чтобы подписывать документы."
+
+msgid "Connected ({info})"
+msgstr "Подключено ({info})"
+
+msgid "Connecting to {url}..."
+msgstr "Подключение к {url}..."
+
+msgid "Copy"
+msgstr "Копировать"
+
+msgid "Could not determine identity from server."
+msgstr "Не удалось определить личность подписанта с сервера."
+
+msgid ""
+"Could not read password from system keychain.\n"
+"Please re-enter your password."
+msgstr ""
+"Не удалось прочитать пароль из системного хранилища.\n"
+"Введите пароль заново."
+
+msgid ""
+"Could not save password to system keychain\n"
+"(access was denied or unavailable).\n"
+"\n"
+"Your password was saved to the config file instead.\n"
+"To use secure storage, allow keychain access\n"
+"when prompted."
+msgstr ""
+"Не удалось сохранить пароль в системное хранилище\n"
+"(доступ запрещён или недоступен).\n"
+"\n"
+"Пароль сохранён в файл конфигурации.\n"
+"Для использования безопасного хранилища\n"
+"разрешите доступ при запросе."
+
+msgid "Credentials"
+msgstr "Учётные данные"
+
+msgid ""
+"Cross-platform client for ARX CoSign\n"
+"electronic signatures."
+msgstr ""
+"Кроссплатформенный клиент для\n"
+"электронных подписей ARX CoSign."
+
+msgid "Custom server"
+msgstr "Другой сервер"
+
+msgid "Cut"
+msgstr "Вырезать"
+
+msgid "Detached (.p7s)"
+msgstr "Отделённая (.p7s)"
+
+msgid "Detached signature"
+msgstr "Отделённая подпись"
+
+msgid "Disconnect"
+msgstr "Отключиться"
+
+msgid "Disconnect from {name}?"
+msgstr "Отключиться от {name}?"
+
+msgid "Disconnecting..."
+msgstr "Отключение..."
+
+msgid "Discovering signer identity..."
+msgstr "Определение личности подписанта..."
+
+msgid "Edit"
+msgstr "Правка"
+
+msgid "Email"
+msgstr "Почта"
+
+msgid "Email:"
+msgstr "Почта:"
+
+msgid "Embedded"
+msgstr "Встроенная"
+
+msgid "Embedded signatures"
+msgstr "Встроенные подписи"
+
+msgid "Enter a server URL."
+msgstr "Введите URL сервера."
+
+msgid "Enter manually..."
+msgstr "Ввести вручную..."
+
+msgid "Enter signer identity:"
+msgstr "Введите данные подписанта:"
+
+msgid "Error: {error}"
+msgstr "Ошибка: {error}"
+
+msgid "FAILED"
+msgstr "НЕДЕЙСТВИТЕЛЬНА"
+
+msgid "Failed"
+msgstr "Ошибка"
+
+msgid "Failed: {info}"
+msgstr "Ошибка: {info}"
+
+msgid "File"
+msgstr "Файл"
+
+msgid ""
+"File already exists:\n"
+"{filename}\n"
+"\n"
+"Overwrite?"
+msgstr ""
+"Файл уже существует:\n"
+"{filename}\n"
+"\n"
+"Перезаписать?"
+
+msgid ""
+"File not found:\n"
+"{path}"
+msgstr ""
+"Файл не найден:\n"
+"{path}"
+
+msgid "Font:"
+msgstr "Шрифт:"
+
+msgid "GitHub"
+msgstr "GitHub"
+
+msgid "Image (opt):"
+msgstr "Изображение:"
+
+msgid "Images"
+msgstr "Изображения"
+
+msgid "Inspecting signature..."
+msgstr "Проверка подписи..."
+
+msgid "Invisible signature"
+msgstr "Невидимая подпись"
+
+msgid "License: Apache 2.0"
+msgstr "Лицензия: Apache 2.0"
+
+msgid "Loading credentials..."
+msgstr "Загрузка учётных данных..."
+
+msgid "Loading saved credentials..."
+msgstr "Загрузка сохранённых данных..."
+
+msgid "Log In"
+msgstr "Войти"
+
+msgid "Log Out"
+msgstr "Выйти"
+
+msgid ""
+"Log out?\n"
+"Server connection will be preserved."
+msgstr ""
+"Выйти из учётной записи?\n"
+"Подключение к серверу сохранится."
+
+msgid "Logging out..."
+msgstr "Выход..."
+
+msgid "Login"
+msgstr "Вход"
+
+msgid "Name"
+msgstr "Имя"
+
+msgid "Name (required):"
+msgstr "Имя (обязательно):"
+
+msgid "Name is required."
+msgstr "Имя обязательно."
+
+msgid "Next"
+msgstr "Далее"
+
+msgid "No server configured"
+msgstr "Сервер не настроен"
+
+msgid ""
+"No server configured.\n"
+"Click 'Setup...' to configure."
+msgstr ""
+"Сервер не настроен.\n"
+"Нажмите «Настроить...» для настройки."
+
+msgid "OK"
+msgstr "OK"
+
+msgid "Org"
+msgstr "Организация"
+
+msgid "Organization"
+msgstr "Организация"
+
+msgid "Organization:"
+msgstr "Организация:"
+
+msgid "Output (opt):"
+msgstr "Результат:"
+
+msgid ""
+"Output path must be absolute.\n"
+"Use 'Browse...' to select a location."
+msgstr ""
+"Путь должен быть абсолютным.\n"
+"Нажмите «Обзор...» для выбора."
+
+msgid "PDF file:"
+msgstr "PDF файл:"
+
+msgid "PDF files"
+msgstr "PDF файлы"
+
+msgid "PKCS#7 signature"
+msgstr "Подпись PKCS#7"
+
+msgid "PKCS#7 signatures"
+msgstr "Подписи PKCS#7"
+
+msgid "Page:"
+msgstr "Страница:"
+
+msgid "Password:"
+msgstr "Пароль:"
+
+msgid "Paste"
+msgstr "Вставить"
+
+msgid ""
+"Permission denied:\n"
+"{path}\n"
+"\n"
+"Try saving to a different location\n"
+"using 'Browse...'."
+msgstr ""
+"Доступ запрещён:\n"
+"{path}\n"
+"\n"
+"Попробуйте сохранить в другое место\n"
+"через «Обзор...»."
+
+msgid ""
+"Permission denied:\n"
+"{path}\n"
+"\n"
+"Try selecting the file again using 'Browse...'."
+msgstr ""
+"Доступ запрещён:\n"
+"{path}\n"
+"\n"
+"Попробуйте выбрать файл заново через «Обзор...»."
+
+msgid "Please select a PDF file."
+msgstr "Выберите PDF файл."
+
+msgid "Please select a file to verify."
+msgstr "Выберите файл для проверки."
+
+msgid "Position:"
+msgstr "Положение:"
+
+msgid "Ready"
+msgstr "Готово"
+
+msgid "Report a Bug"
+msgstr "Сообщить об ошибке"
+
+msgid "Retry"
+msgstr "Повторить"
+
+msgid "Save"
+msgstr "Сохранить"
+
+msgid "Save credentials"
+msgstr "Сохранить учётные данные"
+
+msgid "Save credentials (username/password)"
+msgstr "Сохранить учётные данные (логин/пароль)"
+
+msgid "Save signature as"
+msgstr "Сохранить подпись как"
+
+msgid "Save signed PDF as"
+msgstr "Сохранить подписанный PDF как"
+
+msgid "Saving credentials..."
+msgstr "Сохранение учётных данных..."
+
+msgid "Select All"
+msgstr "Выделить все"
+
+msgid "Select PDF"
+msgstr "Выбрать PDF"
+
+msgid "Select PDF to verify"
+msgstr "Выбрать PDF для проверки"
+
+msgid "Select a CoSign server:"
+msgstr "Выберите сервер CoSign:"
+
+msgid ""
+"Select a PDF file and click Verify to check signatures.\n"
+"\n"
+"Modes:\n"
+"  PDF only -- verify embedded signatures\n"
+"  PDF + .p7s -- verify detached signature\n"
+"  .p7s only -- inspect certificate (no crypto verification)"
+msgstr ""
+"Выберите PDF файл и нажмите «Проверить».\n"
+"\n"
+"Режимы:\n"
+"  Только PDF -- проверка встроенных подписей\n"
+"  PDF + .p7s -- проверка отделённой подписи\n"
+"  Только .p7s -- просмотр сертификата (без криптопроверки)"
+
+msgid "Select a server."
+msgstr "Выберите сервер."
+
+msgid "Select signature file"
+msgstr "Выбрать файл подписи"
+
+msgid "Select signature image"
+msgstr "Выбрать изображение подписи"
+
+msgid ""
+"Server connected.\n"
+"Log in to sign documents."
+msgstr ""
+"Сервер подключён.\n"
+"Войдите, чтобы подписывать документы."
+
+msgid "Server error: {error}"
+msgstr "Ошибка сервера: {error}"
+
+msgid "Server verification"
+msgstr "Серверная проверка"
+
+msgid "Setup complete! Summary:"
+msgstr "Настройка завершена! Итог:"
+
+msgid "Sign"
+msgstr "Подписать"
+
+msgid "Sign (Detached)"
+msgstr "Подписать (отделённая)"
+
+msgid "Sign PDF"
+msgstr "Подписать PDF"
+
+msgid "Signature"
+msgstr "Подпись"
+
+msgid "Signature (.p7s):"
+msgstr "Подпись (.p7s):"
+
+msgid "Signature FAILED"
+msgstr "Подпись НЕДЕЙСТВИТЕЛЬНА"
+
+msgid "Signature VALID"
+msgstr "Подпись действительна"
+
+msgid "Signature {current}/{total} ({signer})"
+msgstr "Подпись {current}/{total} ({signer})"
+
+msgid "Signed! -> {filename} ({size})"
+msgstr "Подписано! -> {filename} ({size})"
+
+msgid "Signed: {time}"
+msgstr "Подписано: {time}"
+
+msgid "Signer Identity"
+msgstr "Личность подписанта"
+
+msgid "Signer identity found:"
+msgstr "Личность подписанта определена:"
+
+msgid "Signer identity is required. Click 'Enter manually...' to provide it."
+msgstr "Необходимо указать личность подписанта. Нажмите «Ввести вручную...»."
+
+msgid "Signer identity is required. Retry the connection or go back to fix credentials."
+msgstr "Необходимо указать личность подписанта. Повторите попытку или вернитесь назад."
+
+msgid "Signer: {name}"
+msgstr "Подписант: {name}"
+
+msgid "Signing..."
+msgstr "Подписание..."
+
+msgid "Step {current} of {total}"
+msgstr "Шаг {current} из {total}"
+
+msgid "Storage: {storage}"
+msgstr "Хранилище: {storage}"
+
+msgid "TLS error: {error}"
+msgstr "Ошибка TLS: {error}"
+
+msgid "Telegram"
+msgstr "Telegram"
+
+msgid ""
+"This PDF is {size_mb} MB.\n"
+"\n"
+"Files over 30 MB may take a long time to sign\n"
+"or fail on the server.\n"
+"\n"
+"Continue?"
+msgstr ""
+"Размер PDF: {size_mb} МБ.\n"
+"\n"
+"Файлы более 30 МБ могут долго подписываться\n"
+"или вызвать ошибку на сервере.\n"
+"\n"
+"Продолжить?"
+
+msgid ""
+"This will also remove your credentials\n"
+"and signer identity."
+msgstr ""
+"Учётные данные и личность\n"
+"подписанта будут удалены."
+
+msgid "URL:"
+msgstr "URL:"
+
+msgid "Unavailable: {error}"
+msgstr "Недоступно: {error}"
+
+msgid "Undo"
+msgstr "Отменить"
+
+msgid "Unexpected error: {error}"
+msgstr "Непредвиденная ошибка: {error}"
+
+msgid "Username and password are required."
+msgstr "Введите имя пользователя и пароль."
+
+msgid "Username:"
+msgstr "Логин:"
+
+msgid "Username: {username}"
+msgstr "Логин: {username}"
+
+msgid "VALID"
+msgstr "ДЕЙСТВИТЕЛЬНА"
+
+msgid "Verify"
+msgstr "Проверить"
+
+msgid "Verify Signature"
+msgstr "Проверка подписи"
+
+msgid "Verifying detached signature..."
+msgstr "Проверка отделённой подписи..."
+
+msgid "Verifying embedded signatures..."
+msgstr "Проверка встроенных подписей..."
+
+msgid "Verifying..."
+msgstr "Проверка..."
+
+msgid "Version {version}"
+msgstr "Версия {version}"
+
+msgid "Warning: account locks after {max_attempts} failed attempts!"
+msgstr "Учётная запись блокируется после {max_attempts} неудачных попыток!"
+
+msgid "Settings"
+msgstr "Настройки"
+
+msgid "Language:"
+msgstr "Язык:"
+
+msgid "System"
+msgstr "Системный"
+
+msgid "Restart the app to apply the new language."
+msgstr "Перезапустите приложение для смены языка."
+
+msgid "{failed} of {total} signature(s) FAILED"
+msgstr "{failed} из {total} подписей НЕДЕЙСТВИТЕЛЬНЫ"

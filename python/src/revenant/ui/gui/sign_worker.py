@@ -19,6 +19,7 @@ from ...config import (
 from ...constants import BYTES_PER_MB, DEFAULT_TIMEOUT_SOAP, PDF_WARN_SIZE
 from ...errors import RevenantError
 from ..workflows import SigningResult, resolve_sig_fields, sign_one_detached, sign_one_embedded
+from .i18n import _
 from .utils import reveal_file
 
 _logger = logging.getLogger(__name__)
@@ -44,10 +45,10 @@ def start_signing(
     from tkinter import messagebox
 
     if not pdf_path:
-        messagebox.showwarning("Revenant", "Please select a PDF file.")
+        messagebox.showwarning("Revenant", _("Please select a PDF file."))
         return
     if not Path(pdf_path).is_file():
-        messagebox.showerror("Revenant", f"File not found:\n{pdf_path}")
+        messagebox.showerror("Revenant", _("File not found:\n{path}").format(path=pdf_path))
         return
 
     pdf_size = Path(pdf_path).stat().st_size
@@ -55,17 +56,16 @@ def start_signing(
         size_mb = pdf_size / BYTES_PER_MB
         if not messagebox.askyesno(
             "Revenant",
-            f"This PDF is {size_mb:.0f} MB.\n\n"
-            "Files over 30 MB may take a long time to sign\n"
-            "or fail on the server.\n\n"
-            "Continue?",
+            _(
+                "This PDF is {size_mb} MB.\n\nFiles over 30 MB may take a long time to sign\nor fail on the server.\n\nContinue?"
+            ).format(size_mb=f"{size_mb:.0f}"),
         ):
             return
 
     if output_path and not Path(output_path).is_absolute():
         messagebox.showwarning(
             "Revenant",
-            "Output path must be absolute.\nUse 'Browse...' to select a location.",
+            _("Output path must be absolute.\nUse 'Browse...' to select a location."),
         )
         return
 
@@ -74,15 +74,17 @@ def start_signing(
         and Path(output_path).exists()
         and not messagebox.askyesno(
             "Revenant",
-            f"File already exists:\n{Path(output_path).name}\n\nOverwrite?",
+            _("File already exists:\n{filename}\n\nOverwrite?").format(
+                filename=Path(output_path).name
+            ),
         )
     ):
         return
 
-    status_text.set("Loading credentials...")
+    status_text.set(_("Loading credentials..."))
     root.update_idletasks()
     user, pwd = resolve_credentials()
-    status_text.set("Ready")
+    status_text.set(_("Ready"))
     if not user or not pwd:
         creds = login_dialog_fn()
         if creds is None:
@@ -90,7 +92,7 @@ def start_signing(
         user, pwd = creds
 
     sign_btn.configure(state="disabled")
-    status_text.set("Signing...")
+    status_text.set(_("Signing..."))
     root.update_idletasks()
 
     threading.Thread(
@@ -134,14 +136,14 @@ def _do_sign(
     """Perform signing using shared workflow (runs in background thread)."""
     from ..helpers import default_detached_output_path, default_output_path, format_size_kb
 
-    url, timeout, _ = get_server_config()
+    url, timeout, _profile = get_server_config()
     if not url:
         _finish_sign(
             root,
             sign_btn,
             status_text,
             False,
-            "No server configured.\nClick 'Setup...' to configure.",
+            _("No server configured.\nClick 'Setup...' to configure."),
         )
         return
 
@@ -155,7 +157,9 @@ def _do_sign(
             sign_btn,
             status_text,
             False,
-            f"Permission denied:\n{pdf_path}\n\nTry selecting the file again using 'Browse...'.",
+            _(
+                "Permission denied:\n{path}\n\nTry selecting the file again using 'Browse...'."
+            ).format(path=pdf_path),
         )
         return
 
@@ -217,25 +221,43 @@ def _present_result(
             sign_btn,
             status_text,
             True,
-            f"Signed! -> {output_path.name} ({size_str})",
+            _("Signed! -> {filename} ({size})").format(filename=output_path.name, size=size_str),
             str(output_path),
         )
     elif result.auth_failed:
-        _finish_sign(root, sign_btn, status_text, False, f"Auth failed: {result.error_message}")
+        _finish_sign(
+            root,
+            sign_btn,
+            status_text,
+            False,
+            _("Auth failed: {error}").format(error=result.error_message),
+        )
     elif result.tls_error:
-        _finish_sign(root, sign_btn, status_text, False, f"TLS error: {result.error_message}")
+        _finish_sign(
+            root,
+            sign_btn,
+            status_text,
+            False,
+            _("TLS error: {error}").format(error=result.error_message),
+        )
     elif result.error_message and "Permission denied" in result.error_message:
         _finish_sign(
             root,
             sign_btn,
             status_text,
             False,
-            f"Permission denied:\n{output_path}\n\n"
-            "Try saving to a different location\n"
-            "using 'Browse...'.",
+            _(
+                "Permission denied:\n{path}\n\nTry saving to a different location\nusing 'Browse...'."
+            ).format(path=output_path),
         )
     else:
-        _finish_sign(root, sign_btn, status_text, False, f"Error: {result.error_message}")
+        _finish_sign(
+            root,
+            sign_btn,
+            status_text,
+            False,
+            _("Error: {error}").format(error=result.error_message),
+        )
 
 
 def _finish_sign(
@@ -258,7 +280,7 @@ def _finish_sign(
             if output_file:
                 reveal_file(output_file)
         else:
-            status_text.set("Failed")
+            status_text.set(_("Failed"))
             messagebox.showerror("Revenant", message)
 
     root.after(0, _update)

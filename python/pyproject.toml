@@ -56,6 +56,7 @@ where = ["src"]
 "revenant.core.appearance.font_data.noto_sans" = ["*.ttf"]
 "revenant.core.appearance.font_data.ghea_mariam" = ["*.ttf"]
 "revenant.core.appearance.font_data.ghea_grapalat" = ["*.ttf"]
+"revenant.ui.gui.i18n.locales" = ["*/LC_MESSAGES/*.mo"]
 
 # ── Ruff (linter + formatter) ────────────────────────────────────────
 

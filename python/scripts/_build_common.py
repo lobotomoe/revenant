@@ -37,6 +37,24 @@ def check_tkinter():
         )
 
 
+def check_translations():
+    """Verify translation consistency and compile .mo files.
+
+    Fails the build if any locale has missing or empty translations.
+    """
+    from check_translations import main as check_main
+    from compile_translations import main as compile_main
+
+    print("Translations: checking consistency...")
+    if check_main() != 0:
+        print("ERROR: Translation check failed. Fix missing translations before building.")
+        sys.exit(1)
+    print("Translations: compiling .mo files...")
+    if compile_main() != 0:
+        print("ERROR: Translation compilation failed.")
+        sys.exit(1)
+
+
 def check_pikepdf():
     """Check if pikepdf is available (optional)."""
     try:

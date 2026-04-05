@@ -28,6 +28,7 @@ from _build_common import (
     check_pikepdf,
     check_python,
     check_tkinter,
+    check_translations,
     print_results,
 )
 
@@ -69,6 +70,7 @@ def main():
         check_python()
         check_tkinter()
         check_pikepdf()
+        check_translations()
         build_py2app()
         if not no_dmg:
             create_dmg()
@@ -92,6 +94,7 @@ def main():
 
     if build_gui:
         check_tkinter()
+        check_translations()
     check_pikepdf()
 
     if sys.platform == "win32":
