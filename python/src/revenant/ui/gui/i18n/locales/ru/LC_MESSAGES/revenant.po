@@ -556,6 +556,9 @@ msgstr "Версия {version}"
 msgid "Warning: account locks after {max_attempts} failed attempts!"
 msgstr "Учётная запись блокируется после {max_attempts} неудачных попыток!"
 
+msgid "Restart the app to apply the new language?"
+msgstr "Перезапустить приложение для смены языка?"
+
 msgid "Settings"
 msgstr "Настройки"
 
@@ -565,8 +568,6 @@ msgstr "Язык:"
 msgid "System"
 msgstr "Системный"
 
-msgid "Restart the app to apply the new language."
-msgstr "Перезапустите приложение для смены языка."
 
 msgid "{failed} of {total} signature(s) FAILED"
 msgstr "{failed} из {total} подписей НЕДЕЙСТВИТЕЛЬНЫ"

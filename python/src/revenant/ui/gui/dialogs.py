@@ -48,7 +48,6 @@ def show_settings(root: tk.Tk) -> None:
     dlg.title(_("Settings"))
     dlg.resizable(False, False)
     dlg.transient(root)
-    dlg.grab_set()
 
     frame = ttk.Frame(dlg, padding=24)
     frame.grid(sticky="nsew")
@@ -71,15 +70,27 @@ def show_settings(root: tk.Tk) -> None:
     )
     lang_combo.grid(row=0, column=1, sticky="w", pady=4)
 
-    restart_label = ttk.Label(frame, text="", foreground="gray", font=("", 9))
-    restart_label.grid(row=1, column=0, columnspan=2, pady=(4, 0))
-
     def _on_lang_change(_event: object) -> None:
+        from tkinter import messagebox
+
         selected = lang_var.get()
         idx = lang_options.index(selected)
         key = lang_keys[idx]
+        if key == current:
+            return
+        if not messagebox.askyesno(
+            "Revenant",
+            _("Restart the app to apply the new language?"),
+            parent=dlg,
+        ):
+            # Revert combobox to current value
+            lang_var.set(lang_options[current_idx])
+            return
         save_language(key)
-        restart_label.configure(text=_("Restart the app to apply the new language."))
+        from .utils import restart_app
+
+        dlg.destroy()
+        restart_app(root)
 
     lang_combo.bind("<<ComboboxSelected>>", _on_lang_change)
 

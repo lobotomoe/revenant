@@ -556,6 +556,9 @@ msgstr "Տարբերակ {version}"
 msgid "Warning: account locks after {max_attempts} failed attempts!"
 msgstr "զգուշացում. Հաշիվը կարգելափակվում է {max_attempts} անհաջող փորձից հետո."
 
+msgid "Restart the app to apply the new language?"
+msgstr "Վերագործարկե՞լ հավելվածը լեզուն փոխելու համար՟"
+
 msgid "Settings"
 msgstr "Կարգավորումներ"
 
@@ -565,8 +568,6 @@ msgstr "Լեզվա:"
 msgid "System"
 msgstr "Համակարգ"
 
-msgid "Restart the app to apply the new language."
-msgstr "Վերագորկեցեք ծրագիրը նոր լեզվայի կարարելով համար."
 
 msgid "{failed} of {total} signature(s) FAILED"
 msgstr "{total}-ից {failed} ստորագրություն ՁԱԽՈՂՎԵԼ Է"
