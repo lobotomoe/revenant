@@ -15,11 +15,18 @@ const MAX_CMS_HEX_CHARS = 32 * 1024 * 1024;
 /** Minimum plausible CMS blob size in bytes (header + basic content). */
 export const MIN_CMS_SIZE = 100;
 
+/** End-of-contents octets that terminate BER indefinite-length encoding. */
+const EOC_BYTE_0 = 0x00;
+
 /**
- * Extract exact DER blob from zero-padded hex string.
+ * Extract exact CMS blob from zero-padded hex string.
  *
- * Parses the ASN.1 TLV header to determine exact DER length, avoiding
- * the rstrip("0") approach which corrupts blobs ending in 0x00 bytes.
+ * Handles both DER (definite length) and BER (indefinite length)
+ * encodings.  The original EKENG cosign tool produces BER-encoded
+ * CMS blobs with indefinite length (0x30 0x80 ... 0x00 0x00).
+ *
+ * For DER: parses the ASN.1 TLV header to determine exact length.
+ * For BER indefinite: walks the TLV structure to find the EOC marker.
  */
 export function extractDerFromPaddedHex(hexStr: string): Uint8Array {
   if (hexStr.length < 4) {
@@ -35,11 +42,13 @@ export function extractDerFromPaddedHex(hexStr: string): Uint8Array {
   let headerBytes = 2; // tag + initial length byte
   let contentLen: number;
 
-  if (lengthByte < 0x80) {
+  if (lengthByte === 0x80) {
+    // BER indefinite length encoding (0x30 0x80 ... 0x00 0x00).
+    // Walk the TLV structure to find the EOC marker.
+    return extractBerIndefinite(hexStr);
+  } else if (lengthByte < 0x80) {
     // Short form: lengthByte IS the length
     contentLen = lengthByte;
-  } else if (lengthByte === 0x80) {
-    throw new Error("Indefinite length encoding is not valid in DER");
   } else {
     // Long form: lower 7 bits = number of length bytes
     const numLenBytes = lengthByte & 0x7f;
@@ -73,4 +82,90 @@ export function extractDerFromPaddedHex(hexStr: string): Uint8Array {
 
   const derHex = hexStr.slice(0, totalHexChars);
   return Buffer.from(derHex, "hex");
+}
+
+/**
+ * Extract a BER indefinite-length blob from zero-padded hex.
+ *
+ * Decodes the full hex, then walks the TLV structure to find
+ * where the top-level SEQUENCE's EOC marker (0x00 0x00) is.
+ */
+function extractBerIndefinite(hexStr: string): Uint8Array {
+  const raw = Buffer.from(hexStr, "hex");
+  // Start after the top-level tag (0x30) and length (0x80)
+  let pos = 2;
+  const end = raw.length;
+
+  // Walk top-level children until we hit EOC (0x00 0x00)
+  while (pos < end) {
+    if (raw[pos] === EOC_BYTE_0 && raw[pos + 1] === EOC_BYTE_0) {
+      // Found EOC for the top-level SEQUENCE
+      return raw.subarray(0, pos + 2);
+    }
+    pos = skipTlv(raw, pos, end);
+  }
+
+  throw new Error("BER indefinite-length SEQUENCE: EOC marker not found");
+}
+
+/**
+ * Skip a single TLV element and return the position after it.
+ * Handles both definite and indefinite length children.
+ */
+function skipTlv(data: Uint8Array, pos: number, end: number): number {
+  if (pos >= end) {
+    throw new Error(`BER parse: unexpected end at offset ${pos}`);
+  }
+
+  // Skip tag byte(s)
+  const tagByte = data[pos];
+  if (tagByte === undefined) {
+    throw new Error(`BER parse: unexpected end at offset ${pos}`);
+  }
+  pos += 1;
+  if ((tagByte & 0x1f) === 0x1f) {
+    // Multi-byte tag: keep reading until a byte < 0x80
+    while (pos < end && ((data[pos] ?? 0) & 0x80) !== 0) {
+      pos += 1;
+    }
+    pos += 1; // final tag byte
+  }
+
+  if (pos >= end) {
+    throw new Error("BER parse: tag extends beyond data");
+  }
+
+  const lengthByte = data[pos];
+  if (lengthByte === undefined) {
+    throw new Error("BER parse: tag extends beyond data");
+  }
+  pos += 1;
+
+  if (lengthByte === 0x80) {
+    // Indefinite length child -- walk its children until EOC
+    while (pos < end) {
+      if (data[pos] === EOC_BYTE_0 && data[pos + 1] === EOC_BYTE_0) {
+        return pos + 2;
+      }
+      pos = skipTlv(data, pos, end);
+    }
+    throw new Error("BER parse: nested indefinite-length without EOC");
+  }
+
+  let contentLen: number;
+  if (lengthByte < 0x80) {
+    contentLen = lengthByte;
+  } else {
+    const numLenBytes = lengthByte & 0x7f;
+    if (pos + numLenBytes > end) {
+      throw new Error("BER parse: length field extends beyond data");
+    }
+    contentLen = 0;
+    for (let i = 0; i < numLenBytes; i++) {
+      contentLen = (contentLen << 8) | (data[pos + i] ?? 0);
+    }
+    pos += numLenBytes;
+  }
+
+  return pos + contentLen;
 }

@@ -65,19 +65,26 @@ export function extractCmsFromByterange(
   }
 
   // ByteRange structure: [0 len1 off2 len2]
-  // The hex content sits between "<" at position (len1-1) and ">" at (off2-1)
-  const hexStart = len1; // first hex byte position (after "<")
-  const hexEnd = off2 - 1; // position of ">" (exclusive end for slice)
-
-  // Verify angle brackets at expected positions
-  if (pdfBytes[hexStart - 1] !== 0x3c) {
-    // '<'
-    throw new PDFError(
-      `Expected '<' at offset ${hexStart - 1}, got 0x${(pdfBytes[hexStart - 1] ?? 0).toString(16)}`,
-    );
+  // The hex signature sits between angle brackets in the gap between chunks.
+  // Two conventions exist for where the "<" bracket falls:
+  //   Revenant: "<" is at len1-1 (included in chunk1), hex starts at len1
+  //   Original cosign: "<" is at len1 (first byte of gap), hex starts at len1+1
+  // The ">" bracket is consistently at off2-1 in both conventions.
+  let hexStart: number;
+  if (pdfBytes[len1 - 1] === 0x3c) {
+    // Revenant convention: chunk1 includes "<"
+    hexStart = len1;
+  } else if (pdfBytes[len1] === 0x3c) {
+    // Original cosign convention: "<" is outside chunk1
+    hexStart = len1 + 1;
+  } else {
+    const prev = (pdfBytes[len1 - 1] ?? 0).toString(16);
+    const curr = (pdfBytes[len1] ?? 0).toString(16);
+    throw new PDFError(`Expected '<' near offset ${len1}, got 0x${prev} 0x${curr}`);
   }
+
+  const hexEnd = off2 - 1; // position of ">"
   if (pdfBytes[hexEnd] !== 0x3e) {
-    // '>'
     throw new PDFError(
       `Expected '>' at offset ${hexEnd}, got 0x${(pdfBytes[hexEnd] ?? 0).toString(16)}`,
     );
