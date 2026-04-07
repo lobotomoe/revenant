@@ -56,6 +56,7 @@ where = ["src"]
 "revenant.core.appearance.font_data.noto_sans" = ["*.ttf"]
 "revenant.core.appearance.font_data.ghea_mariam" = ["*.ttf"]
 "revenant.core.appearance.font_data.ghea_grapalat" = ["*.ttf"]
+"revenant.ui.gui.i18n.locales" = ["*/LC_MESSAGES/*.mo"]
 
 # ── Ruff (linter + formatter) ────────────────────────────────────────
 
@@ -103,7 +104,7 @@ ignore = [
 "src/revenant/network/soap_parsers.py" = ["S105"]  # password redaction regex patterns
 "src/revenant/ui/cli/*.py" = ["T20", "S603"]
 "src/revenant/ui/helpers.py" = ["T20"]
-"src/revenant/ui/gui/*.py" = ["T20", "S603"]
+"src/revenant/ui/gui/*.py" = ["T20", "S603", "S606"]
 "tests/*.py" = ["S101", "S105", "S106", "S108", "S301", "S603", "ARG001", "ARG002", "ARG005"]
 "scripts/*.py" = ["T20", "S603", "S607", "S310"]
 

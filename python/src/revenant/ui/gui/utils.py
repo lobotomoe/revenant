@@ -208,6 +208,54 @@ def run_in_thread(
     threading.Thread(target=_worker, daemon=True).start()
 
 
+def restart_app(root: tk.Tk) -> None:
+    """Restart the application process.
+
+    Handles four environments:
+    - macOS .app bundle: ``open -n -a`` (preserves launch services identity)
+    - Linux AppImage: re-exec ``$APPIMAGE`` (not the inner binary)
+    - Frozen exe (PyInstaller/Nuitka): ``Popen`` + ``sys.exit``
+    - Plain Python (dev): ``os.execv``
+    """
+    import os
+
+    _logger.info("Restarting: executable=%s, argv=%s", sys.executable, sys.argv)
+    root.destroy()
+
+    if platform.system() == "Darwin":
+        # macOS .app bundle: relaunch via open(1)
+        exe = Path(sys.executable)
+        for parent in exe.parents:
+            if parent.suffix == ".app":
+                _logger.info("macOS .app restart: %s", parent)
+                subprocess.Popen(
+                    ["/usr/bin/open", "-n", "-a", str(parent)],
+                    start_new_session=True,
+                )
+                sys.exit(0)
+
+    appimage = os.environ.get("APPIMAGE")
+    is_frozen = getattr(sys, "frozen", False)
+
+    if appimage:
+        # Linux AppImage: must re-exec the outer wrapper, not the inner binary
+        _logger.info("AppImage restart: %s", appimage)
+        env = {**os.environ, "PYINSTALLER_RESET_ENVIRONMENT": "1"}
+        subprocess.Popen([appimage, *sys.argv[1:]], env=env, start_new_session=True)
+        sys.exit(0)
+
+    if is_frozen or platform.system() == "Windows":
+        # Frozen exe or Windows: os.execv is unreliable, use Popen + exit
+        _logger.info("Frozen/Windows restart via Popen")
+        env = {**os.environ, "PYINSTALLER_RESET_ENVIRONMENT": "1"}
+        subprocess.Popen([sys.executable, *sys.argv], env=env, start_new_session=True)
+        sys.exit(0)
+
+    # Plain Python (dev mode): os.execv is safe and instant
+    _logger.info("Dev restart via os.execv")
+    os.execv(sys.executable, [sys.executable, *sys.argv])
+
+
 def reveal_file(path: str) -> None:
     """Open the file's parent folder and select it in the OS file manager."""
     p = Path(path)

@@ -44,6 +44,7 @@ class ConfigDict(TypedDict, total=False):
     email: str
     organization: str
     dn: str
+    language: str
 
 
 def load_raw_config() -> dict[str, object]:
@@ -74,7 +75,17 @@ def _pick_str(data: dict[str, object], key: str) -> str | None:
 def _validate_config_dict(data: dict[str, object]) -> ConfigDict:
     """Validate and return config dict, picking only known keys with correct types."""
     result: ConfigDict = {}
-    for key in ("profile", "url", "username", "password", "name", "email", "organization", "dn"):
+    for key in (
+        "profile",
+        "url",
+        "username",
+        "password",
+        "name",
+        "email",
+        "organization",
+        "dn",
+        "language",
+    ):
         val = _pick_str(data, key)
         if val is not None:
             result[key] = val  # type: ignore[literal-required]  # dynamic key from known set

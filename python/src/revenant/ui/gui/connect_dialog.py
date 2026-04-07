@@ -20,6 +20,7 @@ from ...config import (
 from ...constants import DEFAULT_TIMEOUT_HTTP_GET
 from ...network.discovery import ping_server
 from ...network.transport import get_host_tls_info
+from .i18n import _
 from .utils import run_in_thread
 
 if TYPE_CHECKING:
@@ -44,7 +45,7 @@ class ConnectDialog:
         # Window
         self._win = tk.Toplevel(parent)
         self._win.withdraw()
-        self._win.title("Connect to Server")
+        self._win.title(_("Connect to Server"))
         self._win.resizable(False, False)
         self._win.transient(parent)
         self._win.grab_set()
@@ -53,7 +54,7 @@ class ConnectDialog:
         outer.grid(sticky="nsew")
 
         # Title
-        ttk.Label(outer, text="Choose Server", font=("", 14, "bold")).grid(
+        ttk.Label(outer, text=_("Choose Server"), font=("", 14, "bold")).grid(
             row=0, column=0, columnspan=2, sticky="w", pady=(0, 8)
         )
 
@@ -72,8 +73,8 @@ class ConnectDialog:
         # Buttons
         nav = ttk.Frame(outer)
         nav.grid(row=3, column=0, columnspan=2, sticky="ew", pady=(12, 0))
-        ttk.Button(nav, text="Cancel", command=self._cancel).pack(side="right", padx=(8, 0))
-        self._connect_btn = ttk.Button(nav, text="Connect", command=self._on_connect)
+        ttk.Button(nav, text=_("Cancel"), command=self._cancel).pack(side="right", padx=(8, 0))
+        self._connect_btn = ttk.Button(nav, text=_("Connect"), command=self._on_connect)
         self._connect_btn.pack(side="right")
 
         from . import center_on_parent
@@ -84,7 +85,7 @@ class ConnectDialog:
         """Build radio buttons for server profiles + custom URL entry."""
         tk, ttk, f = self._tk, self._ttk, self._content
 
-        ttk.Label(f, text="Select a CoSign server:").grid(
+        ttk.Label(f, text=_("Select a CoSign server:")).grid(
             row=0, column=0, columnspan=2, sticky="w", pady=(0, 8)
         )
         self._profile_var = tk.StringVar(value="ekeng")
@@ -96,12 +97,12 @@ class ConnectDialog:
             )
 
         custom_row = len(profiles) + 1
-        ttk.Radiobutton(f, text="Custom server", variable=self._profile_var, value="custom").grid(
-            row=custom_row, column=0, columnspan=2, sticky="w", padx=8, pady=2
-        )
+        ttk.Radiobutton(
+            f, text=_("Custom server"), variable=self._profile_var, value="custom"
+        ).grid(row=custom_row, column=0, columnspan=2, sticky="w", padx=8, pady=2)
 
         url_row = custom_row + 1
-        ttk.Label(f, text="URL:").grid(row=url_row, column=0, sticky="e", padx=(16, 4), pady=4)
+        ttk.Label(f, text=_("URL:")).grid(row=url_row, column=0, sticky="e", padx=(16, 4), pady=4)
         self._custom_url_var = tk.StringVar()
         self._custom_url_entry = ttk.Entry(f, textvariable=self._custom_url_var, width=40)
         self._custom_url_entry.grid(row=url_row, column=1, sticky="w", pady=4)
@@ -130,17 +131,17 @@ class ConnectDialog:
         if key == "custom":
             url = self._custom_url_var.get().strip()
             if not url:
-                messagebox.showwarning("Connect", "Enter a server URL.", parent=self._win)
+                messagebox.showwarning(_("Connect"), _("Enter a server URL."), parent=self._win)
                 return
             try:
                 profile = make_custom_profile(url)
             except ValueError as e:
-                messagebox.showwarning("Connect", str(e), parent=self._win)
+                messagebox.showwarning(_("Connect"), str(e), parent=self._win)
                 return
         else:
             profile = BUILTIN_PROFILES.get(key)
             if profile is None:
-                messagebox.showwarning("Connect", "Select a server.", parent=self._win)
+                messagebox.showwarning(_("Connect"), _("Select a server."), parent=self._win)
                 return
 
         self._profile = profile
@@ -148,7 +149,7 @@ class ConnectDialog:
 
         # Start ping
         self._connect_btn.configure(state="disabled")
-        self._status_var.set(f"Connecting to {profile.url}...")
+        self._status_var.set(_("Connecting to {url}...").format(url=profile.url))
 
         run_in_thread(
             self._win,
@@ -163,7 +164,7 @@ class ConnectDialog:
             # Show TLS info
             host = urlparse(self._profile.url).hostname if self._profile else None
             tls_info = get_host_tls_info(host) if host else None
-            status = f"Connected ({info})"
+            status = _("Connected ({info})").format(info=info)
             if tls_info:
                 status += f" | TLS: {tls_info}"
             self._status_var.set(status)
@@ -175,11 +176,11 @@ class ConnectDialog:
             if self._on_complete_action is not None:
                 self._on_complete_action()
         else:
-            self._status_var.set(f"Failed: {info}")
+            self._status_var.set(_("Failed: {info}").format(info=info))
             self._connect_btn.configure(state="normal")
 
     def _on_ping_fail(self, exc: Exception) -> None:
-        self._status_var.set(f"Error: {exc}")
+        self._status_var.set(_("Error: {error}").format(error=exc))
         self._connect_btn.configure(state="normal")
 
     def _cancel(self) -> None:

@@ -16,6 +16,7 @@ from ...config import (
 )
 from ...core.appearance import AVAILABLE_FONTS, extract_cert_fields
 from ...core.pdf import POSITION_PRESETS
+from .i18n import _
 
 # Position labels for the dropdown (full names only, sorted)
 _POSITIONS = sorted(POSITION_PRESETS)
@@ -34,11 +35,11 @@ def build_unconfigured(parent: tk.Widget, on_connect_action: Callable[[], None])
 
     ttk.Label(
         frame,
-        text="Connect to a server\nto sign documents.",
+        text=_("Connect to a server\nto sign documents."),
         justify="center",
         foreground="gray",
     ).grid(row=0, column=0, pady=(0, 20))
-    ttk.Button(frame, text="Connect", command=on_connect_action, style="Accent.TButton").grid(
+    ttk.Button(frame, text=_("Connect"), command=on_connect_action, style="Accent.TButton").grid(
         row=1, column=0, ipady=4, ipadx=16
     )
 
@@ -56,11 +57,11 @@ def build_server_only(parent: tk.Widget, on_login_action: Callable[[], None]) ->
 
     ttk.Label(
         frame,
-        text="Server connected.\nLog in to sign documents.",
+        text=_("Server connected.\nLog in to sign documents."),
         justify="center",
         foreground="gray",
     ).grid(row=0, column=0, pady=(0, 20))
-    ttk.Button(frame, text="Log In", command=on_login_action, style="Accent.TButton").grid(
+    ttk.Button(frame, text=_("Log In"), command=on_login_action, style="Accent.TButton").grid(
         row=1, column=0, ipady=4, ipadx=16
     )
 
@@ -120,21 +121,23 @@ class SignForm:
         row = 0
 
         # File pickers: PDF, image, output
-        ttk.Label(frame, text="PDF file:").grid(row=row, column=0, sticky="e", **pad)
+        ttk.Label(frame, text=_("PDF file:")).grid(row=row, column=0, sticky="e", **pad)
         ttk.Entry(frame, textvariable=self._pdf_path).grid(row=row, column=1, sticky="ew", **pad)
-        ttk.Button(frame, text="Browse...", command=self._browse_pdf).grid(row=row, column=2, **pad)
+        ttk.Button(frame, text=_("Browse..."), command=self._browse_pdf).grid(
+            row=row, column=2, **pad
+        )
         row += 1
 
         self._image_entry = ttk.Entry(frame, textvariable=self._image_path)
         self._image_entry.grid(row=row, column=1, sticky="ew", **pad)
-        ttk.Label(frame, text="Image (opt):").grid(row=row, column=0, sticky="e", **pad)
-        self._image_browse_btn = ttk.Button(frame, text="Browse...", command=self._browse_image)
+        ttk.Label(frame, text=_("Image (opt):")).grid(row=row, column=0, sticky="e", **pad)
+        self._image_browse_btn = ttk.Button(frame, text=_("Browse..."), command=self._browse_image)
         self._image_browse_btn.grid(row=row, column=2, **pad)
         row += 1
 
-        ttk.Label(frame, text="Output (opt):").grid(row=row, column=0, sticky="e", **pad)
+        ttk.Label(frame, text=_("Output (opt):")).grid(row=row, column=0, sticky="e", **pad)
         ttk.Entry(frame, textvariable=self._output_path).grid(row=row, column=1, sticky="ew", **pad)
-        ttk.Button(frame, text="Browse...", command=self._browse_output).grid(
+        ttk.Button(frame, text=_("Browse..."), command=self._browse_output).grid(
             row=row, column=2, **pad
         )
         row += 1
@@ -157,7 +160,7 @@ class SignForm:
         ttk.Style().configure("TLabelframe", labelmargins=[0, 0, 0, 6])
 
         # Left: Signature options
-        left = ttk.LabelFrame(cols, text="Signature", padding=8, labelanchor="n")
+        left = ttk.LabelFrame(cols, text=_("Signature"), padding=8, labelanchor="n")
         left.grid(row=0, column=0, sticky="nsew")
         left.columnconfigure(1, weight=1)
 
@@ -166,14 +169,14 @@ class SignForm:
         mode_frame.grid(row=0, column=0, columnspan=2, sticky="w", **opt_pad)
         ttk.Radiobutton(
             mode_frame,
-            text="Embedded",
+            text=_("Embedded"),
             variable=self._signing_mode,
             value="embedded",
             command=self._on_mode_change,
         ).pack(side="left", padx=(0, 12))
         ttk.Radiobutton(
             mode_frame,
-            text="Detached (.p7s)",
+            text=_("Detached (.p7s)"),
             variable=self._signing_mode,
             value="detached",
             command=self._on_mode_change,
@@ -182,7 +185,7 @@ class SignForm:
         self._pos_combo = ttk.Combobox(
             left, textvariable=self._position, values=_POSITIONS, state="readonly"
         )
-        ttk.Label(left, text="Position:").grid(row=1, column=0, sticky="e", **opt_pad)
+        ttk.Label(left, text=_("Position:")).grid(row=1, column=0, sticky="e", **opt_pad)
         self._pos_combo.grid(row=1, column=1, sticky="ew", **opt_pad)
 
         page_validate = frame.register(self._validate_page)
@@ -193,7 +196,7 @@ class SignForm:
             validate="key",
             validatecommand=(page_validate, "%P"),
         )
-        ttk.Label(left, text="Page:").grid(row=2, column=0, sticky="e", **opt_pad)
+        ttk.Label(left, text=_("Page:")).grid(row=2, column=0, sticky="e", **opt_pad)
         self._page_combo.grid(row=2, column=1, sticky="ew", **opt_pad)
 
         profile = get_active_profile()
@@ -205,19 +208,19 @@ class SignForm:
             values=list(AVAILABLE_FONTS),
             state="readonly",
         )
-        ttk.Label(left, text="Font:").grid(row=3, column=0, sticky="e", **opt_pad)
+        ttk.Label(left, text=_("Font:")).grid(row=3, column=0, sticky="e", **opt_pad)
         self._font_combo.grid(row=3, column=1, sticky="ew", **opt_pad)
 
         self._invisible_cb = ttk.Checkbutton(
             left,
-            text="Invisible signature",
+            text=_("Invisible signature"),
             variable=self._invisible,
             command=self._on_invisible_toggle,
         )
         self._invisible_cb.grid(row=4, column=0, columnspan=2, sticky="w", **opt_pad)
 
         # Right: Account info (server name is in ServerBar, not duplicated here)
-        right = ttk.LabelFrame(cols, text="Account", padding=8, labelanchor="n")
+        right = ttk.LabelFrame(cols, text=_("Account"), padding=8, labelanchor="n")
         right.grid(row=0, column=1, sticky="nsew", padx=(8, 0))
 
         info_row = 0
@@ -233,7 +236,11 @@ class SignForm:
                     info_row += 1
         else:
             # Fallback for custom servers: raw name, org, email
-            for key, label in [("name", "Name"), ("organization", "Org"), ("email", "Email")]:
+            for key, label in [
+                ("name", _("Name")),
+                ("organization", _("Org")),
+                ("email", _("Email")),
+            ]:
                 val = self._signer_info.get(key)
                 if val:
                     ttk.Label(right, text=f"{label}:", foreground="gray").grid(
@@ -243,7 +250,7 @@ class SignForm:
                     info_row += 1
 
         if info_row == 0:
-            ttk.Label(right, text="(no signer)", foreground="gray").grid(
+            ttk.Label(right, text=_("(no signer)"), foreground="gray").grid(
                 row=info_row, column=0, columnspan=2, sticky="w", pady=1
             )
             info_row += 1
@@ -255,13 +262,13 @@ class SignForm:
             row=info_row, column=0, columnspan=2, sticky="w", pady=1
         )
 
-        ttk.Button(right, text="Log Out", command=self._on_logout_action).grid(
+        ttk.Button(right, text=_("Log Out"), command=self._on_logout_action).grid(
             row=info_row + 1, column=0, columnspan=2, sticky="w", pady=(6, 0)
         )
 
         # ── Sign button ──────────────────────────────────────────
         self.sign_btn = ttk.Button(
-            frame, text="Sign PDF", command=self._on_sign_action, style="Accent.TButton"
+            frame, text=_("Sign PDF"), command=self._on_sign_action, style="Accent.TButton"
         )
         self.sign_btn.grid(row=row, column=0, columnspan=3, pady=12, ipady=6)
         row += 1
@@ -299,19 +306,19 @@ class SignForm:
 
         if is_detached:
             path = filedialog.asksaveasfilename(
-                title="Save signature as",
+                title=_("Save signature as"),
                 initialdir=initial_dir,
                 initialfile=initial_file,
                 defaultextension=".p7s",
-                filetypes=[("PKCS#7 signature", "*.p7s"), ("All files", "*.*")],
+                filetypes=[(_("PKCS#7 signature"), "*.p7s"), (_("All files"), "*.*")],
             )
         else:
             path = filedialog.asksaveasfilename(
-                title="Save signed PDF as",
+                title=_("Save signed PDF as"),
                 initialdir=initial_dir,
                 initialfile=initial_file,
                 defaultextension=".pdf",
-                filetypes=[("PDF files", "*.pdf")],
+                filetypes=[(_("PDF files"), "*.pdf")],
             )
 
         if not path:
@@ -359,14 +366,14 @@ class SignForm:
             self._invisible_cb.configure(state="disabled")
             self._image_entry.configure(state="disabled")
             self._image_browse_btn.configure(state="disabled")
-            self.sign_btn.configure(text="Sign (Detached)")
+            self.sign_btn.configure(text=_("Sign (Detached)"))
         else:
             # Restore controls, respecting invisible checkbox state
             self._invisible_cb.configure(state="normal")
             self._image_entry.configure(state="normal")
             self._image_browse_btn.configure(state="normal")
             self._on_invisible_toggle()
-            self.sign_btn.configure(text="Sign PDF")
+            self.sign_btn.configure(text=_("Sign PDF"))
 
         self._update_auto_output()
 
@@ -398,7 +405,7 @@ class SignForm:
         from tkinter import filedialog
 
         path = filedialog.askopenfilename(
-            title="Select PDF", filetypes=[("PDF files", "*.pdf"), ("All files", "*.*")]
+            title=_("Select PDF"), filetypes=[(_("PDF files"), "*.pdf"), (_("All files"), "*.*")]
         )
         if not path:
             return
@@ -418,8 +425,8 @@ class SignForm:
         from tkinter import filedialog
 
         path = filedialog.askopenfilename(
-            title="Select signature image",
-            filetypes=[("Images", "*.png *.jpg *.jpeg"), ("All files", "*.*")],
+            title=_("Select signature image"),
+            filetypes=[(_("Images"), "*.png *.jpg *.jpeg"), (_("All files"), "*.*")],
         )
         if path:
             self._image_path.set(path)
@@ -429,15 +436,15 @@ class SignForm:
 
         if self._signing_mode.get() == "detached":
             path = filedialog.asksaveasfilename(
-                title="Save signature as",
+                title=_("Save signature as"),
                 defaultextension=".p7s",
-                filetypes=[("PKCS#7 signature", "*.p7s"), ("All files", "*.*")],
+                filetypes=[(_("PKCS#7 signature"), "*.p7s"), (_("All files"), "*.*")],
             )
         else:
             path = filedialog.asksaveasfilename(
-                title="Save signed PDF as",
+                title=_("Save signed PDF as"),
                 defaultextension=".pdf",
-                filetypes=[("PDF files", "*.pdf")],
+                filetypes=[(_("PDF files"), "*.pdf")],
             )
         if path:
             self._output_path.set(path)

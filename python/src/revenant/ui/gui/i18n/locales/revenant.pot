@@ -1,0 +1,509 @@
+# Revenant GUI translation template
+# SPDX-License-Identifier: Apache-2.0
+#
+msgid ""
+msgstr ""
+"Content-Type: text/plain; charset=UTF-8\n"
+"Content-Transfer-Encoding: 8bit\n"
+
+msgid ""
+"  Note: cryptographic verification requires the original PDF.
+  Add the PDF to verify the signature integrity."
+msgstr ""
+
+msgid "(no signer)"
+msgstr ""
+
+msgid "About Revenant"
+msgstr ""
+
+msgid "Account"
+msgstr ""
+
+msgid "All files"
+msgstr ""
+
+msgid "All {count} signatures VALID"
+msgstr ""
+
+msgid "Auth failed: {error}"
+msgstr ""
+
+msgid "Authentication failed: {error}"
+msgstr ""
+
+msgid "Author: Aleksandr Kraiz"
+msgstr ""
+
+msgid "Back"
+msgstr ""
+
+msgid "Browse..."
+msgstr ""
+
+msgid "Cancel"
+msgstr ""
+
+msgid "Cannot read file: {error}"
+msgstr ""
+
+msgid "Certificate inspection"
+msgstr ""
+
+msgid "Certificate: {status}"
+msgstr ""
+
+msgid "Choose Server"
+msgstr ""
+
+msgid "Clearing saved credentials..."
+msgstr ""
+
+msgid "Close Window"
+msgstr ""
+
+msgid "Complete"
+msgstr ""
+
+msgid "Connect"
+msgstr ""
+
+msgid "Connect to Server"
+msgstr ""
+
+msgid ""
+"Connect to a server
+to sign documents."
+msgstr ""
+
+msgid "Connected ({info})"
+msgstr ""
+
+msgid "Connecting to {url}..."
+msgstr ""
+
+msgid "Copy"
+msgstr ""
+
+msgid "Could not determine identity from server."
+msgstr ""
+
+msgid ""
+"Could not read password from system keychain.
+Please re-enter your password."
+msgstr ""
+
+msgid ""
+"Could not save password to system keychain
+(access was denied or unavailable).
+
+Your password was saved to the config file instead.
+To use secure storage, allow keychain access
+when prompted."
+msgstr ""
+
+msgid "Credentials"
+msgstr ""
+
+msgid ""
+"Cross-platform client for ARX CoSign
+electronic signatures."
+msgstr ""
+
+msgid "Custom server"
+msgstr ""
+
+msgid "Cut"
+msgstr ""
+
+msgid "Detached (.p7s)"
+msgstr ""
+
+msgid "Detached signature"
+msgstr ""
+
+msgid "Disconnect"
+msgstr ""
+
+msgid "Disconnect from {name}?"
+msgstr ""
+
+msgid "Disconnecting..."
+msgstr ""
+
+msgid "Discovering signer identity..."
+msgstr ""
+
+msgid "Edit"
+msgstr ""
+
+msgid "Email"
+msgstr ""
+
+msgid "Email:"
+msgstr ""
+
+msgid "Embedded"
+msgstr ""
+
+msgid "Embedded signatures"
+msgstr ""
+
+msgid "Enter a server URL."
+msgstr ""
+
+msgid "Enter manually..."
+msgstr ""
+
+msgid "Enter signer identity:"
+msgstr ""
+
+msgid "Error: {error}"
+msgstr ""
+
+msgid "FAILED"
+msgstr ""
+
+msgid "Failed"
+msgstr ""
+
+msgid "Failed: {info}"
+msgstr ""
+
+msgid "File"
+msgstr ""
+
+msgid ""
+"File already exists:
+{filename}
+
+Overwrite?"
+msgstr ""
+
+msgid ""
+"File not found:
+{path}"
+msgstr ""
+
+msgid "Font:"
+msgstr ""
+
+msgid "GitHub"
+msgstr ""
+
+msgid "Image (opt):"
+msgstr ""
+
+msgid "Images"
+msgstr ""
+
+msgid "Inspecting signature..."
+msgstr ""
+
+msgid "Invisible signature"
+msgstr ""
+
+msgid "License: Apache 2.0"
+msgstr ""
+
+msgid "Loading credentials..."
+msgstr ""
+
+msgid "Loading saved credentials..."
+msgstr ""
+
+msgid "Log In"
+msgstr ""
+
+msgid "Log Out"
+msgstr ""
+
+msgid ""
+"Log out?
+Server connection will be preserved."
+msgstr ""
+
+msgid "Logging out..."
+msgstr ""
+
+msgid "Login"
+msgstr ""
+
+msgid "Name"
+msgstr ""
+
+msgid "Name (required):"
+msgstr ""
+
+msgid "Name is required."
+msgstr ""
+
+msgid "Next"
+msgstr ""
+
+msgid "No server configured"
+msgstr ""
+
+msgid ""
+"No server configured.
+Click 'Setup...' to configure."
+msgstr ""
+
+msgid "OK"
+msgstr ""
+
+msgid "Org"
+msgstr ""
+
+msgid "Organization"
+msgstr ""
+
+msgid "Organization:"
+msgstr ""
+
+msgid "Output (opt):"
+msgstr ""
+
+msgid ""
+"Output path must be absolute.
+Use 'Browse...' to select a location."
+msgstr ""
+
+msgid "PDF file:"
+msgstr ""
+
+msgid "PDF files"
+msgstr ""
+
+msgid "PKCS#7 signature"
+msgstr ""
+
+msgid "PKCS#7 signatures"
+msgstr ""
+
+msgid "Page:"
+msgstr ""
+
+msgid "Password:"
+msgstr ""
+
+msgid "Paste"
+msgstr ""
+
+msgid ""
+"Permission denied:
+{path}
+
+Try saving to a different location
+using 'Browse...'."
+msgstr ""
+
+msgid ""
+"Permission denied:
+{path}
+
+Try selecting the file again using 'Browse...'."
+msgstr ""
+
+msgid "Please select a PDF file."
+msgstr ""
+
+msgid "Please select a file to verify."
+msgstr ""
+
+msgid "Position:"
+msgstr ""
+
+msgid "Ready"
+msgstr ""
+
+msgid "Report a Bug"
+msgstr ""
+
+msgid "Retry"
+msgstr ""
+
+msgid "Save"
+msgstr ""
+
+msgid "Save credentials"
+msgstr ""
+
+msgid "Save credentials (username/password)"
+msgstr ""
+
+msgid "Save signature as"
+msgstr ""
+
+msgid "Save signed PDF as"
+msgstr ""
+
+msgid "Saving credentials..."
+msgstr ""
+
+msgid "Select All"
+msgstr ""
+
+msgid "Select PDF"
+msgstr ""
+
+msgid "Select PDF to verify"
+msgstr ""
+
+msgid "Select a CoSign server:"
+msgstr ""
+
+msgid ""
+"Select a PDF file and click Verify to check signatures.
+
+Modes:
+  PDF only -- verify embedded signatures
+  PDF + .p7s -- verify detached signature
+  .p7s only -- inspect certificate (no crypto verification)"
+msgstr ""
+
+msgid "Select a server."
+msgstr ""
+
+msgid "Select signature file"
+msgstr ""
+
+msgid "Select signature image"
+msgstr ""
+
+msgid ""
+"Server connected.
+Log in to sign documents."
+msgstr ""
+
+msgid "Server error: {error}"
+msgstr ""
+
+msgid "Server verification"
+msgstr ""
+
+msgid "Setup complete! Summary:"
+msgstr ""
+
+msgid "Sign"
+msgstr ""
+
+msgid "Sign (Detached)"
+msgstr ""
+
+msgid "Sign PDF"
+msgstr ""
+
+msgid "Signature"
+msgstr ""
+
+msgid "Signature (.p7s):"
+msgstr ""
+
+msgid "Signature FAILED"
+msgstr ""
+
+msgid "Signature VALID"
+msgstr ""
+
+msgid "Signature {current}/{total} ({signer})"
+msgstr ""
+
+msgid "Signed! -> {filename} ({size})"
+msgstr ""
+
+msgid "Signed: {time}"
+msgstr ""
+
+msgid "Signer Identity"
+msgstr ""
+
+msgid "Signer identity found:"
+msgstr ""
+
+msgid "Signer identity is required. Click 'Enter manually...' to provide it."
+msgstr ""
+
+msgid "Signer identity is required. Retry the connection or go back to fix credentials."
+msgstr ""
+
+msgid "Signer: {name}"
+msgstr ""
+
+msgid "Signing..."
+msgstr ""
+
+msgid "Step {current} of {total}"
+msgstr ""
+
+msgid "Storage: {storage}"
+msgstr ""
+
+msgid "TLS error: {error}"
+msgstr ""
+
+msgid "Telegram"
+msgstr ""
+
+msgid ""
+"This PDF is {size_mb} MB.
+
+Files over 30 MB may take a long time to sign
+or fail on the server.
+
+Continue?"
+msgstr ""
+
+msgid ""
+"This will also remove your credentials
+and signer identity."
+msgstr ""
+
+msgid "URL:"
+msgstr ""
+
+msgid "Unavailable: {error}"
+msgstr ""
+
+msgid "Undo"
+msgstr ""
+
+msgid "Unexpected error: {error}"
+msgstr ""
+
+msgid "Username and password are required."
+msgstr ""
+
+msgid "Username:"
+msgstr ""
+
+msgid "Username: {username}"
+msgstr ""
+
+msgid "VALID"
+msgstr ""
+
+msgid "Verify"
+msgstr ""
+
+msgid "Verify Signature"
+msgstr ""
+
+msgid "Verifying detached signature..."
+msgstr ""
+
+msgid "Verifying embedded signatures..."
+msgstr ""
+
+msgid "Verifying..."
+msgstr ""
+
+msgid "Version {version}"
+msgstr ""
+
+msgid "Warning: account locks after {max_attempts} failed attempts!"
+msgstr ""
+
+msgid "{failed} of {total} signature(s) FAILED"
+msgstr ""
+
