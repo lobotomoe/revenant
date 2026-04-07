@@ -589,9 +589,15 @@ describe("extractDerFromPaddedHex", () => {
     expect(() => extractDerFromPaddedHex(hex)).toThrow("Expected ASN.1 SEQUENCE");
   });
 
-  it("throws for indefinite length (0x80)", () => {
-    const hex = `3080${"00".repeat(50)}`;
-    expect(() => extractDerFromPaddedHex(hex)).toThrow("Indefinite length");
+  it("parses BER indefinite length (0x80) and finds EOC", () => {
+    // 0x30 0x80 = SEQUENCE with indefinite length
+    // Contains one primitive: 0x04 0x02 0xAA 0xBB (OCTET STRING, 2 bytes)
+    // Terminated by EOC: 0x00 0x00
+    // Followed by zero padding from PDF placeholder
+    const berHex = "3080" + "0402aabb" + "0000" + "000000";
+    const result = extractDerFromPaddedHex(berHex);
+    const expected = Buffer.from("3080" + "0402aabb" + "0000", "hex");
+    expect(Buffer.from(result).equals(expected)).toBe(true);
   });
 
   it("throws when length exceeds available data", () => {
@@ -2007,13 +2013,13 @@ describe("extractSignatureData (unsigned)", () => {
 });
 
 describe("extractCmsFromByterange (angle bracket errors)", () => {
-  it("throws when opening angle bracket is missing", () => {
-    // Build a buffer where the position before hexStart is not '<'
+  it("throws when opening angle bracket is missing at both positions", () => {
+    // Build a buffer where neither len1-1 nor len1 is '<'
     const pdf = new Uint8Array(100);
     pdf.fill(0x41); // 'A' everywhere
     // Set a '>' at the expected closing position
     pdf[49] = 0x3e; // '>'
-    // len1=10, off2=50: expects '<' at position 9 and '>' at position 49
+    // len1=10, off2=50: checks '<' at position 9 and 10, neither is '<'
     expect(() => extractCmsFromByterange(pdf, 10, 50)).toThrow(PDFError);
     expect(() => extractCmsFromByterange(pdf, 10, 50)).toThrow(/Expected '</);
   });
@@ -2021,11 +2027,31 @@ describe("extractCmsFromByterange (angle bracket errors)", () => {
   it("throws when closing angle bracket is missing", () => {
     const pdf = new Uint8Array(100);
     pdf.fill(0x41); // 'A' everywhere
-    // Set '<' at the expected opening position
+    // Set '<' at the expected opening position (Revenant convention)
     pdf[9] = 0x3c; // '<'
     // But '>' is missing at position off2-1 = 49
     expect(() => extractCmsFromByterange(pdf, 10, 50)).toThrow(PDFError);
     expect(() => extractCmsFromByterange(pdf, 10, 50)).toThrow(/Expected '>/);
+  });
+
+  it("accepts cosign bracket convention (< at len1)", () => {
+    // Original cosign: '<' at position len1 (outside chunk1)
+    // DER: 0x30 0x03 0xAA 0xBB 0xCC = 5 bytes = 10 hex chars
+    const derHex = "3003aabbcc";
+    const paddedHex = derHex + "0".repeat(20);
+    const pdf = new Uint8Array(100);
+    pdf.fill(0x58); // 'X' everywhere
+    // '<' at position len1=10 (cosign convention, NOT at 9)
+    pdf[10] = 0x3c;
+    // Write hex content starting at position 11
+    const hexBytes = new TextEncoder().encode(paddedHex);
+    pdf.set(hexBytes, 11);
+    // '>' right after hex content
+    const closePos = 11 + paddedHex.length;
+    pdf[closePos] = 0x3e;
+    // off2 = closePos + 1
+    const result = extractCmsFromByterange(pdf, 10, closePos + 1);
+    expect(Buffer.from(result).equals(Buffer.from(derHex, "hex"))).toBe(true);
   });
 });
 
