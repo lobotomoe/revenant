@@ -13,18 +13,26 @@ _MAX_CMS_HEX_CHARS = 32 * 1024 * 1024
 # Minimum plausible CMS blob size in bytes (header + basic content)
 MIN_CMS_SIZE = 100
 
+# End-of-contents octets that terminate BER indefinite-length encoding
+_EOC_BYTES = b"\x00\x00"
+
 
 def extract_der_from_padded_hex(hex_str: str) -> bytes:
-    """Extract exact DER blob from zero-padded hex string.
+    """Extract exact CMS blob from zero-padded hex string.
 
-    Parses the ASN.1 TLV header to determine exact DER length, avoiding
-    the rstrip("0") approach which corrupts blobs ending in 0x00 bytes.
+    Handles both DER (definite length) and BER (indefinite length)
+    encodings.  The original EKENG cosign tool produces BER-encoded
+    CMS blobs with indefinite length (0x30 0x80 ... 0x00 0x00).
+
+    For DER: parses the ASN.1 TLV header to determine exact length.
+    For BER indefinite: returns the full non-padding content, relying
+    on asn1crypto to parse the BER structure downstream.
 
     Args:
-        hex_str: Hex-encoded DER data, potentially right-padded with zeros.
+        hex_str: Hex-encoded CMS data, potentially right-padded with zeros.
 
     Returns:
-        Exact DER-encoded bytes without padding.
+        CMS bytes without padding.
 
     Raises:
         ValueError: If the hex string is invalid or ASN.1 header is malformed.
@@ -40,12 +48,17 @@ def extract_der_from_padded_hex(hex_str: str) -> bytes:
     length_byte = int(hex_str[2:4], 16)
     header_bytes = 2  # tag + initial length byte
 
+    if length_byte == 0x80:
+        # BER indefinite length encoding (0x30 0x80 ... 0x00 0x00).
+        # The blob ends with EOC (two zero bytes), but the hex placeholder
+        # is also zero-padded, so we can't simply search for 0x0000.
+        # Return the full non-padding content and let asn1crypto handle
+        # the BER parsing.
+        return _extract_ber_indefinite(hex_str)
+
     if length_byte < 0x80:
         # Short form: length_byte IS the length
         content_len = length_byte
-    elif length_byte == 0x80:
-        # Indefinite length -- not valid in DER
-        raise ValueError("Indefinite length encoding is not valid in DER")
     else:
         # Long form: lower 7 bits = number of length bytes
         num_len_bytes = length_byte & 0x7F
@@ -74,3 +87,74 @@ def extract_der_from_padded_hex(hex_str: str) -> bytes:
         )
 
     return bytes.fromhex(hex_str[:total_hex_chars])
+
+
+def _extract_ber_indefinite(hex_str: str) -> bytes:
+    """Extract a BER indefinite-length blob from zero-padded hex.
+
+    Strategy: decode the full hex to bytes, then walk the TLV structure
+    to find where the top-level SEQUENCE's EOC marker is.  Everything
+    after that is zero-padding from the PDF placeholder.
+
+    Raises:
+        ValueError: If the BER structure is malformed.
+    """
+    raw = bytes.fromhex(hex_str)
+    # Start after the top-level tag (0x30) and length (0x80)
+    pos = 2
+    end = len(raw)
+
+    # Walk top-level children until we hit EOC (0x00 0x00)
+    while pos < end:
+        if raw[pos : pos + 2] == _EOC_BYTES:
+            # Found EOC for the top-level SEQUENCE
+            return raw[: pos + 2]
+        # Skip one TLV element
+        pos = _skip_tlv(raw, pos, end)
+
+    raise ValueError("BER indefinite-length SEQUENCE: EOC marker not found")
+
+
+def _skip_tlv(data: bytes, pos: int, end: int) -> int:
+    """Skip a single TLV element and return the position after it.
+
+    Handles both definite and indefinite length children.
+    """
+    if pos >= end:
+        raise ValueError(f"BER parse: unexpected end at offset {pos}")
+
+    # Skip tag byte(s) -- for simplicity, handle single-byte and
+    # multi-byte (high-tag-number) tags
+    tag_byte = data[pos]
+    pos += 1
+    if (tag_byte & 0x1F) == 0x1F:
+        # Multi-byte tag: keep reading until a byte < 0x80
+        while pos < end and data[pos] & 0x80:
+            pos += 1
+        pos += 1  # final tag byte
+
+    if pos >= end:
+        raise ValueError("BER parse: tag extends beyond data")
+
+    # Read length
+    length_byte = data[pos]
+    pos += 1
+
+    if length_byte == 0x80:
+        # Indefinite length child -- walk its children until EOC
+        while pos < end:
+            if data[pos : pos + 2] == _EOC_BYTES:
+                return pos + 2
+            pos = _skip_tlv(data, pos, end)
+        raise ValueError("BER parse: nested indefinite-length without EOC")
+
+    if length_byte < 0x80:
+        content_len = length_byte
+    else:
+        num_len_bytes = length_byte & 0x7F
+        if pos + num_len_bytes > end:
+            raise ValueError("BER parse: length field extends beyond data")
+        content_len = int.from_bytes(data[pos : pos + num_len_bytes], byteorder="big")
+        pos += num_len_bytes
+
+    return pos + content_len

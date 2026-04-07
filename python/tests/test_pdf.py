@@ -500,11 +500,11 @@ def test_prepare_with_signature_image(tmp_path):
 
 
 def test_extract_cms_missing_open_bracket():
-    """Missing '<' before hex content should raise RevenantError."""
-    # Build pdf where position (len1-1) is NOT '<'
-    pdf = b"X" * 100 + b"AABB" + b">" + b"Z" * 10
+    """Missing '<' at both len1-1 and len1 should raise RevenantError."""
+    # Build pdf where neither position (len1-1) nor (len1) is '<'
+    pdf = b"X" * 100 + b"XAABB" + b">" + b"Z" * 10
     with pytest.raises(PDFError, match="Expected '<'"):
-        extract_cms_from_byterange(pdf, len1=100, off2=105)
+        extract_cms_from_byterange(pdf, len1=100, off2=106)
 
 
 def test_extract_cms_missing_close_bracket():
@@ -532,6 +532,17 @@ def test_extract_cms_invalid_hex():
     pdf = b"X" * 99 + b"<" + hex_content + b">" + b"Z" * 10
     with pytest.raises(PDFError, match="Invalid hex"):
         extract_cms_from_byterange(pdf, len1=100, off2=109)
+
+
+def test_extract_cms_cosign_bracket_convention():
+    """Original cosign places '<' at len1 (outside chunk1), not at len1-1."""
+    # Cosign convention: chunk1 does NOT include '<'
+    # chunk1 = pdf[0:100] = "X"*100, then "<" is at offset 100
+    der_hex = "3003aabbcc"
+    hex_content = (der_hex + "0" * 20).encode("ascii")
+    pdf = b"X" * 100 + b"<" + hex_content + b">" + b"Z" * 10
+    result = extract_cms_from_byterange(pdf, len1=100, off2=100 + 1 + len(hex_content) + 1)
+    assert result == bytes.fromhex(der_hex)
 
 
 # ── extract_signature_data — ByteRange sanity checks ─────────────────
@@ -1898,9 +1909,14 @@ def test_extract_der_bad_tag():
 
 
 def test_extract_der_indefinite_length():
-    """Indefinite length (0x80) should raise ValueError."""
-    with pytest.raises(ValueError, match="Indefinite length"):
-        extract_der_from_padded_hex("3080aabbcc")
+    """Indefinite length (0x80) should parse BER and find EOC."""
+    # 0x30 0x80 = SEQUENCE with indefinite length
+    # Contains one primitive: 0x04 0x02 0xAA 0xBB (OCTET STRING, 2 bytes)
+    # Terminated by EOC: 0x00 0x00
+    # Followed by zero padding from PDF placeholder
+    ber_hex = "3080" + "0402aabb" + "0000" + "000000"
+    result = extract_der_from_padded_hex(ber_hex)
+    assert result == bytes.fromhex("3080" + "0402aabb" + "0000")
 
 
 def test_extract_der_length_field_too_large():

@@ -43,17 +43,21 @@ def extract_cms_from_byterange(
         raise PDFError(f"Invalid ByteRange: off2 ({off2}) exceeds PDF size ({len(pdf_bytes)})")
 
     # ByteRange structure: [0 len1 off2 len2]
-    # chunk1 = pdf_bytes[0:len1], ends just before the hex content
-    # chunk2 = pdf_bytes[off2:], starts just after the hex content
-    # The hex is between "<" at position (len1-1) and ">" at position (off2-1)
-    hex_start = len1  # First hex byte position (after "<")
-    hex_end = off2 - 1  # Position of ">" (exclusive end for slice)
+    # The hex signature sits between angle brackets in the gap between chunks.
+    # Two conventions exist for where the "<" bracket falls:
+    #   Revenant: "<" is at len1-1 (included in chunk1), hex starts at len1
+    #   Original cosign: "<" is at len1 (first byte of gap), hex starts at len1+1
+    # The ">" bracket is consistently at off2-1 in both conventions.
+    if pdf_bytes[len1 - 1 : len1] == b"<":
+        # Revenant convention: chunk1 includes "<"
+        hex_start = len1
+    elif pdf_bytes[len1 : len1 + 1] == b"<":
+        # Original cosign convention: "<" is outside chunk1
+        hex_start = len1 + 1
+    else:
+        raise PDFError(f"Expected '<' near offset {len1}, got {pdf_bytes[len1 - 1 : len1 + 1]!r}")
 
-    # Verify angle brackets at expected positions
-    if pdf_bytes[hex_start - 1 : hex_start] != b"<":
-        raise PDFError(
-            f"Expected '<' at offset {hex_start - 1}, got {pdf_bytes[hex_start - 1 : hex_start]!r}"
-        )
+    hex_end = off2 - 1  # Position of ">"
     if pdf_bytes[hex_end : hex_end + 1] != b">":
         raise PDFError(
             f"Expected '>' at offset {hex_end}, got {pdf_bytes[hex_end : hex_end + 1]!r}"
