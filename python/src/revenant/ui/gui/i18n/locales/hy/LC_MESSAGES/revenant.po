@@ -119,6 +119,13 @@ msgid "Credentials"
 msgstr "Հավատարմագրեր"
 
 msgid ""
+"Credentials must contain only Latin characters.\n"
+"Please check your keyboard layout."
+msgstr ""
+"Հավատարմագրերը պետք է պարունակեն միայն լատինատառ նիշեր։\n"
+"Ստուգեք ձեր ստեղնաշարի դասավորությունը։"
+
+msgid ""
 "Cross-platform client for ARX CoSign\n"
 "electronic signatures."
 msgstr ""
