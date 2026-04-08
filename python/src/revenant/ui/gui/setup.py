@@ -358,6 +358,16 @@ class LoginDialog:
                     _("Login"), _("Username and password are required."), parent=self._win
                 )
                 return
+            if not user.isascii() or not pwd.isascii():
+                messagebox.showwarning(
+                    _("Login"),
+                    _(
+                        "Credentials must contain only Latin characters.\n"
+                        "Please check your keyboard layout."
+                    ),
+                    parent=self._win,
+                )
+                return
             self._username = user
             self._password = pwd
 
