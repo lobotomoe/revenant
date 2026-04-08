@@ -20,6 +20,9 @@ msgstr "(нет подписанта)"
 msgid "About Revenant"
 msgstr "О Revenant"
 
+msgid "Access denied. Your account may not have permission to sign."
+msgstr "Доступ запрещён. Возможно, у вашей учётной записи нет прав для подписания."
+
 msgid "Account"
 msgstr "Учётная запись"
 
@@ -29,11 +32,11 @@ msgstr "Все файлы"
 msgid "All {count} signatures VALID"
 msgstr "Все {count} подписей действительны"
 
-msgid "Auth failed: {error}"
-msgstr "Ошибка авторизации: {error}"
-
 msgid "Authentication failed: {error}"
 msgstr "Ошибка аутентификации: {error}"
+
+msgid "Authentication rejected. Check your username and password."
+msgstr "Аутентификация отклонена. Проверьте имя пользователя и пароль."
 
 msgid "Author: Aleksandr Kraiz"
 msgstr "Автор: Aleksandr Kraiz"
@@ -46,6 +49,9 @@ msgstr "Обзор..."
 
 msgid "Cancel"
 msgstr "Отмена"
+
+msgid "Cannot connect to the server. Check your internet connection."
+msgstr "Не удалось подключиться к серверу. Проверьте подключение к интернету."
 
 msgid "Cannot read file: {error}"
 msgstr "Не удалось прочитать файл: {error}"
@@ -363,6 +369,9 @@ msgstr "Готово"
 msgid "Report a Bug"
 msgstr "Сообщить об ошибке"
 
+msgid "Request rejected by server. Contact your system administrator."
+msgstr "Запрос отклонён сервером. Обратитесь к системному администратору."
+
 msgid "Retry"
 msgstr "Повторить"
 
@@ -383,6 +392,9 @@ msgstr "Сохранить подписанный PDF как"
 
 msgid "Saving credentials..."
 msgstr "Сохранение учётных данных..."
+
+msgid "Secure connection failed. Contact your system administrator."
+msgstr "Защищённое соединение не установлено. Обратитесь к системному администратору."
 
 msgid "Select All"
 msgstr "Выделить все"
@@ -420,6 +432,9 @@ msgstr "Выбрать файл подписи"
 msgid "Select signature image"
 msgstr "Выбрать изображение подписи"
 
+msgid "Server address not found. Check the server URL."
+msgstr "Адрес сервера не найден. Проверьте URL сервера."
+
 msgid ""
 "Server connected.\n"
 "Log in to sign documents."
@@ -427,8 +442,17 @@ msgstr ""
 "Сервер подключён.\n"
 "Войдите, чтобы подписывать документы."
 
+msgid "Server error. The signing service may be temporarily unavailable."
+msgstr "Ошибка сервера. Служба подписания может быть временно недоступна."
+
 msgid "Server error: {error}"
 msgstr "Ошибка сервера: {error}"
+
+msgid "Server is not available. It may be down for maintenance."
+msgstr "Сервер недоступен. Возможно, ведётся техническое обслуживание."
+
+msgid "Server is not responding. Check your internet connection and try again."
+msgstr "Сервер не отвечает. Проверьте подключение к интернету и повторите попытку."
 
 msgid "Server verification"
 msgstr "Серверная проверка"
@@ -489,9 +513,6 @@ msgstr "Шаг {current} из {total}"
 
 msgid "Storage: {storage}"
 msgstr "Хранилище: {storage}"
-
-msgid "TLS error: {error}"
-msgstr "Ошибка TLS: {error}"
 
 msgid "Telegram"
 msgstr "Telegram"
