@@ -32,9 +32,6 @@ msgstr "Все файлы"
 msgid "All {count} signatures VALID"
 msgstr "Все {count} подписей действительны"
 
-msgid "Auth failed: {error}"
-msgstr "Ошибка авторизации: {error}"
-
 msgid "Authentication failed: {error}"
 msgstr "Ошибка аутентификации: {error}"
 
@@ -516,9 +513,6 @@ msgstr "Шаг {current} из {total}"
 
 msgid "Storage: {storage}"
 msgstr "Хранилище: {storage}"
-
-msgid "TLS error: {error}"
-msgstr "Ошибка TLS: {error}"
 
 msgid "Telegram"
 msgstr "Telegram"

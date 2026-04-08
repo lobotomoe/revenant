@@ -29,9 +29,6 @@ msgstr ""
 msgid "All {count} signatures VALID"
 msgstr ""
 
-msgid "Auth failed: {error}"
-msgstr ""
-
 msgid "Authentication failed: {error}"
 msgstr ""
 
@@ -469,9 +466,6 @@ msgid "Step {current} of {total}"
 msgstr ""
 
 msgid "Storage: {storage}"
-msgstr ""
-
-msgid "TLS error: {error}"
 msgstr ""
 
 msgid "Telegram"

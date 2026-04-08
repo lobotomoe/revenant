@@ -32,9 +32,6 @@ msgstr "Բոլոր ֆայլերը"
 msgid "All {count} signatures VALID"
 msgstr "Բոլոր {count} ստորագրությունները ՎԱՎԵՐ են"
 
-msgid "Auth failed: {error}"
-msgstr "Նույնականացումը ձախողվեց. {error}"
-
 msgid "Authentication failed: {error}"
 msgstr "Վավերացումը ձախողվեց. {error}"
 
@@ -516,9 +513,6 @@ msgstr "քայլ {current} ից {total}"
 
 msgid "Storage: {storage}"
 msgstr "պահոց. {storage}"
-
-msgid "TLS error: {error}"
-msgstr "TLS սխալ.. {error}"
 
 msgid "Telegram"
 msgstr "Telegram"
