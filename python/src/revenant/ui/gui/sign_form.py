@@ -24,6 +24,23 @@ _POSITIONS = sorted(POSITION_PRESETS)
 # Page choices (1-based for user display, converted to 0-based internally)
 _PAGES = ["last", "first", "1", "2", "3", "4", "5"]
 
+# ── Position preview canvas ──────────────────────────────────────────
+_PREVIEW_W = 80  # canvas width (A4 aspect ratio)
+_PREVIEW_H = 113  # canvas height
+_PREVIEW_MARGIN = 6
+# Signature stamp proportions relative to A4 page (595x842pt)
+_SIG_W_RATIO = 210 / 595
+_SIG_H_RATIO = 70 / 842
+
+_PREVIEW_ALIGN: dict[str, tuple[str, str]] = {
+    "bottom-left": ("left", "bottom"),
+    "bottom-center": ("center", "bottom"),
+    "bottom-right": ("right", "bottom"),
+    "top-left": ("left", "top"),
+    "top-center": ("center", "top"),
+    "top-right": ("right", "top"),
+}
+
 
 def build_unconfigured(parent: tk.Widget, on_connect_action: Callable[[], None]) -> None:
     """Build the Sign tab for unconfigured state (Layer 0: connect prompt)."""
@@ -159,13 +176,17 @@ class SignForm:
         # Add bottom margin below LabelFrame titles
         ttk.Style().configure("TLabelframe", labelmargins=[0, 0, 0, 6])
 
-        # Left: Signature options
+        # Left: Signature options (settings + position preview)
         left = ttk.LabelFrame(cols, text=_("Signature"), padding=8, labelanchor="n")
         left.grid(row=0, column=0, sticky="nsew")
-        left.columnconfigure(1, weight=1)
+
+        # Settings sub-frame on the left side
+        settings = ttk.Frame(left)
+        settings.pack(side="left", fill="both", expand=True)
+        settings.columnconfigure(1, weight=1)
 
         # Mode selector
-        mode_frame = ttk.Frame(left)
+        mode_frame = ttk.Frame(settings)
         mode_frame.grid(row=0, column=0, columnspan=2, sticky="w", **opt_pad)
         ttk.Radiobutton(
             mode_frame,
@@ -183,41 +204,55 @@ class SignForm:
         ).pack(side="left")
 
         self._pos_combo = ttk.Combobox(
-            left, textvariable=self._position, values=_POSITIONS, state="readonly"
+            settings, textvariable=self._position, values=_POSITIONS, state="readonly"
         )
-        ttk.Label(left, text=_("Position:")).grid(row=1, column=0, sticky="e", **opt_pad)
+        ttk.Label(settings, text=_("Position:")).grid(row=1, column=0, sticky="e", **opt_pad)
         self._pos_combo.grid(row=1, column=1, sticky="ew", **opt_pad)
 
         page_validate = frame.register(self._validate_page)
         self._page_combo = ttk.Combobox(
-            left,
+            settings,
             textvariable=self._page,
             values=_PAGES,
             validate="key",
             validatecommand=(page_validate, "%P"),
         )
-        ttk.Label(left, text=_("Page:")).grid(row=2, column=0, sticky="e", **opt_pad)
+        ttk.Label(settings, text=_("Page:")).grid(row=2, column=0, sticky="e", **opt_pad)
         self._page_combo.grid(row=2, column=1, sticky="ew", **opt_pad)
 
         profile = get_active_profile()
         default_font = profile.font if profile else "noto-sans"
         self._font_key.set(default_font)
         self._font_combo = ttk.Combobox(
-            left,
+            settings,
             textvariable=self._font_key,
             values=list(AVAILABLE_FONTS),
             state="readonly",
         )
-        ttk.Label(left, text=_("Font:")).grid(row=3, column=0, sticky="e", **opt_pad)
+        ttk.Label(settings, text=_("Font:")).grid(row=3, column=0, sticky="e", **opt_pad)
         self._font_combo.grid(row=3, column=1, sticky="ew", **opt_pad)
 
         self._invisible_cb = ttk.Checkbutton(
-            left,
+            settings,
             text=_("Invisible signature"),
             variable=self._invisible,
             command=self._on_invisible_toggle,
         )
         self._invisible_cb.grid(row=4, column=0, columnspan=2, sticky="w", **opt_pad)
+
+        # Position preview canvas on the right side
+        import tkinter as real_tk
+
+        self._preview = real_tk.Canvas(
+            left,
+            width=_PREVIEW_W,
+            height=_PREVIEW_H,
+            highlightthickness=1,
+            highlightbackground="#ccc",
+        )
+        self._preview.pack(side="right", padx=(8, 0), pady=4)
+        self._draw_position_preview()
+        self._pos_combo.bind("<<ComboboxSelected>>", lambda _: self._draw_position_preview())
 
         # Right: Account info (server name is in ServerBar, not duplicated here)
         right = ttk.LabelFrame(cols, text=_("Account"), padding=8, labelanchor="n")
@@ -328,6 +363,50 @@ class SignForm:
         self._auto_output = ""  # Now user-confirmed
         return True
 
+    # ── Position preview ───────────────────────────────────────────
+
+    def _draw_position_preview(self) -> None:
+        """Draw a mini page diagram showing where the signature stamp will land."""
+        c = self._preview
+        c.delete("all")
+
+        m = _PREVIEW_MARGIN
+        pw = _PREVIEW_W - 2 * m
+        ph = _PREVIEW_H - 2 * m
+
+        # Page background
+        c.create_rectangle(m, m, m + pw, m + ph, outline="#999", width=1, fill="white")
+
+        # Fake text lines
+        line_m = 6
+        line_h = 3
+        line_gap = 5
+        for i in range(8):
+            ly = m + line_m + i * (line_h + line_gap)
+            if ly + line_h > m + ph - line_m:
+                break
+            lw = pw - 2 * line_m
+            if i == 0:
+                lw = int(lw * 0.6)
+            elif i % 3 == 0:
+                lw = int(lw * 0.75)
+            c.create_rectangle(
+                m + line_m, ly, m + line_m + lw, ly + line_h, fill="#ddd", outline=""
+            )
+
+        # Signature stamp
+        sw = int(pw * _SIG_W_RATIO * 2.5)
+        sh = int(ph * _SIG_H_RATIO * 2.5)
+        sig_m = 4
+
+        position = self._position.get()
+        halign, valign = _PREVIEW_ALIGN.get(position, ("right", "bottom"))
+
+        sx = {"left": m + sig_m, "center": m + (pw - sw) // 2, "right": m + pw - sw - sig_m}[halign]
+        sy = {"top": m + sig_m, "center": m + (ph - sh) // 2, "bottom": m + ph - sh - sig_m}[valign]
+
+        c.create_rectangle(sx, sy, sx + sw, sy + sh, outline="#e67e22", width=2, fill="#fef3e0")
+
     # ── Form state handlers ──────────────────────────────────────
 
     @staticmethod
@@ -349,10 +428,13 @@ class SignForm:
             self._pos_combo.configure(state="disabled")
             self._page_combo.configure(state="disabled")
             self._font_combo.configure(state="disabled")
+            self._preview.pack_forget()
         else:
             self._pos_combo.configure(state="readonly")
             self._page_combo.configure(state="normal")
             self._font_combo.configure(state="readonly")
+            self._preview.pack(side="right", padx=(8, 0), pady=4)
+            self._draw_position_preview()
 
     def _on_mode_change(self) -> None:
         """Toggle appearance controls and output path based on signing mode."""
@@ -366,6 +448,7 @@ class SignForm:
             self._invisible_cb.configure(state="disabled")
             self._image_entry.configure(state="disabled")
             self._image_browse_btn.configure(state="disabled")
+            self._preview.pack_forget()
             self.sign_btn.configure(text=_("Sign (Detached)"))
         else:
             # Restore controls, respecting invisible checkbox state
@@ -373,6 +456,9 @@ class SignForm:
             self._image_entry.configure(state="normal")
             self._image_browse_btn.configure(state="normal")
             self._on_invisible_toggle()
+            if not self._invisible.get():
+                self._preview.pack(side="right", padx=(8, 0), pady=4)
+                self._draw_position_preview()
             self.sign_btn.configure(text=_("Sign PDF"))
 
         self._update_auto_output()
