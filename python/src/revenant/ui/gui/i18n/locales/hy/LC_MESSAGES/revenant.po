@@ -20,6 +20,9 @@ msgstr "(ստորագրող չկա)"
 msgid "About Revenant"
 msgstr "Revenant-ի մասին"
 
+msgid "Access denied. Your account may not have permission to sign."
+msgstr "Մուտքն արգելված է։ Հնարավոր է՝ ձեր հաշիվը չունի ստորագրման թույլտվություն։"
+
 msgid "Account"
 msgstr "Հաշիվ"
 
@@ -35,6 +38,9 @@ msgstr "Նույնականացումը ձախողվեց. {error}"
 msgid "Authentication failed: {error}"
 msgstr "Վավերացումը ձախողվեց. {error}"
 
+msgid "Authentication rejected. Check your username and password."
+msgstr "Նույնականացումը մերժվեց։ Ստուգեք օգտանունն ու գաղտնաբառը։"
+
 msgid "Author: Aleksandr Kraiz"
 msgstr "Հեղինակ՝ Aleksandr Kraiz"
 
@@ -46,6 +52,9 @@ msgstr "Թերթել..."
 
 msgid "Cancel"
 msgstr "Չեղարկել"
+
+msgid "Cannot connect to the server. Check your internet connection."
+msgstr "Չհաջողվեց միանալ սերվերին։ Ստուգեք ինտերնետ կապը։"
 
 msgid "Cannot read file: {error}"
 msgstr "Չհաջողվեց կարդալ ֆայլը. {error}"
@@ -363,6 +372,9 @@ msgstr "Պատրաստ"
 msgid "Report a Bug"
 msgstr "Հաղորդել սխալի մասին"
 
+msgid "Request rejected by server. Contact your system administrator."
+msgstr "Հարցումը մերժվեց սերվերի կողմից։ Դիմեք ձեր համակարգի ադմինիստրատորին։"
+
 msgid "Retry"
 msgstr "Կրկնել"
 
@@ -383,6 +395,9 @@ msgstr "Ստորագրված PDF-ը պահել որպես"
 
 msgid "Saving credentials..."
 msgstr "Հավատարմագրերը պահվում են..."
+
+msgid "Secure connection failed. Contact your system administrator."
+msgstr "Անվտանգ կապը ձախողվեց։ Դիմեք ձեր համակարգի ադմինիստրատորին։"
 
 msgid "Select All"
 msgstr "Ընտրել բոլորը"
@@ -420,6 +435,9 @@ msgstr "Ընտրել ստորագրության ֆայլ"
 msgid "Select signature image"
 msgstr "Ընտրել ստորագրության պատկեր"
 
+msgid "Server address not found. Check the server URL."
+msgstr "Սերվերի հասցեն չի գտնվել։ Ստուգեք սերվերի URL-ը։"
+
 msgid ""
 "Server connected.\n"
 "Log in to sign documents."
@@ -427,8 +445,17 @@ msgstr ""
 "Սերվերն միացված է։\n"
 "Մուտք գործեք՝ փաստաթղթեր ստորագրելու համար։"
 
+msgid "Server error. The signing service may be temporarily unavailable."
+msgstr "Սերվերի սխալ։ Ստորագրման ծառայությունը կարող է ժամանակավորապես անհասանելի լինել։"
+
 msgid "Server error: {error}"
 msgstr "Սերվերի սխալ. {error}"
+
+msgid "Server is not available. It may be down for maintenance."
+msgstr "Սերվերն անհասանելի է։ Հնարավոր է՝ կատարվում է սպասարկում։"
+
+msgid "Server is not responding. Check your internet connection and try again."
+msgstr "Սերվերը չի արձագանքում։ Ստուգեք ինտերնետ կապը և կրկնեք փորձը։"
 
 msgid "Server verification"
 msgstr "Սերվերային ստուգում"

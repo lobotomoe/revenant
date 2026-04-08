@@ -24,6 +24,30 @@ from .utils import reveal_file
 
 _logger = logging.getLogger(__name__)
 
+# ── User-friendly error messages ─────────────────────────────────────
+
+# Patterns matched against the raw error string -> friendly message.
+# Order matters: first match wins.
+_FRIENDLY_ERRORS: list[tuple[str, str]] = [
+    ("timed out", _("Server is not responding. Check your internet connection and try again.")),
+    ("Cannot connect", _("Cannot connect to the server. Check your internet connection.")),
+    ("Connection refused", _("Server is not available. It may be down for maintenance.")),
+    ("Name or service not known", _("Server address not found. Check the server URL.")),
+    ("SSL error", _("Secure connection failed. Contact your system administrator.")),
+    ("HTTP 403", _("Access denied. Your account may not have permission to sign.")),
+    ("HTTP 401", _("Authentication rejected. Check your username and password.")),
+    ("HTTP 5", _("Server error. The signing service may be temporarily unavailable.")),
+    ("HTTP 4", _("Request rejected by server. Contact your system administrator.")),
+]
+
+
+def _friendly_error(raw: str) -> str:
+    """Map a technical error message to a user-friendly one."""
+    for pattern, friendly in _FRIENDLY_ERRORS:
+        if pattern in raw:
+            return friendly
+    return raw
+
 
 def start_signing(
     root: tk.Tk,
@@ -225,20 +249,24 @@ def _present_result(
             str(output_path),
         )
     elif result.auth_failed:
+        raw = result.error_message or ""
+        _logger.error("Auth failed: %s", raw)
         _finish_sign(
             root,
             sign_btn,
             status_text,
             False,
-            _("Auth failed: {error}").format(error=result.error_message),
+            _friendly_error(raw),
         )
     elif result.tls_error:
+        raw = result.error_message or ""
+        _logger.error("TLS error: %s", raw)
         _finish_sign(
             root,
             sign_btn,
             status_text,
             False,
-            _("TLS error: {error}").format(error=result.error_message),
+            _friendly_error(raw),
         )
     elif result.error_message and "Permission denied" in result.error_message:
         _finish_sign(
@@ -251,12 +279,14 @@ def _present_result(
             ).format(path=output_path),
         )
     else:
+        raw = result.error_message or ""
+        _logger.error("Signing error: %s", raw)
         _finish_sign(
             root,
             sign_btn,
             status_text,
             False,
-            _("Error: {error}").format(error=result.error_message),
+            _friendly_error(raw),
         )
 
 
