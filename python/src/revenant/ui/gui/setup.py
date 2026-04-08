@@ -174,9 +174,19 @@ class LoginDialog:
             row=1, column=1, sticky="w", pady=4
         )
         ttk.Label(f, text=_("Password:")).grid(row=2, column=0, sticky="e", padx=(0, 8), pady=4)
-        ttk.Entry(f, textvariable=self._pass_var, width=30, show="\u2022").grid(
-            row=2, column=1, sticky="w", pady=4
+        pwd_frame = ttk.Frame(f)
+        pwd_frame.grid(row=2, column=1, sticky="w", pady=4)
+        self._pass_entry = ttk.Entry(
+            pwd_frame, textvariable=self._pass_var, width=26, show="\u2022"
         )
+        self._pass_entry.pack(side="left")
+        self._pass_visible = False
+        ttk.Button(
+            pwd_frame,
+            text="\u25cf",
+            width=3,
+            command=self._toggle_password_visibility,
+        ).pack(side="left", padx=(4, 0))
 
     def _build_identity(self) -> None:
         """Step 2: Discover signer identity."""
@@ -343,6 +353,13 @@ class LoginDialog:
         )
 
         self._next_btn.configure(text=_("Save"), state="normal")
+
+    # ── UI helpers ──────────────────────────────────────────────────
+
+    def _toggle_password_visibility(self) -> None:
+        """Toggle password field between masked and plain text."""
+        self._pass_visible = not self._pass_visible
+        self._pass_entry.configure(show="" if self._pass_visible else "\u2022")
 
     # ── Navigation ──────────────────────────────────────────────────
 
