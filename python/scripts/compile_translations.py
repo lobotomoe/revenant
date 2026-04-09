@@ -17,44 +17,14 @@ import subprocess
 import sys
 from pathlib import Path
 
+from _po_common import parse_po_entries
+
 LOCALES_DIR = Path(__file__).parent.parent / "src" / "revenant" / "ui" / "gui" / "i18n" / "locales"
-
-
-def _unquote(s: str) -> str:
-    s = s.strip()
-    if s.startswith('"') and s.endswith('"'):
-        s = s[1:-1]
-    return s.replace("\\n", "\n").replace('\\"', '"').replace("\\\\", "\\")
 
 
 def _compile_po_python(po_path: Path, mo_path: Path) -> None:
     """Pure-Python .po -> .mo compiler (GNU gettext binary format)."""
-    messages: list[tuple[bytes, bytes]] = []
-    current_id: list[str] = []
-    current_str: list[str] = []
-    reading = ""
-
-    for raw_line in po_path.read_text(encoding="utf-8").splitlines():
-        line = raw_line.strip()
-        if line.startswith("#"):
-            continue
-        if line.startswith("msgid "):
-            if reading == "str":
-                messages.append(("".join(current_id).encode(), "".join(current_str).encode()))
-            current_id = [_unquote(line[6:])]
-            current_str = []
-            reading = "id"
-        elif line.startswith("msgstr "):
-            current_str = [_unquote(line[7:])]
-            reading = "str"
-        elif line.startswith('"') and line.endswith('"'):
-            if reading == "id":
-                current_id.append(_unquote(line))
-            elif reading == "str":
-                current_str.append(_unquote(line))
-
-    if reading == "str":
-        messages.append(("".join(current_id).encode(), "".join(current_str).encode()))
+    messages = [(mid.encode(), mstr.encode()) for mid, mstr in parse_po_entries(po_path)]
 
     messages.sort(key=lambda pair: pair[0])
 

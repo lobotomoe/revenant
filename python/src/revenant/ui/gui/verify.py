@@ -275,8 +275,8 @@ class VerifyPanel:
         embedded_results: list[VerificationResult] = []
         try:
             embedded_results = verify_all_embedded_signatures(pdf_bytes)
-        except RevenantError:
-            pass  # No embedded signatures -- that's fine
+        except RevenantError as e:
+            _logger.debug("No embedded signatures in detached PDF: %s", e)
 
         server_result = try_server_verify(pdf_bytes) if embedded_results else None
         self._root.after(

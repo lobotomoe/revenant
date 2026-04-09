@@ -105,23 +105,49 @@ def start_signing(
     ):
         return
 
+    sign_btn.configure(state="disabled")
     status_text.set(_("Loading credentials..."))
     root.update_idletasks()
-    user, pwd = resolve_credentials()
-    status_text.set(_("Ready"))
-    if not user or not pwd:
-        creds = login_dialog_fn()
-        if creds is None:
+
+    def _resolve_and_sign() -> None:
+        user, pwd = resolve_credentials()
+        if not user or not pwd:
+            # Must show login dialog on the main thread
+            def _prompt() -> None:
+                creds = login_dialog_fn()
+                if creds is None:
+                    sign_btn.configure(state="normal")
+                    status_text.set(_("Ready"))
+                    return
+                u, p = creds
+                status_text.set(_("Signing..."))
+                root.update_idletasks()
+                threading.Thread(
+                    target=_do_sign,
+                    args=(
+                        root,
+                        signing_mode,
+                        pdf_path,
+                        output_path,
+                        position,
+                        page,
+                        font_key,
+                        invisible,
+                        image_path,
+                        signer_name,
+                        u,
+                        p,
+                        sign_btn,
+                        status_text,
+                    ),
+                    daemon=True,
+                ).start()
+
+            root.after(0, _prompt)
             return
-        user, pwd = creds
 
-    sign_btn.configure(state="disabled")
-    status_text.set(_("Signing..."))
-    root.update_idletasks()
-
-    threading.Thread(
-        target=_do_sign,
-        args=(
+        root.after(0, lambda: status_text.set(_("Signing...")))
+        _do_sign(
             root,
             signing_mode,
             pdf_path,
@@ -136,9 +162,9 @@ def start_signing(
             pwd,
             sign_btn,
             status_text,
-        ),
-        daemon=True,
-    ).start()
+        )
+
+    threading.Thread(target=_resolve_and_sign, daemon=True).start()
 
 
 def _do_sign(

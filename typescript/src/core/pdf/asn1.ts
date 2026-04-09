@@ -108,11 +108,16 @@ function extractBerIndefinite(hexStr: string): Uint8Array {
   throw new Error("BER indefinite-length SEQUENCE: EOC marker not found");
 }
 
+const MAX_BER_DEPTH = 64;
+
 /**
  * Skip a single TLV element and return the position after it.
  * Handles both definite and indefinite length children.
  */
-function skipTlv(data: Uint8Array, pos: number, end: number): number {
+function skipTlv(data: Uint8Array, pos: number, end: number, depth = 0): number {
+  if (depth > MAX_BER_DEPTH) {
+    throw new Error(`BER parse: nesting too deep (>${MAX_BER_DEPTH} levels)`);
+  }
   if (pos >= end) {
     throw new Error(`BER parse: unexpected end at offset ${pos}`);
   }
@@ -147,7 +152,7 @@ function skipTlv(data: Uint8Array, pos: number, end: number): number {
       if (data[pos] === EOC_BYTE_0 && data[pos + 1] === EOC_BYTE_0) {
         return pos + 2;
       }
-      pos = skipTlv(data, pos, end);
+      pos = skipTlv(data, pos, end, depth + 1);
     }
     throw new Error("BER parse: nested indefinite-length without EOC");
   }
@@ -157,6 +162,9 @@ function skipTlv(data: Uint8Array, pos: number, end: number): number {
     contentLen = lengthByte;
   } else {
     const numLenBytes = lengthByte & 0x7f;
+    if (numLenBytes > 4) {
+      throw new Error(`BER parse: length field too large: ${numLenBytes} bytes`);
+    }
     if (pos + numLenBytes > end) {
       throw new Error("BER parse: length field extends beyond data");
     }

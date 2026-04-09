@@ -115,11 +115,16 @@ def _extract_ber_indefinite(hex_str: str) -> bytes:
     raise ValueError("BER indefinite-length SEQUENCE: EOC marker not found")
 
 
-def _skip_tlv(data: bytes, pos: int, end: int) -> int:
+_MAX_BER_DEPTH = 64
+
+
+def _skip_tlv(data: bytes, pos: int, end: int, *, _depth: int = 0) -> int:
     """Skip a single TLV element and return the position after it.
 
     Handles both definite and indefinite length children.
     """
+    if _depth > _MAX_BER_DEPTH:
+        raise ValueError(f"BER parse: nesting too deep (>{_MAX_BER_DEPTH} levels)")
     if pos >= end:
         raise ValueError(f"BER parse: unexpected end at offset {pos}")
 
@@ -145,7 +150,7 @@ def _skip_tlv(data: bytes, pos: int, end: int) -> int:
         while pos < end:
             if data[pos : pos + 2] == _EOC_BYTES:
                 return pos + 2
-            pos = _skip_tlv(data, pos, end)
+            pos = _skip_tlv(data, pos, end, _depth=_depth + 1)
         raise ValueError("BER parse: nested indefinite-length without EOC")
 
     if length_byte < 0x80:

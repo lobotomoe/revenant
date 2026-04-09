@@ -7,19 +7,34 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
-## [1.1.0] - 2026-03-16
+## [1.1.0] - 2026-04-09
 
 ### Added
 
+- **Localization**: Russian and Armenian language support for the GUI (gettext-based i18n)
+- **Signature position preview**: mini page diagram in the sign form showing stamp placement
+- **Password visibility toggle** in the login dialog
+- **Friendly error messages**: raw HTTP/TLS errors mapped to user-readable messages in the GUI
+- **ASCII credential warning**: warn when credentials contain non-Latin characters
 - **Universal macOS binaries** (arm64 + x86_64) -- Intel Mac users can now install from the Mac App Store, Homebrew, and DMG
 - Mac App Store badge in README
 - `merge_universal.py` script for lipo-merging .app bundles and CLI binaries
+- Translation consistency checker (`check_translations.py`) and .po compiler (`compile_translations.py`)
 
 ### Changed
 
 - Homebrew formula no longer requires `arch: :arm64`
 - Release pipeline builds on both `macos-latest` (arm64) and `macos-15-intel` (x86_64), merges with `lipo`
 - Release artifacts renamed from `*-macos-arm64` to `*-macos-universal`
+- Credential resolution moved off main thread to prevent UI freeze on macOS keychain prompts
+- Platform-specific helpers (macOS menu bar, Windows icon) extracted to dedicated module
+
+### Fixed
+
+- Support for original EKENG cosign BER-encoded PDF signatures (indefinite-length CMS blobs) in both Python and TypeScript
+- BER parser guards against deeply nested structures (depth limit) and oversized length fields
+- npm publish step in release pipeline no longer silently swallows errors
+- macOS notarization step properly fails on command errors instead of silently continuing
 
 ## [1.0.0] - 2026-02-26
 

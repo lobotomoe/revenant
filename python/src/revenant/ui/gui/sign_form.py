@@ -17,29 +17,13 @@ from ...config import (
 from ...core.appearance import AVAILABLE_FONTS, extract_cert_fields
 from ...core.pdf import POSITION_PRESETS
 from .i18n import _
+from .position_preview import PREVIEW_H, PREVIEW_W, draw_position_preview
 
 # Position labels for the dropdown (full names only, sorted)
 _POSITIONS = sorted(POSITION_PRESETS)
 
 # Page choices (1-based for user display, converted to 0-based internally)
 _PAGES = ["last", "first", "1", "2", "3", "4", "5"]
-
-# ── Position preview canvas ──────────────────────────────────────────
-_PREVIEW_W = 80  # canvas width (A4 aspect ratio)
-_PREVIEW_H = 113  # canvas height
-_PREVIEW_MARGIN = 6
-# Signature stamp proportions relative to A4 page (595x842pt)
-_SIG_W_RATIO = 210 / 595
-_SIG_H_RATIO = 70 / 842
-
-_PREVIEW_ALIGN: dict[str, tuple[str, str]] = {
-    "bottom-left": ("left", "bottom"),
-    "bottom-center": ("center", "bottom"),
-    "bottom-right": ("right", "bottom"),
-    "top-left": ("left", "top"),
-    "top-center": ("center", "top"),
-    "top-right": ("right", "top"),
-}
 
 
 def build_unconfigured(parent: tk.Widget, on_connect_action: Callable[[], None]) -> None:
@@ -245,8 +229,8 @@ class SignForm:
 
         self._preview = real_tk.Canvas(
             left,
-            width=_PREVIEW_W,
-            height=_PREVIEW_H,
+            width=PREVIEW_W,
+            height=PREVIEW_H,
             highlightthickness=1,
             highlightbackground="#ccc",
         )
@@ -367,45 +351,7 @@ class SignForm:
 
     def _draw_position_preview(self) -> None:
         """Draw a mini page diagram showing where the signature stamp will land."""
-        c = self._preview
-        c.delete("all")
-
-        m = _PREVIEW_MARGIN
-        pw = _PREVIEW_W - 2 * m
-        ph = _PREVIEW_H - 2 * m
-
-        # Page background
-        c.create_rectangle(m, m, m + pw, m + ph, outline="#999", width=1, fill="white")
-
-        # Fake text lines
-        line_m = 6
-        line_h = 3
-        line_gap = 5
-        for i in range(8):
-            ly = m + line_m + i * (line_h + line_gap)
-            if ly + line_h > m + ph - line_m:
-                break
-            lw = pw - 2 * line_m
-            if i == 0:
-                lw = int(lw * 0.6)
-            elif i % 3 == 0:
-                lw = int(lw * 0.75)
-            c.create_rectangle(
-                m + line_m, ly, m + line_m + lw, ly + line_h, fill="#ddd", outline=""
-            )
-
-        # Signature stamp
-        sw = int(pw * _SIG_W_RATIO * 2.5)
-        sh = int(ph * _SIG_H_RATIO * 2.5)
-        sig_m = 4
-
-        position = self._position.get()
-        halign, valign = _PREVIEW_ALIGN.get(position, ("right", "bottom"))
-
-        sx = {"left": m + sig_m, "center": m + (pw - sw) // 2, "right": m + pw - sw - sig_m}[halign]
-        sy = {"top": m + sig_m, "center": m + (ph - sh) // 2, "bottom": m + ph - sh - sig_m}[valign]
-
-        c.create_rectangle(sx, sy, sx + sw, sy + sh, outline="#e67e22", width=2, fill="#fef3e0")
+        draw_position_preview(self._preview, self._position.get())
 
     # ── Form state handlers ──────────────────────────────────────
 

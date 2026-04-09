@@ -76,9 +76,9 @@
   </branding>
 
   <releases>
-    <release version="1.1.0" date="2026-03-16">
+    <release version="1.1.0" date="2026-04-09">
       <description>
-        <p>Universal macOS binary (arm64 + x86_64) for Intel Mac support.</p>
+        <p>Russian and Armenian localization, signature position preview, friendly error messages, BER signature support.</p>
         <ul>
           <li>Mac App Store, Homebrew, and DMG now support Intel Macs</li>
           <li>Universal binary merging via lipo</li>

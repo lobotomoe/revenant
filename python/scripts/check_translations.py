@@ -48,50 +48,9 @@ def parse_po_file(path: Path) -> dict[str, str]:
 
     Handles multiline strings. Skips the header entry (empty msgid).
     """
-    entries: dict[str, str] = {}
-    current_id: list[str] = []
-    current_str: list[str] = []
-    reading = ""  # "id" or "str"
+    from _po_common import parse_po_entries
 
-    for raw_line in path.read_text(encoding="utf-8").splitlines():
-        line = raw_line.strip()
-        if line.startswith("#"):
-            continue
-        if line.startswith("msgid "):
-            # Save previous entry
-            if reading == "str":
-                mid = "".join(current_id)
-                mstr = "".join(current_str)
-                if mid:  # skip header
-                    entries[mid] = mstr
-            current_id = [_unquote(line[6:])]
-            current_str = []
-            reading = "id"
-        elif line.startswith("msgstr "):
-            current_str = [_unquote(line[7:])]
-            reading = "str"
-        elif line.startswith('"') and line.endswith('"'):
-            if reading == "id":
-                current_id.append(_unquote(line))
-            elif reading == "str":
-                current_str.append(_unquote(line))
-
-    # Last entry
-    if reading == "str":
-        mid = "".join(current_id)
-        mstr = "".join(current_str)
-        if mid:
-            entries[mid] = mstr
-
-    return entries
-
-
-def _unquote(s: str) -> str:
-    """Remove surrounding quotes and unescape basic sequences."""
-    s = s.strip()
-    if s.startswith('"') and s.endswith('"'):
-        s = s[1:-1]
-    return s.replace("\\n", "\n").replace('\\"', '"').replace("\\\\", "\\")
+    return {mid: mstr for mid, mstr in parse_po_entries(path) if mid}
 
 
 def main() -> int:

@@ -448,16 +448,17 @@ jobs:
           API_KEY_ID: ${{ secrets.APPSTORE_API_KEY_ID }}
           API_ISSUER_ID: ${{ secrets.APPSTORE_API_ISSUER_ID }}
         run: |
+          SUBMIT_EXIT=0
           SUBMIT_OUT=$(xcrun notarytool submit dist/Revenant.dmg \
             --key ~/private_keys/AuthKey_${API_KEY_ID}.p8 \
             --key-id "$API_KEY_ID" \
             --issuer "$API_ISSUER_ID" \
-            --wait 2>&1) || true
+            --wait 2>&1) || SUBMIT_EXIT=$?
           echo "$SUBMIT_OUT"
 
           SUBMISSION_ID=$(echo "$SUBMIT_OUT" | grep '  id:' | head -1 | awk '{print $2}')
 
-          if echo "$SUBMIT_OUT" | grep -q "status: Invalid"; then
+          if [ "$SUBMIT_EXIT" -ne 0 ] && ! echo "$SUBMIT_OUT" | grep -q "status: Accepted"; then
             echo "::error::Notarization failed. Fetching detailed log..."
             xcrun notarytool log "$SUBMISSION_ID" \
               --key ~/private_keys/AuthKey_${API_KEY_ID}.p8 \
@@ -838,7 +839,13 @@ jobs:
         run: pnpm build
 
       - name: Publish
-        run: pnpm publish --no-git-checks --access public || echo "Version already published, skipping"
+        run: |
+          PKG_VERSION="${GITHUB_REF_NAME#v}"
+          if npm view "revenant-sign@$PKG_VERSION" version 2>/dev/null; then
+            echo "Version $PKG_VERSION already published, skipping"
+          else
+            pnpm publish --no-git-checks --access public
+          fi
         env:
           NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
 
