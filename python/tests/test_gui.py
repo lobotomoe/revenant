@@ -5,6 +5,8 @@ from __future__ import annotations
 from typing import TYPE_CHECKING
 from unittest.mock import MagicMock, patch
 
+import pytest
+
 if TYPE_CHECKING:
     from revenant.core.pdf import CmsInspection, VerificationResult
 
@@ -104,6 +106,14 @@ def test_check_tkinter_returns_tuple():
 
 
 # ── Verify dialog formatting helpers ─────────────────────────────────────
+
+
+@pytest.fixture(autouse=True, scope="module")
+def _init_i18n():
+    """Initialize i18n to English so translated keys resolve to real text."""
+    from revenant.ui.gui.i18n import init_locale
+
+    init_locale("en")
 
 
 def test_format_results_single_valid():

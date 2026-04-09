@@ -1,0 +1,23 @@
+[default.extend-identifiers]
+PNGs = "PNGs"
+
+[default.extend-words]
+# Truncated msgid keys -- not real typos
+agai = "agai"
+# Apple App Store error code prefix
+ITMS = "ITMS"
+# PDF spec: /FlateDecode is the standard filter name
+Flate = "Flate"
+# PyInstaller API uses "datas" as a parameter name
+datas = "datas"
+# Server response text quoted verbatim in tests/docs
+occured = "occured"
+# OpenType features abbreviation
+OT = "OT"
+
+[files]
+extend-exclude = [
+    "docs/",
+    # Font metrics are auto-generated hex data
+    "python/src/revenant/core/appearance/font_data/",
+]
