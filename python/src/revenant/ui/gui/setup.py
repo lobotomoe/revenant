@@ -40,7 +40,7 @@ _LOGIN_STEP_DONE = 2
 
 
 def _login_step_titles() -> list[str]:
-    return [_("Credentials"), _("Signer Identity"), _("Complete")]
+    return [_("gui.credentials"), _("gui.signer_identity"), _("gui.complete")]
 
 
 _LOGIN_NUM_STEPS = 3
@@ -69,7 +69,7 @@ class LoginDialog:
         # Window
         self._win = tk.Toplevel(parent)
         self._win.withdraw()
-        self._win.title(_("Log In"))
+        self._win.title(_("gui.log_in"))
         self._win.resizable(False, False)
         self._win.transient(parent)
         self._win.grab_set()
@@ -94,10 +94,10 @@ class LoginDialog:
         # Navigation buttons
         nav = ttk.Frame(outer)
         nav.grid(row=2, column=0, columnspan=2, sticky="ew", pady=(8, 0))
-        self._back_btn = ttk.Button(nav, text=_("Back"), command=self._go_back)
+        self._back_btn = ttk.Button(nav, text=_("gui.back"), command=self._go_back)
         self._back_btn.pack(side="left")
-        ttk.Button(nav, text=_("Cancel"), command=self._cancel).pack(side="right", padx=(8, 0))
-        self._next_btn = ttk.Button(nav, text=_("Next"), command=self._go_next)
+        ttk.Button(nav, text=_("gui.cancel"), command=self._cancel).pack(side="right", padx=(8, 0))
+        self._next_btn = ttk.Button(nav, text=_("gui.next"), command=self._go_next)
         self._next_btn.pack(side="right")
 
         # Status label
@@ -121,12 +121,12 @@ class LoginDialog:
         self._status_var.set("")
         self._title_var.set(_login_step_titles()[self._step])
         self._step_var.set(
-            _("Step {current} of {total}").format(current=self._step + 1, total=_LOGIN_NUM_STEPS)
+            _("gui.step_current_of_total").format(current=self._step + 1, total=_LOGIN_NUM_STEPS)
         )
         self._back_btn.configure(
             state="normal" if self._step > _LOGIN_STEP_CREDENTIALS else "disabled"
         )
-        self._next_btn.configure(state="normal", text=_("Next"))
+        self._next_btn.configure(state="normal", text=_("gui.next"))
 
         builders = [
             self._build_credentials,
@@ -142,7 +142,7 @@ class LoginDialog:
         if self._profile is not None and self._profile.max_auth_attempts:
             ttk.Label(
                 f,
-                text=_("Warning: account locks after {max_attempts} failed attempts!").format(
+                text=_("gui.warning_account_locks_after_max_attempts_failed_attempts").format(
                     max_attempts=self._profile.max_auth_attempts
                 ),
                 foreground="#cc7700",
@@ -153,7 +153,7 @@ class LoginDialog:
 
         # Pre-fill from saved config if empty
         if not self._username and not self._password:
-            self._status_var.set(_("Loading saved credentials..."))
+            self._status_var.set(_("gui.loading_saved_credentials_ellipsis"))
             self._win.update_idletasks()
             saved_user, saved_pass = get_credentials()
             if saved_user is not None:
@@ -162,18 +162,20 @@ class LoginDialog:
                 self._pass_var.set(saved_pass)
             if saved_user and not saved_pass and is_keyring_available():
                 self._status_var.set(
-                    _(
-                        "Could not read password from system keychain.\nPlease re-enter your password."
-                    )
+                    _("gui.could_not_read_password_from_system_keychain_pleas_a490f2d1")
                 )
             else:
                 self._status_var.set("")
 
-        ttk.Label(f, text=_("Username:")).grid(row=1, column=0, sticky="e", padx=(0, 8), pady=4)
+        ttk.Label(f, text=_("gui.username_label")).grid(
+            row=1, column=0, sticky="e", padx=(0, 8), pady=4
+        )
         ttk.Entry(f, textvariable=self._user_var, width=30).grid(
             row=1, column=1, sticky="w", pady=4
         )
-        ttk.Label(f, text=_("Password:")).grid(row=2, column=0, sticky="e", padx=(0, 8), pady=4)
+        ttk.Label(f, text=_("gui.password_label")).grid(
+            row=2, column=0, sticky="e", padx=(0, 8), pady=4
+        )
         pwd_frame = ttk.Frame(f)
         pwd_frame.grid(row=2, column=1, sticky="w", pady=4)
         self._pass_entry = ttk.Entry(
@@ -193,7 +195,7 @@ class LoginDialog:
         self._next_btn.configure(state="disabled")
         # Back stays enabled so the user can escape if discovery hangs
 
-        self._id_status = self._tk.StringVar(value=_("Discovering signer identity..."))
+        self._id_status = self._tk.StringVar(value=_("gui.discovering_signer_identity_ellipsis"))
         self._ttk.Label(self._content, textvariable=self._id_status, wraplength=400).grid(
             row=0, column=0, sticky="w", pady=4
         )
@@ -223,16 +225,16 @@ class LoginDialog:
             self._show_identity(info)
             self._next_btn.configure(state="normal")
         else:
-            self._id_status.set(_("Could not determine identity from server."))
+            self._id_status.set(_("gui.could_not_determine_identity_from_server"))
             self._show_fallbacks()
 
     def _on_discover_fail(self, exc: Exception) -> None:
         if isinstance(exc, AuthError):
-            self._id_status.set(_("Authentication failed: {error}").format(error=exc))
+            self._id_status.set(_("gui.authentication_failed_error").format(error=exc))
         elif isinstance(exc, (TLSError, RevenantError)):
-            self._id_status.set(_("Server error: {error}").format(error=exc))
+            self._id_status.set(_("gui.server_error_error").format(error=exc))
         else:
-            self._id_status.set(_("Error: {error}").format(error=exc))
+            self._id_status.set(_("gui.error_error").format(error=exc))
         self._show_fallbacks()
 
     def _show_identity(self, info: dict[str, str | None]) -> None:
@@ -241,7 +243,7 @@ class LoginDialog:
 
         for w in self._id_frame.winfo_children():
             w.destroy()
-        self._id_status.set(_("Signer identity found:"))
+        self._id_status.set(_("gui.signer_identity_found_label"))
         row = 0
 
         if self._profile is not None and self._profile.cert_fields:
@@ -256,9 +258,9 @@ class LoginDialog:
         else:
             # Fallback for custom servers: raw name, email, org
             for key, label in [
-                ("name", _("Name")),
-                ("email", _("Email")),
-                ("organization", _("Organization")),
+                ("name", _("gui.name")),
+                ("email", _("gui.email")),
+                ("organization", _("gui.organization")),
             ]:
                 val = info.get(key)
                 if val:
@@ -280,12 +282,12 @@ class LoginDialog:
 
         has_cert_fields = self._profile is not None and bool(self._profile.cert_fields)
 
-        self._ttk.Button(self._id_frame, text=_("Retry"), command=self._id_retry).grid(
+        self._ttk.Button(self._id_frame, text=_("gui.retry"), command=self._id_retry).grid(
             row=0, column=0, sticky="w", pady=4
         )
         if not has_cert_fields:
             self._ttk.Button(
-                self._id_frame, text=_("Enter manually..."), command=self._id_manual
+                self._id_frame, text=_("gui.enter_manually_ellipsis"), command=self._id_manual
             ).grid(row=0, column=1, sticky="w", padx=(8, 0), pady=4)
 
     def _id_retry(self) -> None:
@@ -298,26 +300,26 @@ class LoginDialog:
         tk, ttk = self._tk, self._ttk
         for w in self._id_frame.winfo_children():
             w.destroy()
-        self._id_status.set(_("Enter signer identity:"))
+        self._id_status.set(_("gui.enter_signer_identity_label"))
 
         saved = get_signer_info()
         self._manual_name = tk.StringVar(value=saved.get("name") or "")
         self._manual_email = tk.StringVar(value=saved.get("email") or "")
         self._manual_org = tk.StringVar(value=saved.get("organization") or "")
 
-        ttk.Label(self._id_frame, text=_("Name (required):")).grid(
+        ttk.Label(self._id_frame, text=_("gui.name_required_label")).grid(
             row=0, column=0, sticky="e", padx=(0, 8)
         )
         ttk.Entry(self._id_frame, textvariable=self._manual_name, width=30).grid(
             row=0, column=1, sticky="w"
         )
-        ttk.Label(self._id_frame, text=_("Email:")).grid(
+        ttk.Label(self._id_frame, text=_("gui.email_label")).grid(
             row=1, column=0, sticky="e", padx=(0, 8), pady=4
         )
         ttk.Entry(self._id_frame, textvariable=self._manual_email, width=30).grid(
             row=1, column=1, sticky="w"
         )
-        ttk.Label(self._id_frame, text=_("Organization:")).grid(
+        ttk.Label(self._id_frame, text=_("gui.organization_label")).grid(
             row=2, column=0, sticky="e", padx=(0, 8), pady=4
         )
         ttk.Entry(self._id_frame, textvariable=self._manual_org, width=30).grid(
@@ -329,30 +331,30 @@ class LoginDialog:
         """Step 3: Summary and save."""
         tk, ttk, f = self._tk, self._ttk, self._content
 
-        ttk.Label(f, text=_("Setup complete! Summary:"), font=("", 11, "bold")).grid(
+        ttk.Label(f, text=_("gui.setup_complete_summary_label"), font=("", 11, "bold")).grid(
             row=0, column=0, columnspan=2, sticky="w", pady=(0, 8)
         )
         row = 1
         if self._identity is not None:
-            ttk.Label(f, text=_("Signer: {name}").format(name=self._identity.get("name", ""))).grid(
-                row=row, column=0, columnspan=2, sticky="w", padx=8
-            )
+            ttk.Label(
+                f, text=_("gui.signer_name").format(name=self._identity.get("name", ""))
+            ).grid(row=row, column=0, columnspan=2, sticky="w", padx=8)
             row += 1
-        ttk.Label(f, text=_("Username: {username}").format(username=self._username)).grid(
+        ttk.Label(f, text=_("gui.username_username").format(username=self._username)).grid(
             row=row, column=0, columnspan=2, sticky="w", padx=8
         )
 
         self._save_creds_var = tk.BooleanVar(value=True)
         ttk.Checkbutton(
-            f, text=_("Save credentials (username/password)"), variable=self._save_creds_var
+            f, text=_("gui.save_credentials_username_password"), variable=self._save_creds_var
         ).grid(row=row + 2, column=0, columnspan=2, sticky="w", padx=8, pady=8)
 
         storage = get_credential_storage_info()
-        ttk.Label(f, text=_("Storage: {storage}").format(storage=storage), foreground="gray").grid(
+        ttk.Label(f, text=_("gui.storage_storage").format(storage=storage), foreground="gray").grid(
             row=row + 3, column=0, columnspan=2, sticky="w", padx=24
         )
 
-        self._next_btn.configure(text=_("Save"), state="normal")
+        self._next_btn.configure(text=_("gui.save"), state="normal")
 
     # ── UI helpers ──────────────────────────────────────────────────
 
@@ -372,16 +374,13 @@ class LoginDialog:
             pwd = self._pass_var.get().strip()
             if not user or not pwd:
                 messagebox.showwarning(
-                    _("Login"), _("Username and password are required."), parent=self._win
+                    _("gui.login"), _("gui.username_and_password_are_required"), parent=self._win
                 )
                 return
             if not user.isascii() or not pwd.isascii():
                 messagebox.showwarning(
-                    _("Login"),
-                    _(
-                        "Credentials must contain only Latin characters.\n"
-                        "Please check your keyboard layout."
-                    ),
+                    _("gui.login"),
+                    _("gui.credentials_must_contain_only_latin_characters_ple_e9a0742d"),
                     parent=self._win,
                 )
                 return
@@ -392,7 +391,9 @@ class LoginDialog:
             if self._identity is None and hasattr(self, "_manual_name"):
                 name = self._manual_name.get().strip()
                 if not name:
-                    messagebox.showwarning(_("Login"), _("Name is required."), parent=self._win)
+                    messagebox.showwarning(
+                        _("gui.login"), _("gui.name_is_required"), parent=self._win
+                    )
                     return
                 self._identity = {
                     "name": name,
@@ -403,12 +404,10 @@ class LoginDialog:
             elif self._identity is None:
                 has_cert_fields = self._profile is not None and bool(self._profile.cert_fields)
                 if has_cert_fields:
-                    msg = _(
-                        "Signer identity is required. Retry the connection or go back to fix credentials."
-                    )
+                    msg = _("gui.signer_identity_is_required_retry_the_connection_o_6eb0ccec")
                 else:
-                    msg = _("Signer identity is required. Click 'Enter manually...' to provide it.")
-                messagebox.showwarning(_("Login"), msg, parent=self._win)
+                    msg = _("gui.signer_identity_is_required_click_enter_manually_t_397d205e")
+                messagebox.showwarning(_("gui.login"), msg, parent=self._win)
                 return
 
         elif self._step == _LOGIN_STEP_DONE:
@@ -443,7 +442,7 @@ class LoginDialog:
             )
         if self._save_creds_var.get():
             _logger.info("Login: saving credentials (checkbox checked)")
-            self._status_var.set(_("Saving credentials..."))
+            self._status_var.set(_("gui.saving_credentials_ellipsis"))
             self._win.update_idletasks()
             stored_securely = save_credentials(self._username, self._password)
             if not stored_securely and is_keyring_available():
@@ -451,18 +450,12 @@ class LoginDialog:
 
                 messagebox.showwarning(
                     "Revenant",
-                    _(
-                        "Could not save password to system keychain\n"
-                        "(access was denied or unavailable).\n\n"
-                        "Your password was saved to the config file instead.\n"
-                        "To use secure storage, allow keychain access\n"
-                        "when prompted."
-                    ),
+                    _("gui.could_not_save_password_to_system_keychain_access_04b14699"),
                     parent=self._win,
                 )
         else:
             _logger.info("Login: clearing credentials (checkbox unchecked)")
-            self._status_var.set(_("Clearing saved credentials..."))
+            self._status_var.set(_("gui.clearing_saved_credentials_ellipsis"))
             self._win.update_idletasks()
             clear_credentials()
 

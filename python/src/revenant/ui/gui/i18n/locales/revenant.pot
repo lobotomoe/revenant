@@ -1,535 +1,662 @@
-# Revenant GUI translation template
+# Revenant GUI translation template (keys-based)
 # SPDX-License-Identifier: Apache-2.0
 #
+# NOTE: msgid values are stable keys used in GUI source code.
 msgid ""
 msgstr ""
 "Content-Type: text/plain; charset=UTF-8\n"
 "Content-Transfer-Encoding: 8bit\n"
 
-msgid ""
-"  Note: cryptographic verification requires the original PDF.
-  Add the PDF to verify the signature integrity."
+#. EN: About Revenant
+msgid "gui.about_revenant"
 msgstr ""
 
-msgid "(no signer)"
+#. EN: Access denied. Your account may not have permission to sign.
+msgid "gui.access_denied_your_account_may_not_have_permission_to_sign"
 msgstr ""
 
-msgid "About Revenant"
+#. EN: Account
+msgid "gui.account"
 msgstr ""
 
-msgid "Access denied. Your account may not have permission to sign."
+#. EN: All {count} signatures VALID
+msgid "gui.all_count_signatures_valid"
 msgstr ""
 
-msgid "Account"
+#. EN: All files
+msgid "gui.all_files"
 msgstr ""
 
-msgid "All files"
+#. EN: Authentication failed: {error}
+msgid "gui.authentication_failed_error"
 msgstr ""
 
-msgid "All {count} signatures VALID"
+#. EN: Authentication rejected. Check your username and password.
+msgid "gui.authentication_rejected_check_your_username_and_password"
 msgstr ""
 
-msgid "Authentication failed: {error}"
+#. EN: Author: Aleksandr Kraiz
+msgid "gui.author_aleksandr_kraiz"
 msgstr ""
 
-msgid "Authentication rejected. Check your username and password."
+#. EN: Back
+msgid "gui.back"
 msgstr ""
 
-msgid "Author: Aleksandr Kraiz"
+#. EN: Browse...
+msgid "gui.browse_ellipsis"
 msgstr ""
 
-msgid "Back"
+#. EN: Cancel
+msgid "gui.cancel"
 msgstr ""
 
-msgid "Browse..."
+#. EN: Cannot connect to the server. Check your internet connection.
+msgid "gui.cannot_connect_to_the_server_check_your_internet_connection"
 msgstr ""
 
-msgid "Cancel"
+#. EN: Cannot read file: {error}
+msgid "gui.cannot_read_file_error"
 msgstr ""
 
-msgid "Cannot connect to the server. Check your internet connection."
+#. EN: Certificate inspection
+msgid "gui.certificate_inspection"
 msgstr ""
 
-msgid "Cannot read file: {error}"
+#. EN: Certificate: {status}
+msgid "gui.certificate_status"
 msgstr ""
 
-msgid "Certificate inspection"
+#. EN: Choose Server
+msgid "gui.choose_server"
 msgstr ""
 
-msgid "Certificate: {status}"
+#. EN: Clearing saved credentials...
+msgid "gui.clearing_saved_credentials_ellipsis"
 msgstr ""
 
-msgid "Choose Server"
+#. EN: Close Window
+msgid "gui.close_window"
 msgstr ""
 
-msgid "Clearing saved credentials..."
+#. EN: Complete
+msgid "gui.complete"
 msgstr ""
 
-msgid "Close Window"
+#. EN: Connect
+msgid "gui.connect"
 msgstr ""
 
-msgid "Complete"
+#. EN: Connect to a server\\nto sign documents.
+msgid "gui.connect_to_a_server_to_sign_documents"
 msgstr ""
 
-msgid "Connect"
+#. EN: Connect to Server
+msgid "gui.connect_to_server"
 msgstr ""
 
-msgid "Connect to Server"
+#. EN: Connected ({info})
+msgid "gui.connected_info"
 msgstr ""
 
-msgid ""
-"Connect to a server
-to sign documents."
+#. EN: Connecting to {url}...
+msgid "gui.connecting_to_url_ellipsis"
 msgstr ""
 
-msgid "Connected ({info})"
+#. EN: Copy
+msgid "gui.copy"
 msgstr ""
 
-msgid "Connecting to {url}..."
+#. EN: Could not determine identity from server.
+msgid "gui.could_not_determine_identity_from_server"
 msgstr ""
 
-msgid "Copy"
+#. EN: Could not read password from system keychain.\\nPlease re-enter your password.
+msgid "gui.could_not_read_password_from_system_keychain_pleas_a490f2d1"
 msgstr ""
 
-msgid "Could not determine identity from server."
+#. EN: Could not save password to system keychain\\n(access was denied or unavailable).\\n\\nYour password
+#.     was saved to the config file instead.\\nTo use secure storage, allow keychain access\\nwhen
+#.     prompted.
+msgid "gui.could_not_save_password_to_system_keychain_access_04b14699"
 msgstr ""
 
-msgid ""
-"Could not read password from system keychain.
-Please re-enter your password."
+#. EN: Credentials
+msgid "gui.credentials"
 msgstr ""
 
-msgid ""
-"Could not save password to system keychain
-(access was denied or unavailable).
-
-Your password was saved to the config file instead.
-To use secure storage, allow keychain access
-when prompted."
+#. EN: Credentials must contain only Latin characters.\\nPlease check your keyboard layout.
+msgid "gui.credentials_must_contain_only_latin_characters_ple_e9a0742d"
 msgstr ""
 
-msgid "Credentials"
+#. EN: Cross-platform client for ARX CoSign\\nelectronic signatures.
+msgid "gui.cross_platform_client_for_arx_cosign_electronic_signatures"
 msgstr ""
 
-msgid ""
-"Credentials must contain only Latin characters.\n"
-"Please check your keyboard layout."
+#. EN: Custom server
+msgid "gui.custom_server"
 msgstr ""
 
-msgid ""
-"Cross-platform client for ARX CoSign
-electronic signatures."
+#. EN: Cut
+msgid "gui.cut"
 msgstr ""
 
-msgid "Custom server"
+#. EN: Detached (.p7s)
+msgid "gui.detached_p7s"
 msgstr ""
 
-msgid "Cut"
+#. EN: Detached signature
+msgid "gui.detached_signature"
 msgstr ""
 
-msgid "Detached (.p7s)"
+#. EN: Disconnect
+msgid "gui.disconnect"
 msgstr ""
 
-msgid "Detached signature"
+#. EN: Disconnect from {name}?
+msgid "gui.disconnect_from_name"
 msgstr ""
 
-msgid "Disconnect"
+#. EN: Disconnecting...
+msgid "gui.disconnecting_ellipsis"
 msgstr ""
 
-msgid "Disconnect from {name}?"
+#. EN: Discovering signer identity...
+msgid "gui.discovering_signer_identity_ellipsis"
 msgstr ""
 
-msgid "Disconnecting..."
+#. EN: Edit
+msgid "gui.edit"
 msgstr ""
 
-msgid "Discovering signer identity..."
+#. EN: Email
+msgid "gui.email"
 msgstr ""
 
-msgid "Edit"
+#. EN: Email:
+msgid "gui.email_label"
 msgstr ""
 
-msgid "Email"
+#. EN: Embedded
+msgid "gui.embedded"
 msgstr ""
 
-msgid "Email:"
+#. EN: Embedded signatures
+msgid "gui.embedded_signatures"
 msgstr ""
 
-msgid "Embedded"
+#. EN: Enter a server URL.
+msgid "gui.enter_a_server_url"
 msgstr ""
 
-msgid "Embedded signatures"
+#. EN: Enter manually...
+msgid "gui.enter_manually_ellipsis"
 msgstr ""
 
-msgid "Enter a server URL."
+#. EN: Enter signer identity:
+msgid "gui.enter_signer_identity_label"
 msgstr ""
 
-msgid "Enter manually..."
+#. EN: Error: {error}
+msgid "gui.error_error"
 msgstr ""
 
-msgid "Enter signer identity:"
+#. EN: Failed
+msgid "gui.failed"
 msgstr ""
 
-msgid "Error: {error}"
+#. EN: Failed: {info}
+msgid "gui.failed_info"
 msgstr ""
 
-msgid "FAILED"
+#. EN: {failed} of {total} signature(s) FAILED
+msgid "gui.failed_of_total_signature_s_failed"
 msgstr ""
 
-msgid "Failed"
+#. EN: FAILED
+msgid "gui.failed_upper"
 msgstr ""
 
-msgid "Failed: {info}"
+#. EN: File
+msgid "gui.file"
 msgstr ""
 
-msgid "File"
+#. EN: File already exists:\\n{filename}\\n\\nOverwrite?
+msgid "gui.file_already_exists_filename_overwrite"
 msgstr ""
-
-msgid ""
-"File already exists:
-{filename}
 
-Overwrite?"
+#. EN: File not found:\\n{path}
+msgid "gui.file_not_found_path"
 msgstr ""
 
-msgid ""
-"File not found:
-{path}"
+#. EN: Font:
+msgid "gui.font_label"
 msgstr ""
 
-msgid "Font:"
+#. EN: GitHub
+msgid "gui.github"
 msgstr ""
 
-msgid "GitHub"
+#. EN: Image (opt):
+msgid "gui.image_opt_label"
 msgstr ""
 
-msgid "Image (opt):"
+#. EN: Images
+msgid "gui.images"
 msgstr ""
 
-msgid "Images"
+#. EN: Inspecting signature...
+msgid "gui.inspecting_signature_ellipsis"
 msgstr ""
 
-msgid "Inspecting signature..."
+#. EN: Invisible signature
+msgid "gui.invisible_signature"
 msgstr ""
 
-msgid "Invisible signature"
+#. EN: Language:
+msgid "gui.language_label"
 msgstr ""
 
-msgid "License: Apache 2.0"
+#. EN: License: Apache 2.0
+msgid "gui.license_apache_2_0"
 msgstr ""
 
-msgid "Loading credentials..."
+#. EN: Loading credentials...
+msgid "gui.loading_credentials_ellipsis"
 msgstr ""
 
-msgid "Loading saved credentials..."
+#. EN: Loading saved credentials...
+msgid "gui.loading_saved_credentials_ellipsis"
 msgstr ""
 
-msgid "Log In"
+#. EN: Log In
+msgid "gui.log_in"
 msgstr ""
 
-msgid "Log Out"
+#. EN: Log Out
+msgid "gui.log_out"
 msgstr ""
 
-msgid ""
-"Log out?
-Server connection will be preserved."
+#. EN: Log out?\\nServer connection will be preserved.
+msgid "gui.log_out_server_connection_will_be_preserved"
 msgstr ""
 
-msgid "Logging out..."
+#. EN: Logging out...
+msgid "gui.logging_out_ellipsis"
 msgstr ""
 
-msgid "Login"
+#. EN: Login
+msgid "gui.login"
 msgstr ""
 
-msgid "Name"
+#. EN: Name
+msgid "gui.name"
 msgstr ""
 
-msgid "Name (required):"
+#. EN: Name is required.
+msgid "gui.name_is_required"
 msgstr ""
 
-msgid "Name is required."
+#. EN: Name (required):
+msgid "gui.name_required_label"
 msgstr ""
 
-msgid "Next"
+#. EN: Next
+msgid "gui.next"
 msgstr ""
 
-msgid "No server configured"
+#. EN: No server configured
+msgid "gui.no_server_configured"
 msgstr ""
 
-msgid ""
-"No server configured.
-Click 'Setup...' to configure."
+#. EN: No server configured.\\nClick 'Setup...' to configure.
+msgid "gui.no_server_configured_click_setup_to_configure"
 msgstr ""
 
-msgid "OK"
+#. EN: (no signer)
+msgid "gui.no_signer"
 msgstr ""
 
-msgid "Org"
+#. EN:   Note: cryptographic verification requires the original PDF.\\n  Add the PDF to verify the
+#.     signature integrity.
+msgid "gui.note_cryptographic_verification_requires_the_origi_d0fbbcbb"
 msgstr ""
 
-msgid "Organization"
+#. EN: OK
+msgid "gui.ok_upper"
 msgstr ""
 
-msgid "Organization:"
+#. EN: Org
+msgid "gui.org"
 msgstr ""
 
-msgid "Output (opt):"
+#. EN: Organization
+msgid "gui.organization"
 msgstr ""
 
-msgid ""
-"Output path must be absolute.
-Use 'Browse...' to select a location."
+#. EN: Organization:
+msgid "gui.organization_label"
 msgstr ""
 
-msgid "PDF file:"
+#. EN: Output (opt):
+msgid "gui.output_opt_label"
 msgstr ""
 
-msgid "PDF files"
+#. EN: Output path must be absolute.\\nUse 'Browse...' to select a location.
+msgid "gui.output_path_must_be_absolute_use_browse_to_select_a_location"
 msgstr ""
 
-msgid "PKCS#7 signature"
+#. EN: Page:
+msgid "gui.page_label"
 msgstr ""
 
-msgid "PKCS#7 signatures"
+#. EN: Password:
+msgid "gui.password_label"
 msgstr ""
 
-msgid "Page:"
+#. EN: Paste
+msgid "gui.paste"
 msgstr ""
 
-msgid "Password:"
+#. EN: PDF file:
+msgid "gui.pdf_file_label"
 msgstr ""
 
-msgid "Paste"
+#. EN: PDF files
+msgid "gui.pdf_files"
 msgstr ""
 
-msgid ""
-"Permission denied:
-{path}
-
-Try saving to a different location
-using 'Browse...'."
+#. EN: Permission denied:\\n{path}\\n\\nTry saving to a different location\\nusing 'Browse...'.
+msgid "gui.permission_denied_path_try_saving_to_a_different_l_51ac0570"
 msgstr ""
-
-msgid ""
-"Permission denied:
-{path}
 
-Try selecting the file again using 'Browse...'."
+#. EN: Permission denied:\\n{path}\\n\\nTry selecting the file again using 'Browse...'.
+msgid "gui.permission_denied_path_try_selecting_the_file_agai_de400967"
 msgstr ""
 
-msgid "Please select a PDF file."
+#. EN: PKCS#7 signature
+msgid "gui.pkcs_7_signature"
 msgstr ""
 
-msgid "Please select a file to verify."
+#. EN: PKCS#7 signatures
+msgid "gui.pkcs_7_signatures"
 msgstr ""
 
-msgid "Position:"
+#. EN: Please select a file to verify.
+msgid "gui.please_select_a_file_to_verify"
 msgstr ""
 
-msgid "Ready"
+#. EN: Please select a PDF file.
+msgid "gui.please_select_a_pdf_file"
 msgstr ""
 
-msgid "Report a Bug"
+#. EN: Position:
+msgid "gui.position_label"
 msgstr ""
 
-msgid "Request rejected by server. Contact your system administrator."
+#. EN: Ready
+msgid "gui.ready"
 msgstr ""
 
-msgid "Retry"
+#. EN: Report a Bug
+msgid "gui.report_a_bug"
 msgstr ""
 
-msgid "Save"
+#. EN: Request rejected by server. Contact your system administrator.
+msgid "gui.request_rejected_by_server_contact_your_system_administrator"
 msgstr ""
 
-msgid "Save credentials"
+#. EN: Restart the app to apply the new language?
+msgid "gui.restart_the_app_to_apply_the_new_language"
 msgstr ""
 
-msgid "Save credentials (username/password)"
+#. EN: Retry
+msgid "gui.retry"
 msgstr ""
 
-msgid "Save signature as"
+#. EN: Save
+msgid "gui.save"
 msgstr ""
 
-msgid "Save signed PDF as"
+#. EN: Save credentials
+msgid "gui.save_credentials"
 msgstr ""
 
-msgid "Saving credentials..."
+#. EN: Save credentials (username/password)
+msgid "gui.save_credentials_username_password"
 msgstr ""
 
-msgid "Secure connection failed. Contact your system administrator."
+#. EN: Save signature as
+msgid "gui.save_signature_as"
 msgstr ""
 
-msgid "Select All"
+#. EN: Save signed PDF as
+msgid "gui.save_signed_pdf_as"
 msgstr ""
 
-msgid "Select PDF"
+#. EN: Saving credentials...
+msgid "gui.saving_credentials_ellipsis"
 msgstr ""
 
-msgid "Select PDF to verify"
+#. EN: Secure connection failed. Contact your system administrator.
+msgid "gui.secure_connection_failed_contact_your_system_administrator"
 msgstr ""
 
-msgid "Select a CoSign server:"
+#. EN: Select a CoSign server:
+msgid "gui.select_a_cosign_server_label"
 msgstr ""
 
-msgid ""
-"Select a PDF file and click Verify to check signatures.
+#. EN: Select a PDF file and click Verify to check signatures.\\n\\nModes:\\n  PDF only -- verify embedded
+#.     signatures\\n  PDF + .p7s -- verify detached signature\\n  .p7s only -- inspect certificate (no
+#.     crypto verification)
+msgid "gui.select_a_pdf_file_and_click_verify_to_check_signat_8fbc47f0"
+msgstr ""
 
-Modes:
-  PDF only -- verify embedded signatures
-  PDF + .p7s -- verify detached signature
-  .p7s only -- inspect certificate (no crypto verification)"
+#. EN: Select a server.
+msgid "gui.select_a_server"
 msgstr ""
 
-msgid "Select a server."
+#. EN: Select All
+msgid "gui.select_all"
 msgstr ""
 
-msgid "Select signature file"
+#. EN: Select PDF
+msgid "gui.select_pdf"
 msgstr ""
 
-msgid "Select signature image"
+#. EN: Select PDF to verify
+msgid "gui.select_pdf_to_verify"
 msgstr ""
 
-msgid "Server address not found. Check the server URL."
+#. EN: Select signature file
+msgid "gui.select_signature_file"
 msgstr ""
 
-msgid ""
-"Server connected.
-Log in to sign documents."
+#. EN: Select signature image
+msgid "gui.select_signature_image"
 msgstr ""
 
-msgid "Server error. The signing service may be temporarily unavailable."
+#. EN: Server address not found. Check the server URL.
+msgid "gui.server_address_not_found_check_the_server_url"
 msgstr ""
 
-msgid "Server error: {error}"
+#. EN: Server connected.\\nLog in to sign documents.
+msgid "gui.server_connected_log_in_to_sign_documents"
 msgstr ""
 
-msgid "Server is not available. It may be down for maintenance."
+#. EN: Server error: {error}
+msgid "gui.server_error_error"
 msgstr ""
 
-msgid "Server is not responding. Check your internet connection and try again."
+#. EN: Server error. The signing service may be temporarily unavailable.
+msgid "gui.server_error_the_signing_service_may_be_temporaril_d8163695"
 msgstr ""
 
-msgid "Server verification"
+#. EN: Server is not available. It may be down for maintenance.
+msgid "gui.server_is_not_available_it_may_be_down_for_maintenance"
 msgstr ""
 
-msgid "Setup complete! Summary:"
+#. EN: Server is not responding. Check your internet connection and try again.
+msgid "gui.server_is_not_responding_check_your_internet_conne_cd87621d"
 msgstr ""
 
-msgid "Sign"
+#. EN: Server verification
+msgid "gui.server_verification"
 msgstr ""
 
-msgid "Sign (Detached)"
+#. EN: Settings
+msgid "gui.settings"
 msgstr ""
 
-msgid "Sign PDF"
+#. EN: Setup complete! Summary:
+msgid "gui.setup_complete_summary_label"
 msgstr ""
 
-msgid "Signature"
+#. EN: Sign
+msgid "gui.sign"
 msgstr ""
 
-msgid "Signature (.p7s):"
+#. EN: Sign (Detached)
+msgid "gui.sign_detached"
 msgstr ""
 
-msgid "Signature FAILED"
+#. EN: Sign PDF
+msgid "gui.sign_pdf"
 msgstr ""
 
-msgid "Signature VALID"
+#. EN: Signature
+msgid "gui.signature"
 msgstr ""
 
-msgid "Signature {current}/{total} ({signer})"
+#. EN: Signature {current}/{total} ({signer})
+msgid "gui.signature_current_total_signer"
 msgstr ""
 
-msgid "Signed! -> {filename} ({size})"
+#. EN: Signature FAILED
+msgid "gui.signature_failed"
 msgstr ""
 
-msgid "Signed: {time}"
+#. EN: Signature (.p7s):
+msgid "gui.signature_p7s_label"
 msgstr ""
 
-msgid "Signer Identity"
+#. EN: Signature VALID
+msgid "gui.signature_valid"
 msgstr ""
 
-msgid "Signer identity found:"
+#. EN: Signed! -> {filename} ({size})
+msgid "gui.signed_filename_size"
 msgstr ""
 
-msgid "Signer identity is required. Click 'Enter manually...' to provide it."
+#. EN: Signed: {time}
+msgid "gui.signed_time"
 msgstr ""
 
-msgid "Signer identity is required. Retry the connection or go back to fix credentials."
+#. EN: Signer Identity
+msgid "gui.signer_identity"
 msgstr ""
 
-msgid "Signer: {name}"
+#. EN: Signer identity found:
+msgid "gui.signer_identity_found_label"
 msgstr ""
 
-msgid "Signing..."
+#. EN: Signer identity is required. Click 'Enter manually...' to provide it.
+msgid "gui.signer_identity_is_required_click_enter_manually_t_397d205e"
 msgstr ""
 
-msgid "Step {current} of {total}"
+#. EN: Signer identity is required. Retry the connection or go back to fix credentials.
+msgid "gui.signer_identity_is_required_retry_the_connection_o_6eb0ccec"
 msgstr ""
 
-msgid "Storage: {storage}"
+#. EN: Signer: {name}
+msgid "gui.signer_name"
 msgstr ""
 
-msgid "Telegram"
+#. EN: Signing...
+msgid "gui.signing_ellipsis"
 msgstr ""
 
-msgid ""
-"This PDF is {size_mb} MB.
+#. EN: Step {current} of {total}
+msgid "gui.step_current_of_total"
+msgstr ""
 
-Files over 30 MB may take a long time to sign
-or fail on the server.
+#. EN: Storage: {storage}
+msgid "gui.storage_storage"
+msgstr ""
 
-Continue?"
+#. EN: System
+msgid "gui.system"
 msgstr ""
 
-msgid ""
-"This will also remove your credentials
-and signer identity."
+#. EN: Telegram
+msgid "gui.telegram"
 msgstr ""
 
-msgid "URL:"
+#. EN: This PDF is {size_mb} MB.\\n\\nFiles over 30 MB may take a long time to sign\\nor fail on the
+#.     server.\\n\\nContinue?
+msgid "gui.this_pdf_is_size_mb_mb_files_over_30_mb_may_take_a_64b3d55a"
 msgstr ""
 
-msgid "Unavailable: {error}"
+#. EN: This will also remove your credentials\\nand signer identity.
+msgid "gui.this_will_also_remove_your_credentials_and_signer_identity"
 msgstr ""
 
-msgid "Undo"
+#. EN: Unavailable: {error}
+msgid "gui.unavailable_error"
 msgstr ""
 
-msgid "Unexpected error: {error}"
+#. EN: Undo
+msgid "gui.undo"
 msgstr ""
 
-msgid "Username and password are required."
+#. EN: Unexpected error: {error}
+msgid "gui.unexpected_error_error"
 msgstr ""
 
-msgid "Username:"
+#. EN: URL:
+msgid "gui.url_label_upper"
 msgstr ""
 
-msgid "Username: {username}"
+#. EN: Username and password are required.
+msgid "gui.username_and_password_are_required"
 msgstr ""
 
-msgid "VALID"
+#. EN: Username:
+msgid "gui.username_label"
 msgstr ""
 
-msgid "Verify"
+#. EN: Username: {username}
+msgid "gui.username_username"
 msgstr ""
 
-msgid "Verify Signature"
+#. EN: VALID
+msgid "gui.valid_upper"
 msgstr ""
 
-msgid "Verifying detached signature..."
+#. EN: Verify
+msgid "gui.verify"
 msgstr ""
 
-msgid "Verifying embedded signatures..."
+#. EN: Verify Signature
+msgid "gui.verify_signature"
 msgstr ""
 
-msgid "Verifying..."
+#. EN: Verifying detached signature...
+msgid "gui.verifying_detached_signature_ellipsis"
 msgstr ""
 
-msgid "Version {version}"
+#. EN: Verifying...
+msgid "gui.verifying_ellipsis"
 msgstr ""
 
-msgid "Warning: account locks after {max_attempts} failed attempts!"
+#. EN: Verifying embedded signatures...
+msgid "gui.verifying_embedded_signatures_ellipsis"
 msgstr ""
 
-msgid "{failed} of {total} signature(s) FAILED"
+#. EN: Version {version}
+msgid "gui.version_version"
 msgstr ""
 
+#. EN: Warning: account locks after {max_attempts} failed attempts!
+msgid "gui.warning_account_locks_after_max_attempts_failed_attempts"
+msgstr ""

@@ -81,15 +81,15 @@ class ServerBar:
         """Update display based on current config layer."""
         layer = get_config_layer()
         if layer == 0:
-            self._label_var.set(_("No server configured"))
+            self._label_var.set(_("gui.no_server_configured"))
             self._label.configure(foreground="gray", font=("", 10))
-            self._btn.configure(text=_("Connect"), command=self._on_connect_action)
+            self._btn.configure(text=_("gui.connect"), command=self._on_connect_action)
         else:
             profile = get_active_profile()
             name = profile.display_name if profile else "Server"
             self._label_var.set(name)
             self._label.configure(foreground="", font=("", 10, "bold"))
-            self._btn.configure(text=_("Disconnect"), command=self._on_disconnect_action)
+            self._btn.configure(text=_("gui.disconnect"), command=self._on_disconnect_action)
 
 
 # ── Main Application ────────────────────────────────────────────────
@@ -115,7 +115,7 @@ class RevenantGUI:
         self.page = tk.StringVar(value="last")
         self.font_key = tk.StringVar(value="noto-sans")
         self.invisible = tk.BooleanVar(value=False)
-        self.status_text = tk.StringVar(value=_("Ready"))
+        self.status_text = tk.StringVar(value=_("gui.ready"))
         self._signer_info = get_signer_info()
         self._content_frame: tk.Widget | None = None
         self._sign_form: SignForm | None = None
@@ -178,11 +178,11 @@ class RevenantGUI:
         notebook.grid(row=1, column=0, sticky="nsew", pady=(4, 0))
 
         self._sign_tab = ttk.Frame(notebook)
-        notebook.add(self._sign_tab, text=_("Sign"))
+        notebook.add(self._sign_tab, text=_("gui.sign"))
         self._refresh_sign_tab()
 
         verify_tab = ttk.Frame(notebook)
-        notebook.add(verify_tab, text=_("Verify"))
+        notebook.add(verify_tab, text=_("gui.verify"))
         from .verify import VerifyPanel
 
         self._verify_panel = VerifyPanel(verify_tab, self.root)
@@ -199,7 +199,7 @@ class RevenantGUI:
 
         if layer == 2:
             self._signer_info = get_signer_info()
-            self.status_text.set(_("Ready"))
+            self.status_text.set(_("gui.ready"))
             self._sign_form = SignForm(
                 self._sign_tab,
                 self.root,
@@ -283,17 +283,17 @@ class RevenantGUI:
 
         if layer == 2:
             msg = (
-                _("Disconnect from {name}?").format(name=name)
+                _("gui.disconnect_from_name").format(name=name)
                 + "\n\n"
-                + _("This will also remove your credentials\nand signer identity.")
+                + _("gui.this_will_also_remove_your_credentials_and_signer_identity")
             )
         else:
-            msg = _("Disconnect from {name}?").format(name=name)
+            msg = _("gui.disconnect_from_name").format(name=name)
 
         if not messagebox.askyesno("Revenant", msg):
             return
 
-        self.status_text.set(_("Disconnecting..."))
+        self.status_text.set(_("gui.disconnecting_ellipsis"))
         self.root.update_idletasks()
         reset_all()
         if self._server_bar is not None:
@@ -316,9 +316,11 @@ class RevenantGUI:
         """Clear credentials and identity, keeping server config."""
         from tkinter import messagebox
 
-        if not messagebox.askyesno("Revenant", _("Log out?\nServer connection will be preserved.")):
+        if not messagebox.askyesno(
+            "Revenant", _("gui.log_out_server_connection_will_be_preserved")
+        ):
             return
-        self.status_text.set(_("Logging out..."))
+        self.status_text.set(_("gui.logging_out_ellipsis"))
         self.root.update_idletasks()
         logout()
         if self._server_bar is not None:

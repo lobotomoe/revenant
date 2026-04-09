@@ -67,7 +67,7 @@ def format_results(
     for entry in vr.entries:
         if vr.total_count > 1:
             append(
-                _("Signature {current}/{total} ({signer})").format(
+                _("gui.signature_current_total_signer").format(
                     current=entry.index + 1, total=entry.total, signer=entry.signer_name
                 )
                 + "\n",
@@ -78,20 +78,20 @@ def format_results(
             append(f"  {line}\n")
 
         if entry.valid:
-            append("  " + _("VALID") + "\n\n", "valid")
+            append("  " + _("gui.valid_upper") + "\n\n", "valid")
         else:
-            append("  " + _("FAILED") + "\n\n", "failed")
+            append("  " + _("gui.failed_upper") + "\n\n", "failed")
 
     # Summary
     if vr.all_valid:
         if vr.total_count > 1:
-            summary = _("All {count} signatures VALID").format(count=vr.total_count)
+            summary = _("gui.all_count_signatures_valid").format(count=vr.total_count)
         else:
-            summary = _("Signature VALID")
+            summary = _("gui.signature_valid")
         append(summary + "\n", "valid")
     else:
         append(
-            _("{failed} of {total} signature(s) FAILED").format(
+            _("gui.failed_of_total_signature_s_failed").format(
                 failed=vr.failed_count, total=vr.total_count
             )
             + "\n",
@@ -101,26 +101,23 @@ def format_results(
 
 def format_detached_result(append: AppendFn, result: VerificationResult) -> None:
     """Format detached signature verification result."""
-    append(_("Detached signature") + "\n", "header")
+    append(_("gui.detached_signature") + "\n", "header")
 
     for line in result["details"]:
         for sub in line.split("\n"):
             append(f"  {sub}\n")
 
     if result["valid"]:
-        append("\n" + _("Signature VALID") + "\n", "valid")
+        append("\n" + _("gui.signature_valid") + "\n", "valid")
     else:
-        append("\n" + _("Signature FAILED") + "\n", "failed")
+        append("\n" + _("gui.signature_failed") + "\n", "failed")
 
 
 def format_inspection(append: AppendFn, result: CmsInspection) -> None:
     """Format CMS inspection result (no cryptographic verification)."""
-    append(_("Certificate inspection") + "\n", "header")
+    append(_("gui.certificate_inspection") + "\n", "header")
     append(
-        _(
-            "  Note: cryptographic verification requires the original PDF.\n  Add the PDF to verify the signature integrity."
-        )
-        + "\n\n",
+        _("gui.note_cryptographic_verification_requires_the_origi_d0fbbcbb") + "\n\n",
         "warning",
     )
 
@@ -152,23 +149,23 @@ def try_server_verify(pdf_bytes: bytes) -> ServerVerifyResult | None:
 
 def format_server_result(append: AppendFn, result: ServerVerifyResult) -> None:
     """Format server verification result using an append callback."""
-    append("\n" + _("Server verification") + "\n", "header")
+    append("\n" + _("gui.server_verification") + "\n", "header")
 
     if result.error:
-        append("  " + _("Unavailable: {error}").format(error=result.error) + "\n", "failed")
+        append("  " + _("gui.unavailable_error").format(error=result.error) + "\n", "failed")
         return
 
     if result.signer_name:
-        append("  " + _("Signer: {name}").format(name=result.signer_name) + "\n")
+        append("  " + _("gui.signer_name").format(name=result.signer_name) + "\n")
     if result.sign_time:
-        append("  " + _("Signed: {time}").format(time=result.sign_time) + "\n")
+        append("  " + _("gui.signed_time").format(time=result.sign_time) + "\n")
     if result.certificate_status:
-        append("  " + _("Certificate: {status}").format(status=result.certificate_status) + "\n")
+        append("  " + _("gui.certificate_status").format(status=result.certificate_status) + "\n")
 
     if result.valid:
-        append("  " + _("VALID") + "\n", "valid")
+        append("  " + _("gui.valid_upper") + "\n", "valid")
     else:
-        append("  " + _("FAILED") + "\n", "failed")
+        append("  " + _("gui.failed_upper") + "\n", "failed")
 
 
 # ── Standalone dialog (for welcome screen) ───────────────────────
@@ -185,8 +182,8 @@ def show_verify_dialog(parent: tk.Tk | tk.Toplevel) -> None:
     from tkinter import filedialog
 
     path = filedialog.askopenfilename(
-        title=_("Select PDF to verify"),
-        filetypes=[(_("PDF files"), "*.pdf"), (_("All files"), "*.*")],
+        title=_("gui.select_pdf_to_verify"),
+        filetypes=[(_("gui.pdf_files"), "*.pdf"), (_("gui.all_files"), "*.*")],
     )
     if not path:
         return
@@ -203,7 +200,7 @@ class _VerifyResultDialog:
 
         self._win = tk.Toplevel(parent)
         self._win.withdraw()
-        self._win.title(_("Verify Signature"))
+        self._win.title(_("gui.verify_signature"))
         self._win.resizable(True, True)
         self._win.transient(parent)
         self._win.grab_set()
@@ -256,11 +253,11 @@ class _VerifyResultDialog:
         )
 
         # OK button
-        ttk.Button(outer, text=_("OK"), command=self._win.destroy).grid(
+        ttk.Button(outer, text=_("gui.ok_upper"), command=self._win.destroy).grid(
             row=2, column=0, pady=(12, 0)
         )
 
-        self._append(_("Verifying...") + "\n")
+        self._append(_("gui.verifying_ellipsis") + "\n")
         self._pdf_path = pdf_path
 
         from . import center_on_parent
@@ -288,7 +285,7 @@ class _VerifyResultDialog:
         try:
             pdf_bytes = self._pdf_path.read_bytes()
         except OSError as e:
-            msg = _("Cannot read file: {error}").format(error=e)
+            msg = _("gui.cannot_read_file_error").format(error=e)
             self._win.after(0, lambda m=msg: self._show_error(m))
             return
 
@@ -300,7 +297,7 @@ class _VerifyResultDialog:
             return
         except Exception as e:
             _logger.exception("Unexpected error during verification")
-            msg = _("Unexpected error: {error}").format(error=e)
+            msg = _("gui.unexpected_error_error").format(error=e)
             self._win.after(0, lambda m=msg: self._show_error(m))
             return
 

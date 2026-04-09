@@ -1,601 +1,663 @@
 # Revenant GUI -- Russian translation
 # SPDX-License-Identifier: Apache-2.0
 #
+# NOTE: msgid values are stable keys used in GUI source code.
 msgid ""
 msgstr ""
 "Content-Type: text/plain; charset=UTF-8\n"
 "Content-Transfer-Encoding: 8bit\n"
 "Language: ru\n"
 
-msgid ""
-"  Note: cryptographic verification requires the original PDF.\n"
-"  Add the PDF to verify the signature integrity."
-msgstr ""
-"  Криптографическая проверка требует оригинальный PDF.\n"
-"  Добавьте PDF для проверки целостности подписи."
-
-msgid "(no signer)"
-msgstr "(нет подписанта)"
-
-msgid "About Revenant"
+#. EN: About Revenant
+msgid "gui.about_revenant"
 msgstr "О Revenant"
 
-msgid "Access denied. Your account may not have permission to sign."
+#. EN: Access denied. Your account may not have permission to sign.
+msgid "gui.access_denied_your_account_may_not_have_permission_to_sign"
 msgstr "Доступ запрещён. Возможно, у вашей учётной записи нет прав для подписания."
 
-msgid "Account"
+#. EN: Account
+msgid "gui.account"
 msgstr "Учётная запись"
 
-msgid "All files"
-msgstr "Все файлы"
-
-msgid "All {count} signatures VALID"
+#. EN: All {count} signatures VALID
+msgid "gui.all_count_signatures_valid"
 msgstr "Все {count} подписей действительны"
 
-msgid "Authentication failed: {error}"
+#. EN: All files
+msgid "gui.all_files"
+msgstr "Все файлы"
+
+#. EN: Authentication failed: {error}
+msgid "gui.authentication_failed_error"
 msgstr "Ошибка аутентификации: {error}"
 
-msgid "Authentication rejected. Check your username and password."
+#. EN: Authentication rejected. Check your username and password.
+msgid "gui.authentication_rejected_check_your_username_and_password"
 msgstr "Аутентификация отклонена. Проверьте имя пользователя и пароль."
 
-msgid "Author: Aleksandr Kraiz"
+#. EN: Author: Aleksandr Kraiz
+msgid "gui.author_aleksandr_kraiz"
 msgstr "Автор: Aleksandr Kraiz"
 
-msgid "Back"
+#. EN: Back
+msgid "gui.back"
 msgstr "Назад"
 
-msgid "Browse..."
+#. EN: Browse...
+msgid "gui.browse_ellipsis"
 msgstr "Обзор..."
 
-msgid "Cancel"
+#. EN: Cancel
+msgid "gui.cancel"
 msgstr "Отмена"
 
-msgid "Cannot connect to the server. Check your internet connection."
+#. EN: Cannot connect to the server. Check your internet connection.
+msgid "gui.cannot_connect_to_the_server_check_your_internet_connection"
 msgstr "Не удалось подключиться к серверу. Проверьте подключение к интернету."
 
-msgid "Cannot read file: {error}"
+#. EN: Cannot read file: {error}
+msgid "gui.cannot_read_file_error"
 msgstr "Не удалось прочитать файл: {error}"
 
-msgid "Certificate inspection"
+#. EN: Certificate inspection
+msgid "gui.certificate_inspection"
 msgstr "Проверка сертификата"
 
-msgid "Certificate: {status}"
+#. EN: Certificate: {status}
+msgid "gui.certificate_status"
 msgstr "Сертификат: {status}"
 
-msgid "Choose Server"
+#. EN: Choose Server
+msgid "gui.choose_server"
 msgstr "Выбор сервера"
 
-msgid "Clearing saved credentials..."
-msgstr "Удаление сохранённых данных..."
+#. EN: Clearing saved credentials...
+msgid "gui.clearing_saved_credentials_ellipsis"
+msgstr "Удаление сохранённых учётных данных..."
 
-msgid "Close Window"
+#. EN: Close Window
+msgid "gui.close_window"
 msgstr "Закрыть окно"
 
-msgid "Complete"
+#. EN: Complete
+msgid "gui.complete"
 msgstr "Готово"
 
-msgid "Connect"
+#. EN: Connect
+msgid "gui.connect"
 msgstr "Подключиться"
 
-msgid "Connect to Server"
+#. EN: Connect to a server\\nto sign documents.
+msgid "gui.connect_to_a_server_to_sign_documents"
+msgstr "Подключитесь к серверу,\\nчтобы подписывать документы."
+
+#. EN: Connect to Server
+msgid "gui.connect_to_server"
 msgstr "Подключение к серверу"
 
-msgid ""
-"Connect to a server\n"
-"to sign documents."
-msgstr ""
-"Подключитесь к серверу,\n"
-"чтобы подписывать документы."
-
-msgid "Connected ({info})"
+#. EN: Connected ({info})
+msgid "gui.connected_info"
 msgstr "Подключено ({info})"
 
-msgid "Connecting to {url}..."
+#. EN: Connecting to {url}...
+msgid "gui.connecting_to_url_ellipsis"
 msgstr "Подключение к {url}..."
 
-msgid "Copy"
+#. EN: Copy
+msgid "gui.copy"
 msgstr "Копировать"
 
-msgid "Could not determine identity from server."
+#. EN: Could not determine identity from server.
+msgid "gui.could_not_determine_identity_from_server"
 msgstr "Не удалось определить личность подписанта с сервера."
 
-msgid ""
-"Could not read password from system keychain.\n"
-"Please re-enter your password."
-msgstr ""
-"Не удалось прочитать пароль из системного хранилища.\n"
-"Введите пароль заново."
+#. EN: Could not read password from system keychain.\\nPlease re-enter your password.
+msgid "gui.could_not_read_password_from_system_keychain_pleas_a490f2d1"
+msgstr "Не удалось прочитать пароль из системного хранилища.\\nВведите пароль заново."
 
-msgid ""
-"Could not save password to system keychain\n"
-"(access was denied or unavailable).\n"
-"\n"
-"Your password was saved to the config file instead.\n"
-"To use secure storage, allow keychain access\n"
-"when prompted."
-msgstr ""
-"Не удалось сохранить пароль в системное хранилище\n"
-"(доступ запрещён или недоступен).\n"
-"\n"
-"Пароль сохранён в файл конфигурации.\n"
-"Для использования безопасного хранилища\n"
-"разрешите доступ при запросе."
+#. EN: Could not save password to system keychain\\n(access was denied or unavailable).\\n\\nYour password
+#.     was saved to the config file instead.\\nTo use secure storage, allow keychain access\\nwhen
+#.     prompted.
+msgid "gui.could_not_save_password_to_system_keychain_access_04b14699"
+msgstr "Не удалось сохранить пароль в системное хранилище\\n(доступ запрещён или недоступен).\\n\\nПароль сохранён в файл конфигурации.\\nДля использования безопасного хранилища\\nразрешите доступ при запросе."
 
-msgid "Credentials"
+#. EN: Credentials
+msgid "gui.credentials"
 msgstr "Учётные данные"
 
-msgid ""
-"Credentials must contain only Latin characters.\n"
-"Please check your keyboard layout."
-msgstr ""
-"Учётные данные должны содержать только латинские символы.\n"
-"Проверьте раскладку клавиатуры."
+#. EN: Credentials must contain only Latin characters.\\nPlease check your keyboard layout.
+msgid "gui.credentials_must_contain_only_latin_characters_ple_e9a0742d"
+msgstr "Учётные данные должны содержать только латинские символы.\\nПроверьте раскладку клавиатуры."
 
-msgid ""
-"Cross-platform client for ARX CoSign\n"
-"electronic signatures."
-msgstr ""
-"Кроссплатформенный клиент для\n"
-"электронных подписей ARX CoSign."
+#. EN: Cross-platform client for ARX CoSign\\nelectronic signatures.
+msgid "gui.cross_platform_client_for_arx_cosign_electronic_signatures"
+msgstr "Кроссплатформенный клиент для\\nэлектронных подписей ARX CoSign."
 
-msgid "Custom server"
+#. EN: Custom server
+msgid "gui.custom_server"
 msgstr "Другой сервер"
 
-msgid "Cut"
+#. EN: Cut
+msgid "gui.cut"
 msgstr "Вырезать"
 
-msgid "Detached (.p7s)"
+#. EN: Detached (.p7s)
+msgid "gui.detached_p7s"
 msgstr "Отделённая (.p7s)"
 
-msgid "Detached signature"
+#. EN: Detached signature
+msgid "gui.detached_signature"
 msgstr "Отделённая подпись"
 
-msgid "Disconnect"
+#. EN: Disconnect
+msgid "gui.disconnect"
 msgstr "Отключиться"
 
-msgid "Disconnect from {name}?"
+#. EN: Disconnect from {name}?
+msgid "gui.disconnect_from_name"
 msgstr "Отключиться от {name}?"
 
-msgid "Disconnecting..."
+#. EN: Disconnecting...
+msgid "gui.disconnecting_ellipsis"
 msgstr "Отключение..."
 
-msgid "Discovering signer identity..."
+#. EN: Discovering signer identity...
+msgid "gui.discovering_signer_identity_ellipsis"
 msgstr "Определение личности подписанта..."
 
-msgid "Edit"
+#. EN: Edit
+msgid "gui.edit"
 msgstr "Правка"
 
-msgid "Email"
-msgstr "Почта"
+#. EN: Email
+msgid "gui.email"
+msgstr "Эл. почта"
 
-msgid "Email:"
-msgstr "Почта:"
+#. EN: Email:
+msgid "gui.email_label"
+msgstr "Эл. почта:"
 
-msgid "Embedded"
+#. EN: Embedded
+msgid "gui.embedded"
 msgstr "Встроенная"
 
-msgid "Embedded signatures"
+#. EN: Embedded signatures
+msgid "gui.embedded_signatures"
 msgstr "Встроенные подписи"
 
-msgid "Enter a server URL."
+#. EN: Enter a server URL.
+msgid "gui.enter_a_server_url"
 msgstr "Введите URL сервера."
 
-msgid "Enter manually..."
+#. EN: Enter manually...
+msgid "gui.enter_manually_ellipsis"
 msgstr "Ввести вручную..."
 
-msgid "Enter signer identity:"
+#. EN: Enter signer identity:
+msgid "gui.enter_signer_identity_label"
 msgstr "Введите данные подписанта:"
 
-msgid "Error: {error}"
+#. EN: Error: {error}
+msgid "gui.error_error"
 msgstr "Ошибка: {error}"
 
-msgid "FAILED"
-msgstr "НЕДЕЙСТВИТЕЛЬНА"
-
-msgid "Failed"
+#. EN: Failed
+msgid "gui.failed"
 msgstr "Ошибка"
 
-msgid "Failed: {info}"
+#. EN: Failed: {info}
+msgid "gui.failed_info"
 msgstr "Ошибка: {info}"
 
-msgid "File"
+#. EN: {failed} of {total} signature(s) FAILED
+msgid "gui.failed_of_total_signature_s_failed"
+msgstr "{failed} из {total} подписей НЕДЕЙСТВИТЕЛЬНЫ"
+
+#. EN: FAILED
+msgid "gui.failed_upper"
+msgstr "НЕДЕЙСТВИТЕЛЬНА"
+
+#. EN: File
+msgid "gui.file"
 msgstr "Файл"
 
-msgid ""
-"File already exists:\n"
-"{filename}\n"
-"\n"
-"Overwrite?"
-msgstr ""
-"Файл уже существует:\n"
-"{filename}\n"
-"\n"
-"Перезаписать?"
+#. EN: File already exists:\\n{filename}\\n\\nOverwrite?
+msgid "gui.file_already_exists_filename_overwrite"
+msgstr "Файл уже существует:\\n{filename}\\n\\nПерезаписать?"
 
-msgid ""
-"File not found:\n"
-"{path}"
-msgstr ""
-"Файл не найден:\n"
-"{path}"
+#. EN: File not found:\\n{path}
+msgid "gui.file_not_found_path"
+msgstr "Файл не найден:\\n{path}"
 
-msgid "Font:"
+#. EN: Font:
+msgid "gui.font_label"
 msgstr "Шрифт:"
 
-msgid "GitHub"
+#. EN: GitHub
+msgid "gui.github"
 msgstr "GitHub"
 
-msgid "Image (opt):"
+#. EN: Image (opt):
+msgid "gui.image_opt_label"
 msgstr "Изображение:"
 
-msgid "Images"
+#. EN: Images
+msgid "gui.images"
 msgstr "Изображения"
 
-msgid "Inspecting signature..."
+#. EN: Inspecting signature...
+msgid "gui.inspecting_signature_ellipsis"
 msgstr "Проверка подписи..."
 
-msgid "Invisible signature"
+#. EN: Invisible signature
+msgid "gui.invisible_signature"
 msgstr "Невидимая подпись"
 
-msgid "License: Apache 2.0"
-msgstr "Лицензия: Apache 2.0"
-
-msgid "Loading credentials..."
-msgstr "Загрузка учётных данных..."
-
-msgid "Loading saved credentials..."
-msgstr "Загрузка сохранённых данных..."
-
-msgid "Log In"
-msgstr "Войти"
-
-msgid "Log Out"
-msgstr "Выйти"
-
-msgid ""
-"Log out?\n"
-"Server connection will be preserved."
-msgstr ""
-"Выйти из учётной записи?\n"
-"Подключение к серверу сохранится."
-
-msgid "Logging out..."
-msgstr "Выход..."
-
-msgid "Login"
-msgstr "Вход"
-
-msgid "Name"
-msgstr "Имя"
-
-msgid "Name (required):"
-msgstr "Имя (обязательно):"
-
-msgid "Name is required."
-msgstr "Имя обязательно."
-
-msgid "Next"
-msgstr "Далее"
-
-msgid "No server configured"
-msgstr "Сервер не настроен"
-
-msgid ""
-"No server configured.\n"
-"Click 'Setup...' to configure."
-msgstr ""
-"Сервер не настроен.\n"
-"Нажмите «Настроить...» для настройки."
-
-msgid "OK"
-msgstr "OK"
-
-msgid "Org"
-msgstr "Организация"
-
-msgid "Organization"
-msgstr "Организация"
-
-msgid "Organization:"
-msgstr "Организация:"
-
-msgid "Output (opt):"
-msgstr "Результат:"
-
-msgid ""
-"Output path must be absolute.\n"
-"Use 'Browse...' to select a location."
-msgstr ""
-"Путь должен быть абсолютным.\n"
-"Нажмите «Обзор...» для выбора."
-
-msgid "PDF file:"
-msgstr "PDF файл:"
-
-msgid "PDF files"
-msgstr "PDF файлы"
-
-msgid "PKCS#7 signature"
-msgstr "Подпись PKCS#7"
-
-msgid "PKCS#7 signatures"
-msgstr "Подписи PKCS#7"
-
-msgid "Page:"
-msgstr "Страница:"
-
-msgid "Password:"
-msgstr "Пароль:"
-
-msgid "Paste"
-msgstr "Вставить"
-
-msgid ""
-"Permission denied:\n"
-"{path}\n"
-"\n"
-"Try saving to a different location\n"
-"using 'Browse...'."
-msgstr ""
-"Доступ запрещён:\n"
-"{path}\n"
-"\n"
-"Попробуйте сохранить в другое место\n"
-"через «Обзор...»."
-
-msgid ""
-"Permission denied:\n"
-"{path}\n"
-"\n"
-"Try selecting the file again using 'Browse...'."
-msgstr ""
-"Доступ запрещён:\n"
-"{path}\n"
-"\n"
-"Попробуйте выбрать файл заново через «Обзор...»."
-
-msgid "Please select a PDF file."
-msgstr "Выберите PDF файл."
-
-msgid "Please select a file to verify."
-msgstr "Выберите файл для проверки."
-
-msgid "Position:"
-msgstr "Положение:"
-
-msgid "Ready"
-msgstr "Готово"
-
-msgid "Report a Bug"
-msgstr "Сообщить об ошибке"
-
-msgid "Request rejected by server. Contact your system administrator."
-msgstr "Запрос отклонён сервером. Обратитесь к системному администратору."
-
-msgid "Retry"
-msgstr "Повторить"
-
-msgid "Save"
-msgstr "Сохранить"
-
-msgid "Save credentials"
-msgstr "Сохранить учётные данные"
-
-msgid "Save credentials (username/password)"
-msgstr "Сохранить учётные данные (логин/пароль)"
-
-msgid "Save signature as"
-msgstr "Сохранить подпись как"
-
-msgid "Save signed PDF as"
-msgstr "Сохранить подписанный PDF как"
-
-msgid "Saving credentials..."
-msgstr "Сохранение учётных данных..."
-
-msgid "Secure connection failed. Contact your system administrator."
-msgstr "Защищённое соединение не установлено. Обратитесь к системному администратору."
-
-msgid "Select All"
-msgstr "Выделить все"
-
-msgid "Select PDF"
-msgstr "Выбрать PDF"
-
-msgid "Select PDF to verify"
-msgstr "Выбрать PDF для проверки"
-
-msgid "Select a CoSign server:"
-msgstr "Выберите сервер CoSign:"
-
-msgid ""
-"Select a PDF file and click Verify to check signatures.\n"
-"\n"
-"Modes:\n"
-"  PDF only -- verify embedded signatures\n"
-"  PDF + .p7s -- verify detached signature\n"
-"  .p7s only -- inspect certificate (no crypto verification)"
-msgstr ""
-"Выберите PDF файл и нажмите «Проверить».\n"
-"\n"
-"Режимы:\n"
-"  Только PDF -- проверка встроенных подписей\n"
-"  PDF + .p7s -- проверка отделённой подписи\n"
-"  Только .p7s -- просмотр сертификата (без криптопроверки)"
-
-msgid "Select a server."
-msgstr "Выберите сервер."
-
-msgid "Select signature file"
-msgstr "Выбрать файл подписи"
-
-msgid "Select signature image"
-msgstr "Выбрать изображение подписи"
-
-msgid "Server address not found. Check the server URL."
-msgstr "Адрес сервера не найден. Проверьте URL сервера."
-
-msgid ""
-"Server connected.\n"
-"Log in to sign documents."
-msgstr ""
-"Сервер подключён.\n"
-"Войдите, чтобы подписывать документы."
-
-msgid "Server error. The signing service may be temporarily unavailable."
-msgstr "Ошибка сервера. Служба подписания может быть временно недоступна."
-
-msgid "Server error: {error}"
-msgstr "Ошибка сервера: {error}"
-
-msgid "Server is not available. It may be down for maintenance."
-msgstr "Сервер недоступен. Возможно, ведётся техническое обслуживание."
-
-msgid "Server is not responding. Check your internet connection and try again."
-msgstr "Сервер не отвечает. Проверьте подключение к интернету и повторите попытку."
-
-msgid "Server verification"
-msgstr "Серверная проверка"
-
-msgid "Setup complete! Summary:"
-msgstr "Настройка завершена! Итог:"
-
-msgid "Sign"
-msgstr "Подписать"
-
-msgid "Sign (Detached)"
-msgstr "Подписать (отделённая)"
-
-msgid "Sign PDF"
-msgstr "Подписать PDF"
-
-msgid "Signature"
-msgstr "Подпись"
-
-msgid "Signature (.p7s):"
-msgstr "Подпись (.p7s):"
-
-msgid "Signature FAILED"
-msgstr "Подпись НЕДЕЙСТВИТЕЛЬНА"
-
-msgid "Signature VALID"
-msgstr "Подпись действительна"
-
-msgid "Signature {current}/{total} ({signer})"
-msgstr "Подпись {current}/{total} ({signer})"
-
-msgid "Signed! -> {filename} ({size})"
-msgstr "Подписано! -> {filename} ({size})"
-
-msgid "Signed: {time}"
-msgstr "Подписано: {time}"
-
-msgid "Signer Identity"
-msgstr "Личность подписанта"
-
-msgid "Signer identity found:"
-msgstr "Личность подписанта определена:"
-
-msgid "Signer identity is required. Click 'Enter manually...' to provide it."
-msgstr "Необходимо указать личность подписанта. Нажмите «Ввести вручную...»."
-
-msgid "Signer identity is required. Retry the connection or go back to fix credentials."
-msgstr "Необходимо указать личность подписанта. Повторите попытку или вернитесь назад."
-
-msgid "Signer: {name}"
-msgstr "Подписант: {name}"
-
-msgid "Signing..."
-msgstr "Подписание..."
-
-msgid "Step {current} of {total}"
-msgstr "Шаг {current} из {total}"
-
-msgid "Storage: {storage}"
-msgstr "Хранилище: {storage}"
-
-msgid "Telegram"
-msgstr "Telegram"
-
-msgid ""
-"This PDF is {size_mb} MB.\n"
-"\n"
-"Files over 30 MB may take a long time to sign\n"
-"or fail on the server.\n"
-"\n"
-"Continue?"
-msgstr ""
-"Размер PDF: {size_mb} МБ.\n"
-"\n"
-"Файлы более 30 МБ могут долго подписываться\n"
-"или вызвать ошибку на сервере.\n"
-"\n"
-"Продолжить?"
-
-msgid ""
-"This will also remove your credentials\n"
-"and signer identity."
-msgstr ""
-"Учётные данные и личность\n"
-"подписанта будут удалены."
-
-msgid "URL:"
-msgstr "URL:"
-
-msgid "Unavailable: {error}"
-msgstr "Недоступно: {error}"
-
-msgid "Undo"
-msgstr "Отменить"
-
-msgid "Unexpected error: {error}"
-msgstr "Непредвиденная ошибка: {error}"
-
-msgid "Username and password are required."
-msgstr "Введите имя пользователя и пароль."
-
-msgid "Username:"
-msgstr "Логин:"
-
-msgid "Username: {username}"
-msgstr "Логин: {username}"
-
-msgid "VALID"
-msgstr "ДЕЙСТВИТЕЛЬНА"
-
-msgid "Verify"
-msgstr "Проверить"
-
-msgid "Verify Signature"
-msgstr "Проверка подписи"
-
-msgid "Verifying detached signature..."
-msgstr "Проверка отделённой подписи..."
-
-msgid "Verifying embedded signatures..."
-msgstr "Проверка встроенных подписей..."
-
-msgid "Verifying..."
-msgstr "Проверка..."
-
-msgid "Version {version}"
-msgstr "Версия {version}"
-
-msgid "Warning: account locks after {max_attempts} failed attempts!"
-msgstr "Учётная запись блокируется после {max_attempts} неудачных попыток!"
-
-msgid "Restart the app to apply the new language?"
-msgstr "Перезапустить приложение для смены языка?"
-
-msgid "Settings"
-msgstr "Настройки"
-
-msgid "Language:"
+#. EN: Language:
+msgid "gui.language_label"
 msgstr "Язык:"
 
-msgid "System"
+#. EN: License: Apache 2.0
+msgid "gui.license_apache_2_0"
+msgstr "Лицензия: Apache 2.0"
+
+#. EN: Loading credentials...
+msgid "gui.loading_credentials_ellipsis"
+msgstr "Загрузка учётных данных..."
+
+#. EN: Loading saved credentials...
+msgid "gui.loading_saved_credentials_ellipsis"
+msgstr "Загрузка сохранённых учётных данных..."
+
+#. EN: Log In
+msgid "gui.log_in"
+msgstr "Войти"
+
+#. EN: Log Out
+msgid "gui.log_out"
+msgstr "Выйти"
+
+#. EN: Log out?\\nServer connection will be preserved.
+msgid "gui.log_out_server_connection_will_be_preserved"
+msgstr "Выйти из учётной записи?\\nПодключение к серверу сохранится."
+
+#. EN: Logging out...
+msgid "gui.logging_out_ellipsis"
+msgstr "Выход..."
+
+#. EN: Login
+msgid "gui.login"
+msgstr "Вход"
+
+#. EN: Name
+msgid "gui.name"
+msgstr "Имя"
+
+#. EN: Name is required.
+msgid "gui.name_is_required"
+msgstr "Имя обязательно."
+
+#. EN: Name (required):
+msgid "gui.name_required_label"
+msgstr "Имя (обязательно):"
+
+#. EN: Next
+msgid "gui.next"
+msgstr "Далее"
+
+#. EN: No server configured
+msgid "gui.no_server_configured"
+msgstr "Сервер не настроен"
+
+#. EN: No server configured.\\nClick 'Setup...' to configure.
+msgid "gui.no_server_configured_click_setup_to_configure"
+msgstr "Сервер не настроен.\\nНажмите «Настроить...» для настройки."
+
+#. EN: (no signer)
+msgid "gui.no_signer"
+msgstr "(нет подписанта)"
+
+#. EN:   Note: cryptographic verification requires the original PDF.\\n  Add the PDF to verify the
+#.     signature integrity.
+msgid "gui.note_cryptographic_verification_requires_the_origi_d0fbbcbb"
+msgstr "  Криптографическая проверка требует оригинальный PDF.\\n  Добавьте PDF для проверки целостности подписи."
+
+#. EN: OK
+msgid "gui.ok_upper"
+msgstr "OK"
+
+#. EN: Org
+msgid "gui.org"
+msgstr "Организация"
+
+#. EN: Organization
+msgid "gui.organization"
+msgstr "Организация"
+
+#. EN: Organization:
+msgid "gui.organization_label"
+msgstr "Организация:"
+
+#. EN: Output (opt):
+msgid "gui.output_opt_label"
+msgstr "Результат:"
+
+#. EN: Output path must be absolute.\\nUse 'Browse...' to select a location.
+msgid "gui.output_path_must_be_absolute_use_browse_to_select_a_location"
+msgstr "Путь должен быть абсолютным.\\nНажмите «Обзор...» для выбора."
+
+#. EN: Page:
+msgid "gui.page_label"
+msgstr "Страница:"
+
+#. EN: Password:
+msgid "gui.password_label"
+msgstr "Пароль:"
+
+#. EN: Paste
+msgid "gui.paste"
+msgstr "Вставить"
+
+#. EN: PDF file:
+msgid "gui.pdf_file_label"
+msgstr "PDF файл:"
+
+#. EN: PDF files
+msgid "gui.pdf_files"
+msgstr "PDF файлы"
+
+#. EN: Permission denied:\\n{path}\\n\\nTry saving to a different location\\nusing 'Browse...'.
+msgid "gui.permission_denied_path_try_saving_to_a_different_l_51ac0570"
+msgstr "Доступ запрещён:\\n{path}\\n\\nПопробуйте сохранить в другое место\\nчерез «Обзор...»."
+
+#. EN: Permission denied:\\n{path}\\n\\nTry selecting the file again using 'Browse...'.
+msgid "gui.permission_denied_path_try_selecting_the_file_agai_de400967"
+msgstr "Доступ запрещён:\\n{path}\\n\\nПопробуйте выбрать файл заново через «Обзор...»."
+
+#. EN: PKCS#7 signature
+msgid "gui.pkcs_7_signature"
+msgstr "Подпись PKCS#7"
+
+#. EN: PKCS#7 signatures
+msgid "gui.pkcs_7_signatures"
+msgstr "Подписи PKCS#7"
+
+#. EN: Please select a file to verify.
+msgid "gui.please_select_a_file_to_verify"
+msgstr "Выберите файл для проверки."
+
+#. EN: Please select a PDF file.
+msgid "gui.please_select_a_pdf_file"
+msgstr "Выберите PDF файл."
+
+#. EN: Position:
+msgid "gui.position_label"
+msgstr "Положение:"
+
+#. EN: Ready
+msgid "gui.ready"
+msgstr "Готово"
+
+#. EN: Report a Bug
+msgid "gui.report_a_bug"
+msgstr "Сообщить об ошибке"
+
+#. EN: Request rejected by server. Contact your system administrator.
+msgid "gui.request_rejected_by_server_contact_your_system_administrator"
+msgstr "Запрос отклонён сервером. Обратитесь к системному администратору."
+
+#. EN: Restart the app to apply the new language?
+msgid "gui.restart_the_app_to_apply_the_new_language"
+msgstr "Перезапустить приложение для смены языка?"
+
+#. EN: Retry
+msgid "gui.retry"
+msgstr "Повторить"
+
+#. EN: Save
+msgid "gui.save"
+msgstr "Сохранить"
+
+#. EN: Save credentials
+msgid "gui.save_credentials"
+msgstr "Сохранить учётные данные"
+
+#. EN: Save credentials (username/password)
+msgid "gui.save_credentials_username_password"
+msgstr "Сохранить учётные данные (логин/пароль)"
+
+#. EN: Save signature as
+msgid "gui.save_signature_as"
+msgstr "Сохранить подпись как"
+
+#. EN: Save signed PDF as
+msgid "gui.save_signed_pdf_as"
+msgstr "Сохранить подписанный PDF как"
+
+#. EN: Saving credentials...
+msgid "gui.saving_credentials_ellipsis"
+msgstr "Сохранение учётных данных..."
+
+#. EN: Secure connection failed. Contact your system administrator.
+msgid "gui.secure_connection_failed_contact_your_system_administrator"
+msgstr "Защищённое соединение не установлено. Обратитесь к системному администратору."
+
+#. EN: Select a CoSign server:
+msgid "gui.select_a_cosign_server_label"
+msgstr "Выберите сервер CoSign:"
+
+#. EN: Select a PDF file and click Verify to check signatures.\\n\\nModes:\\n  PDF only -- verify embedded
+#.     signatures\\n  PDF + .p7s -- verify detached signature\\n  .p7s only -- inspect certificate (no
+#.     crypto verification)
+msgid "gui.select_a_pdf_file_and_click_verify_to_check_signat_8fbc47f0"
+msgstr "Выберите PDF файл и нажмите «Проверить».\\n\\nРежимы:\\n  Только PDF -- проверка встроенных подписей\\n  PDF + .p7s -- проверка отделённой подписи\\n  Только .p7s -- просмотр сертификата (без криптопроверки)"
+
+#. EN: Select a server.
+msgid "gui.select_a_server"
+msgstr "Выберите сервер."
+
+#. EN: Select All
+msgid "gui.select_all"
+msgstr "Выделить все"
+
+#. EN: Select PDF
+msgid "gui.select_pdf"
+msgstr "Выбрать PDF"
+
+#. EN: Select PDF to verify
+msgid "gui.select_pdf_to_verify"
+msgstr "Выбрать PDF для проверки"
+
+#. EN: Select signature file
+msgid "gui.select_signature_file"
+msgstr "Выбрать файл подписи"
+
+#. EN: Select signature image
+msgid "gui.select_signature_image"
+msgstr "Выбрать изображение подписи"
+
+#. EN: Server address not found. Check the server URL.
+msgid "gui.server_address_not_found_check_the_server_url"
+msgstr "Адрес сервера не найден. Проверьте URL сервера."
+
+#. EN: Server connected.\\nLog in to sign documents.
+msgid "gui.server_connected_log_in_to_sign_documents"
+msgstr "Сервер подключён.\\nВойдите, чтобы подписывать документы."
+
+#. EN: Server error: {error}
+msgid "gui.server_error_error"
+msgstr "Ошибка сервера: {error}"
+
+#. EN: Server error. The signing service may be temporarily unavailable.
+msgid "gui.server_error_the_signing_service_may_be_temporaril_d8163695"
+msgstr "Ошибка сервера. Служба подписания может быть временно недоступна."
+
+#. EN: Server is not available. It may be down for maintenance.
+msgid "gui.server_is_not_available_it_may_be_down_for_maintenance"
+msgstr "Сервер недоступен. Возможно, ведётся техническое обслуживание."
+
+#. EN: Server is not responding. Check your internet connection and try again.
+msgid "gui.server_is_not_responding_check_your_internet_conne_cd87621d"
+msgstr "Сервер не отвечает. Проверьте подключение к интернету и повторите попытку."
+
+#. EN: Server verification
+msgid "gui.server_verification"
+msgstr "Серверная проверка"
+
+#. EN: Settings
+msgid "gui.settings"
+msgstr "Настройки"
+
+#. EN: Setup complete! Summary:
+msgid "gui.setup_complete_summary_label"
+msgstr "Настройка завершена! Итог:"
+
+#. EN: Sign
+msgid "gui.sign"
+msgstr "Подписать"
+
+#. EN: Sign (Detached)
+msgid "gui.sign_detached"
+msgstr "Подписать (отделённая подпись)"
+
+#. EN: Sign PDF
+msgid "gui.sign_pdf"
+msgstr "Подписать PDF"
+
+#. EN: Signature
+msgid "gui.signature"
+msgstr "Подпись"
+
+#. EN: Signature {current}/{total} ({signer})
+msgid "gui.signature_current_total_signer"
+msgstr "Подпись {current}/{total} ({signer})"
+
+#. EN: Signature FAILED
+msgid "gui.signature_failed"
+msgstr "Подпись НЕДЕЙСТВИТЕЛЬНА"
+
+#. EN: Signature (.p7s):
+msgid "gui.signature_p7s_label"
+msgstr "Подпись (.p7s):"
+
+#. EN: Signature VALID
+msgid "gui.signature_valid"
+msgstr "Подпись действительна"
+
+#. EN: Signed! -> {filename} ({size})
+msgid "gui.signed_filename_size"
+msgstr "Подписано! -> {filename} ({size})"
+
+#. EN: Signed: {time}
+msgid "gui.signed_time"
+msgstr "Подписано: {time}"
+
+#. EN: Signer Identity
+msgid "gui.signer_identity"
+msgstr "Личность подписанта"
+
+#. EN: Signer identity found:
+msgid "gui.signer_identity_found_label"
+msgstr "Личность подписанта определена:"
+
+#. EN: Signer identity is required. Click 'Enter manually...' to provide it.
+msgid "gui.signer_identity_is_required_click_enter_manually_t_397d205e"
+msgstr "Необходимо указать личность подписанта. Нажмите «Ввести вручную...»."
+
+#. EN: Signer identity is required. Retry the connection or go back to fix credentials.
+msgid "gui.signer_identity_is_required_retry_the_connection_o_6eb0ccec"
+msgstr "Необходимо указать личность подписанта. Повторите попытку или вернитесь назад."
+
+#. EN: Signer: {name}
+msgid "gui.signer_name"
+msgstr "Подписант: {name}"
+
+#. EN: Signing...
+msgid "gui.signing_ellipsis"
+msgstr "Подписание..."
+
+#. EN: Step {current} of {total}
+msgid "gui.step_current_of_total"
+msgstr "Шаг {current} из {total}"
+
+#. EN: Storage: {storage}
+msgid "gui.storage_storage"
+msgstr "Хранилище: {storage}"
+
+#. EN: System
+msgid "gui.system"
 msgstr "Системный"
 
+#. EN: Telegram
+msgid "gui.telegram"
+msgstr "Telegram"
 
-msgid "{failed} of {total} signature(s) FAILED"
-msgstr "{failed} из {total} подписей НЕДЕЙСТВИТЕЛЬНЫ"
+#. EN: This PDF is {size_mb} MB.\\n\\nFiles over 30 MB may take a long time to sign\\nor fail on the
+#.     server.\\n\\nContinue?
+msgid "gui.this_pdf_is_size_mb_mb_files_over_30_mb_may_take_a_64b3d55a"
+msgstr "Размер PDF: {size_mb} МБ.\\n\\nФайлы более 30 МБ могут долго подписываться\\nили вызвать ошибку на сервере.\\n\\nПродолжить?"
+
+#. EN: This will also remove your credentials\\nand signer identity.
+msgid "gui.this_will_also_remove_your_credentials_and_signer_identity"
+msgstr "Учётные данные и личность\\nподписанта будут удалены."
+
+#. EN: Unavailable: {error}
+msgid "gui.unavailable_error"
+msgstr "Недоступно: {error}"
+
+#. EN: Undo
+msgid "gui.undo"
+msgstr "Отменить"
+
+#. EN: Unexpected error: {error}
+msgid "gui.unexpected_error_error"
+msgstr "Непредвиденная ошибка: {error}"
+
+#. EN: URL:
+msgid "gui.url_label_upper"
+msgstr "URL:"
+
+#. EN: Username and password are required.
+msgid "gui.username_and_password_are_required"
+msgstr "Введите имя пользователя и пароль."
+
+#. EN: Username:
+msgid "gui.username_label"
+msgstr "Логин:"
+
+#. EN: Username: {username}
+msgid "gui.username_username"
+msgstr "Логин: {username}"
+
+#. EN: VALID
+msgid "gui.valid_upper"
+msgstr "ДЕЙСТВИТЕЛЬНА"
+
+#. EN: Verify
+msgid "gui.verify"
+msgstr "Проверить"
+
+#. EN: Verify Signature
+msgid "gui.verify_signature"
+msgstr "Проверка подписи"
+
+#. EN: Verifying detached signature...
+msgid "gui.verifying_detached_signature_ellipsis"
+msgstr "Проверка отделённой подписи..."
+
+#. EN: Verifying...
+msgid "gui.verifying_ellipsis"
+msgstr "Проверка..."
+
+#. EN: Verifying embedded signatures...
+msgid "gui.verifying_embedded_signatures_ellipsis"
+msgstr "Проверка встроенных подписей..."
+
+#. EN: Version {version}
+msgid "gui.version_version"
+msgstr "Версия {version}"
+
+#. EN: Warning: account locks after {max_attempts} failed attempts!
+msgid "gui.warning_account_locks_after_max_attempts_failed_attempts"
+msgstr "Учётная запись блокируется после {max_attempts} неудачных попыток!"

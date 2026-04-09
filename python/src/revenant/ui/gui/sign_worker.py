@@ -29,15 +29,15 @@ _logger = logging.getLogger(__name__)
 # Patterns matched against the raw error string -> friendly message.
 # Order matters: first match wins.
 _FRIENDLY_ERRORS: list[tuple[str, str]] = [
-    ("timed out", _("Server is not responding. Check your internet connection and try again.")),
-    ("Cannot connect", _("Cannot connect to the server. Check your internet connection.")),
-    ("Connection refused", _("Server is not available. It may be down for maintenance.")),
-    ("Name or service not known", _("Server address not found. Check the server URL.")),
-    ("SSL error", _("Secure connection failed. Contact your system administrator.")),
-    ("HTTP 403", _("Access denied. Your account may not have permission to sign.")),
-    ("HTTP 401", _("Authentication rejected. Check your username and password.")),
-    ("HTTP 5", _("Server error. The signing service may be temporarily unavailable.")),
-    ("HTTP 4", _("Request rejected by server. Contact your system administrator.")),
+    ("timed out", _("gui.server_is_not_responding_check_your_internet_conne_cd87621d")),
+    ("Cannot connect", _("gui.cannot_connect_to_the_server_check_your_internet_connection")),
+    ("Connection refused", _("gui.server_is_not_available_it_may_be_down_for_maintenance")),
+    ("Name or service not known", _("gui.server_address_not_found_check_the_server_url")),
+    ("SSL error", _("gui.secure_connection_failed_contact_your_system_administrator")),
+    ("HTTP 403", _("gui.access_denied_your_account_may_not_have_permission_to_sign")),
+    ("HTTP 401", _("gui.authentication_rejected_check_your_username_and_password")),
+    ("HTTP 5", _("gui.server_error_the_signing_service_may_be_temporaril_d8163695")),
+    ("HTTP 4", _("gui.request_rejected_by_server_contact_your_system_administrator")),
 ]
 
 
@@ -69,10 +69,10 @@ def start_signing(
     from tkinter import messagebox
 
     if not pdf_path:
-        messagebox.showwarning("Revenant", _("Please select a PDF file."))
+        messagebox.showwarning("Revenant", _("gui.please_select_a_pdf_file"))
         return
     if not Path(pdf_path).is_file():
-        messagebox.showerror("Revenant", _("File not found:\n{path}").format(path=pdf_path))
+        messagebox.showerror("Revenant", _("gui.file_not_found_path").format(path=pdf_path))
         return
 
     pdf_size = Path(pdf_path).stat().st_size
@@ -80,16 +80,16 @@ def start_signing(
         size_mb = pdf_size / BYTES_PER_MB
         if not messagebox.askyesno(
             "Revenant",
-            _(
-                "This PDF is {size_mb} MB.\n\nFiles over 30 MB may take a long time to sign\nor fail on the server.\n\nContinue?"
-            ).format(size_mb=f"{size_mb:.0f}"),
+            _("gui.this_pdf_is_size_mb_mb_files_over_30_mb_may_take_a_64b3d55a").format(
+                size_mb=f"{size_mb:.0f}"
+            ),
         ):
             return
 
     if output_path and not Path(output_path).is_absolute():
         messagebox.showwarning(
             "Revenant",
-            _("Output path must be absolute.\nUse 'Browse...' to select a location."),
+            _("gui.output_path_must_be_absolute_use_browse_to_select_a_location"),
         )
         return
 
@@ -98,15 +98,13 @@ def start_signing(
         and Path(output_path).exists()
         and not messagebox.askyesno(
             "Revenant",
-            _("File already exists:\n{filename}\n\nOverwrite?").format(
-                filename=Path(output_path).name
-            ),
+            _("gui.file_already_exists_filename_overwrite").format(filename=Path(output_path).name),
         )
     ):
         return
 
     sign_btn.configure(state="disabled")
-    status_text.set(_("Loading credentials..."))
+    status_text.set(_("gui.loading_credentials_ellipsis"))
     root.update_idletasks()
 
     def _resolve_and_sign() -> None:
@@ -117,10 +115,10 @@ def start_signing(
                 creds = login_dialog_fn()
                 if creds is None:
                     sign_btn.configure(state="normal")
-                    status_text.set(_("Ready"))
+                    status_text.set(_("gui.ready"))
                     return
                 u, p = creds
-                status_text.set(_("Signing..."))
+                status_text.set(_("gui.signing_ellipsis"))
                 root.update_idletasks()
                 threading.Thread(
                     target=_do_sign,
@@ -146,7 +144,7 @@ def start_signing(
             root.after(0, _prompt)
             return
 
-        root.after(0, lambda: status_text.set(_("Signing...")))
+        root.after(0, lambda: status_text.set(_("gui.signing_ellipsis")))
         _do_sign(
             root,
             signing_mode,
@@ -193,7 +191,7 @@ def _do_sign(
             sign_btn,
             status_text,
             False,
-            _("No server configured.\nClick 'Setup...' to configure."),
+            _("gui.no_server_configured_click_setup_to_configure"),
         )
         return
 
@@ -207,9 +205,9 @@ def _do_sign(
             sign_btn,
             status_text,
             False,
-            _(
-                "Permission denied:\n{path}\n\nTry selecting the file again using 'Browse...'."
-            ).format(path=pdf_path),
+            _("gui.permission_denied_path_try_selecting_the_file_agai_de400967").format(
+                path=pdf_path
+            ),
         )
         return
 
@@ -271,7 +269,7 @@ def _present_result(
             sign_btn,
             status_text,
             True,
-            _("Signed! -> {filename} ({size})").format(filename=output_path.name, size=size_str),
+            _("gui.signed_filename_size").format(filename=output_path.name, size=size_str),
             str(output_path),
         )
     elif result.auth_failed:
@@ -300,9 +298,9 @@ def _present_result(
             sign_btn,
             status_text,
             False,
-            _(
-                "Permission denied:\n{path}\n\nTry saving to a different location\nusing 'Browse...'."
-            ).format(path=output_path),
+            _("gui.permission_denied_path_try_saving_to_a_different_l_51ac0570").format(
+                path=output_path
+            ),
         )
     else:
         raw = result.error_message or ""
@@ -336,7 +334,7 @@ def _finish_sign(
             if output_file:
                 reveal_file(output_file)
         else:
-            status_text.set(_("Failed"))
+            status_text.set(_("gui.failed"))
             messagebox.showerror("Revenant", message)
 
     root.after(0, _update)

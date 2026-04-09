@@ -66,35 +66,35 @@ def build_macos_menubar(root: tk.Tk) -> None:
 
     # -- File --
     file_menu = tk.Menu(menubar, tearoff=0)
-    file_menu.add_command(label=_("Close Window"), accelerator="Cmd+W", command=root.destroy)
-    menubar.add_cascade(label=_("File"), menu=file_menu)
+    file_menu.add_command(label=_("gui.close_window"), accelerator="Cmd+W", command=root.destroy)
+    menubar.add_cascade(label=_("gui.file"), menu=file_menu)
 
     # -- Edit --
     edit_menu = tk.Menu(menubar, tearoff=0)
     edit_menu.add_command(
-        label=_("Undo"),
+        label=_("gui.undo"),
         accelerator="Cmd+Z",
         command=lambda: _send_virtual_event("<<Undo>>"),
     )
     edit_menu.add_separator()
     edit_menu.add_command(
-        label=_("Cut"),
+        label=_("gui.cut"),
         accelerator="Cmd+X",
         command=lambda: _send_virtual_event("<<Cut>>"),
     )
     edit_menu.add_command(
-        label=_("Copy"),
+        label=_("gui.copy"),
         accelerator="Cmd+C",
         command=lambda: _send_virtual_event("<<Copy>>"),
     )
     edit_menu.add_command(
-        label=_("Paste"),
+        label=_("gui.paste"),
         accelerator="Cmd+V",
         command=lambda: _send_virtual_event("<<Paste>>"),
     )
     edit_menu.add_separator()
-    edit_menu.add_command(label=_("Select All"), accelerator="Cmd+A", command=_select_all)
-    menubar.add_cascade(label=_("Edit"), menu=edit_menu)
+    edit_menu.add_command(label=_("gui.select_all"), accelerator="Cmd+A", command=_select_all)
+    menubar.add_cascade(label=_("gui.edit"), menu=edit_menu)
 
     root.config(menu=menubar)
 

@@ -3,8 +3,9 @@
 """Check translation consistency for the Revenant GUI.
 
 Extracts all _() calls from GUI source files and verifies that every
-.po file has a non-empty translation for each string. Exits with code 1
-if any translations are missing -- no fallbacks allowed.
+.po file has a non-empty translation for each key.
+
+Exits with code 1 if any translations are missing -- no fallbacks allowed.
 
 Usage:
     python scripts/check_translations.py
@@ -61,12 +62,13 @@ def main() -> int:
 
     print(f"Found {len(source_strings)} translatable strings in source code.")
 
+    errors = 0
+
     po_files = sorted(p for p in LOCALES_DIR.rglob("*.po") if p.suffix == ".po")
     if not po_files:
         print("ERROR: No .po translation files found.")
         return 1
 
-    errors = 0
     for po_path in po_files:
         locale = po_path.parent.parent.name  # e.g. "ru" from ru/LC_MESSAGES/revenant.po
         translations = parse_po_file(po_path)

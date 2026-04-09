@@ -69,23 +69,23 @@ class VerifyPanel:
 
         # ── File picker: PDF ──────────────────────────────────────
         self._pdf_var = tk.StringVar()
-        ttk.Label(frame, text=_("PDF file:")).grid(row=0, column=0, sticky="e", **pad)
+        ttk.Label(frame, text=_("gui.pdf_file_label")).grid(row=0, column=0, sticky="e", **pad)
         ttk.Entry(frame, textvariable=self._pdf_var).grid(row=0, column=1, sticky="ew", **pad)
-        ttk.Button(frame, text=_("Browse..."), command=self._browse_pdf).grid(
+        ttk.Button(frame, text=_("gui.browse_ellipsis"), command=self._browse_pdf).grid(
             row=0, column=2, **pad
         )
 
         # ── File picker: Signature (.p7s) ─────────────────────────
         self._sig_var = tk.StringVar()
-        ttk.Label(frame, text=_("Signature (.p7s):")).grid(row=1, column=0, sticky="e", **pad)
+        ttk.Label(frame, text=_("gui.signature_p7s_label")).grid(row=1, column=0, sticky="e", **pad)
         ttk.Entry(frame, textvariable=self._sig_var).grid(row=1, column=1, sticky="ew", **pad)
-        ttk.Button(frame, text=_("Browse..."), command=self._browse_sig).grid(
+        ttk.Button(frame, text=_("gui.browse_ellipsis"), command=self._browse_sig).grid(
             row=1, column=2, **pad
         )
 
         # ── Verify button ────────────────────────────────────────
         self._verify_btn = ttk.Button(
-            frame, text=_("Verify"), command=self._on_verify, style="Accent.TButton"
+            frame, text=_("gui.verify"), command=self._on_verify, style="Accent.TButton"
         )
         self._verify_btn.grid(row=2, column=0, columnspan=3, pady=(8, 8), ipady=4)
 
@@ -125,13 +125,7 @@ class VerifyPanel:
         self._text.configure(state="normal")
         self._text.insert(
             "end",
-            _(
-                "Select a PDF file and click Verify to check signatures.\n\n"
-                "Modes:\n"
-                "  PDF only -- verify embedded signatures\n"
-                "  PDF + .p7s -- verify detached signature\n"
-                "  .p7s only -- inspect certificate (no crypto verification)"
-            ),
+            _("gui.select_a_pdf_file_and_click_verify_to_check_signat_8fbc47f0"),
             "placeholder",
         )
         self._text.configure(state="disabled")
@@ -142,8 +136,8 @@ class VerifyPanel:
         from tkinter import filedialog
 
         path = filedialog.askopenfilename(
-            title=_("Select PDF to verify"),
-            filetypes=[(_("PDF files"), "*.pdf"), (_("All files"), "*.*")],
+            title=_("gui.select_pdf_to_verify"),
+            filetypes=[(_("gui.pdf_files"), "*.pdf"), (_("gui.all_files"), "*.*")],
         )
         if not path:
             return
@@ -158,8 +152,8 @@ class VerifyPanel:
         from tkinter import filedialog
 
         path = filedialog.askopenfilename(
-            title=_("Select signature file"),
-            filetypes=[(_("PKCS#7 signatures"), "*.p7s"), (_("All files"), "*.*")],
+            title=_("gui.select_signature_file"),
+            filetypes=[(_("gui.pkcs_7_signatures"), "*.p7s"), (_("gui.all_files"), "*.*")],
         )
         if not path:
             return
@@ -182,13 +176,13 @@ class VerifyPanel:
         sig = self._sig_var.get().strip()
 
         if not pdf and not sig:
-            messagebox.showwarning("Revenant", _("Please select a file to verify."))
+            messagebox.showwarning("Revenant", _("gui.please_select_a_file_to_verify"))
             return
         if pdf and not Path(pdf).is_file():
-            messagebox.showerror("Revenant", _("File not found:\n{path}").format(path=pdf))
+            messagebox.showerror("Revenant", _("gui.file_not_found_path").format(path=pdf))
             return
         if sig and not Path(sig).is_file():
-            messagebox.showerror("Revenant", _("File not found:\n{path}").format(path=sig))
+            messagebox.showerror("Revenant", _("gui.file_not_found_path").format(path=sig))
             return
 
         self._verify_btn.configure(state="disabled")
@@ -202,7 +196,7 @@ class VerifyPanel:
             sig_size = Path(sig).stat().st_size
             self._append(f"{Path(pdf).name} ({format_size_kb(pdf_size)})", "header")
             self._append(f" + {Path(sig).name} ({format_size_kb(sig_size)})\n", "header")
-            self._append(_("Verifying detached signature...") + "\n\n")
+            self._append(_("gui.verifying_detached_signature_ellipsis") + "\n\n")
             threading.Thread(
                 target=self._do_verify_detached,
                 args=(Path(pdf), Path(sig)),
@@ -212,7 +206,7 @@ class VerifyPanel:
             # Embedded mode
             file_size = Path(pdf).stat().st_size
             self._append(f"{Path(pdf).name} ({format_size_kb(file_size)})\n", "header")
-            self._append(_("Verifying embedded signatures...") + "\n\n")
+            self._append(_("gui.verifying_embedded_signatures_ellipsis") + "\n\n")
             threading.Thread(
                 target=self._do_verify_embedded,
                 args=(Path(pdf),),
@@ -222,7 +216,7 @@ class VerifyPanel:
             # Inspect-only mode
             sig_size = Path(sig).stat().st_size
             self._append(f"{Path(sig).name} ({format_size_kb(sig_size)})\n", "header")
-            self._append(_("Inspecting signature...") + "\n\n")
+            self._append(_("gui.inspecting_signature_ellipsis") + "\n\n")
             threading.Thread(
                 target=self._do_inspect,
                 args=(Path(sig),),
@@ -235,7 +229,7 @@ class VerifyPanel:
         try:
             pdf_bytes = pdf_path.read_bytes()
         except OSError as e:
-            msg = _("Cannot read file: {error}").format(error=e)
+            msg = _("gui.cannot_read_file_error").format(error=e)
             self._root.after(0, lambda m=msg: self._finish_error(m))
             return
 
@@ -247,7 +241,7 @@ class VerifyPanel:
             return
         except Exception as e:
             _logger.exception("Unexpected error during verification")
-            msg = _("Unexpected error: {error}").format(error=e)
+            msg = _("gui.unexpected_error_error").format(error=e)
             self._root.after(0, lambda m=msg: self._finish_error(m))
             return
 
@@ -259,7 +253,7 @@ class VerifyPanel:
             pdf_bytes = pdf_path.read_bytes()
             cms_bytes = sig_path.read_bytes()
         except OSError as e:
-            msg = _("Cannot read file: {error}").format(error=e)
+            msg = _("gui.cannot_read_file_error").format(error=e)
             self._root.after(0, lambda m=msg: self._finish_error(m))
             return
 
@@ -267,7 +261,7 @@ class VerifyPanel:
             detached_result = verify_detached_signature(pdf_bytes, cms_bytes)
         except Exception as e:
             _logger.exception("Unexpected error during detached verification")
-            msg = _("Unexpected error: {error}").format(error=e)
+            msg = _("gui.unexpected_error_error").format(error=e)
             self._root.after(0, lambda m=msg: self._finish_error(m))
             return
 
@@ -292,7 +286,7 @@ class VerifyPanel:
         try:
             cms_bytes = sig_path.read_bytes()
         except OSError as e:
-            msg = _("Cannot read file: {error}").format(error=e)
+            msg = _("gui.cannot_read_file_error").format(error=e)
             self._root.after(0, lambda m=msg: self._finish_error(m))
             return
 
@@ -300,7 +294,7 @@ class VerifyPanel:
             result = inspect_cms_blob(cms_bytes)
         except Exception as e:
             _logger.exception("Unexpected error during inspection")
-            msg = _("Unexpected error: {error}").format(error=e)
+            msg = _("gui.unexpected_error_error").format(error=e)
             self._root.after(0, lambda m=msg: self._finish_error(m))
             return
 
@@ -334,7 +328,7 @@ class VerifyPanel:
         self._clear()
         format_detached_result(self._append, detached_result)
         if embedded_results:
-            self._append("\n" + _("Embedded signatures") + "\n", "header")
+            self._append("\n" + _("gui.embedded_signatures") + "\n", "header")
             format_results(self._append, embedded_results)
         if server_result is not None:
             format_server_result(self._append, server_result)

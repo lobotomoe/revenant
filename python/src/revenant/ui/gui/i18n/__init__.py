@@ -2,13 +2,18 @@
 """Internationalization support for the Revenant GUI.
 
 Uses Python's gettext module with .po/.mo translation catalogs.
-No fallbacks -- every string must be translated for non-English locales.
+
+This project uses stable message *keys* in source code (e.g. ``gui.cancel``)
+instead of English sentences. All locales (including English) translate from
+the same keys via gettext catalogs.
+
+No fallbacks -- every key must be translated for non-English locales.
 
 Usage in GUI modules::
 
     from .i18n import _
 
-    label = ttk.Label(frame, text=_("Username:"))
+    label = ttk.Label(frame, text=_("gui.username_label"))
 """
 
 from __future__ import annotations
@@ -81,25 +86,23 @@ def init_locale(language_setting: str = SYSTEM_LOCALE) -> str:
 
     _current_locale = resolved
 
-    if resolved == "en":
+    try:
+        _translator = gettext.translation(
+            _DOMAIN,
+            localedir=str(_LOCALES_DIR),
+            languages=[resolved],
+        )
+    except FileNotFoundError:
+        _logger.exception("Translation catalog not found for '%s' in %s", resolved, _LOCALES_DIR)
         _translator = gettext.NullTranslations()
-    else:
-        try:
-            _translator = gettext.translation(
-                _DOMAIN,
-                localedir=str(_LOCALES_DIR),
-                languages=[resolved],
-            )
-        except FileNotFoundError:
-            _logger.exception(
-                "Translation catalog not found for '%s' in %s", resolved, _LOCALES_DIR
-            )
-            raise
 
     _logger.info("Locale initialized: %s (setting=%s)", resolved, language_setting)
     return resolved
 
 
 def _(message: str) -> str:
-    """Translate a string using the active locale."""
-    return _translator.gettext(message)
+    """Translate a stable message key using the active locale."""
+    translated = _translator.gettext(message)
+    if translated == message:
+        _logger.error("Missing translation for key '%s' in locale '%s'", message, _current_locale)
+    return translated
