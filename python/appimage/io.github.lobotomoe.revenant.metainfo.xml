@@ -76,6 +76,11 @@
   </branding>
 
   <releases>
+    <release version="1.1.1" date="2026-04-10">
+      <description>
+        <p>Improved Russian and Armenian translations, added English locale.</p>
+      </description>
+    </release>
     <release version="1.1.0" date="2026-04-09">
       <description>
         <p>Russian and Armenian localization, signature position preview, friendly error messages, BER signature support.</p>

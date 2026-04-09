@@ -7,6 +7,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.1.1] - 2026-04-10
+
+### Improved
+
+- Updated Russian and Armenian translations
+- Added English locale for i18n completeness
+- Refined translatable strings across GUI modules
+
 ## [1.1.0] - 2026-04-09
 
 ### Added
@@ -147,7 +155,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Pyright strict mode type checking with 0 errors
 - 96%+ test coverage (600+ tests)
 
-[Unreleased]: https://github.com/lobotomoe/revenant/compare/v1.1.0...HEAD
+[Unreleased]: https://github.com/lobotomoe/revenant/compare/v1.1.1...HEAD
+[1.1.1]: https://github.com/lobotomoe/revenant/compare/v1.1.0...v1.1.1
 [1.1.0]: https://github.com/lobotomoe/revenant/compare/v1.0.0...v1.1.0
 [1.0.0]: https://github.com/lobotomoe/revenant/compare/v0.2.6...v1.0.0
 [0.2.6]: https://github.com/lobotomoe/revenant/compare/v0.2.5...v0.2.6
