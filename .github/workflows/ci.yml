@@ -190,6 +190,9 @@ jobs:
           pip install --require-hashes --no-deps -r ../.github/requirements/dev.txt
           pip install --no-deps -e .
 
+      - name: Compile translations
+        run: python scripts/compile_translations.py
+
       - name: Run tests
         run: pytest -v --junitxml=junit.xml
 
