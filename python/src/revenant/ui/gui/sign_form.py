@@ -39,8 +39,9 @@ def page_display_values() -> list[str]:
 
 
 def page_key_from_display(display: str) -> str:
+    lower = display.lower()
     for key, label in _page_pairs():
-        if label == display:
+        if label.lower() == lower:
             return key
     return display
 
@@ -70,8 +71,9 @@ def position_display_names() -> list[str]:
 
 
 def position_key_from_display(display: str) -> str:
+    lower = display.lower()
     for key, label in _position_pairs():
-        if label == display:
+        if label.lower() == lower:
             return key
     return display
 
