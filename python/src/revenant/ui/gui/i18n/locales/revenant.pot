@@ -696,3 +696,19 @@ msgstr ""
 #. EN: Cancelling...
 msgid "gui.cancelling_ellipsis"
 msgstr ""
+
+#. EN: Show
+msgid "gui.show"
+msgstr ""
+
+#. EN: Hide
+msgid "gui.hide"
+msgstr ""
+
+#. EN: Valid:
+msgid "gui.valid_label"
+msgstr ""
+
+#. EN: Status:
+msgid "gui.status_label"
+msgstr ""

@@ -697,3 +697,19 @@ msgstr "Batch complete: {succeeded} signed, {failed} failed."
 #. EN: Cancelling...
 msgid "gui.cancelling_ellipsis"
 msgstr "Cancelling..."
+
+#. EN: Show
+msgid "gui.show"
+msgstr "Show"
+
+#. EN: Hide
+msgid "gui.hide"
+msgstr "Hide"
+
+#. EN: Valid:
+msgid "gui.valid_label"
+msgstr "Valid:"
+
+#. EN: Status:
+msgid "gui.status_label"
+msgstr "Status:"

@@ -102,6 +102,18 @@ def build_account_panel(
         )
         info_row += 1
 
+    # Certificate validity
+    from ...core.cert_expiry import format_expiry_summary
+
+    not_after = signer_info.get("not_after")
+    if not_after:
+        summary = format_expiry_summary(not_after)
+        color = "red" if "EXPIRED" in summary else "orange" if "soon" in summary else "gray"
+        ttk.Label(parent, text=summary, foreground=color).grid(
+            row=info_row, column=0, columnspan=2, sticky="w", pady=1
+        )
+        info_row += 1
+
     storage_var = tk.StringVar(value=get_credential_storage_info())
     ttk.Label(parent, textvariable=storage_var, foreground="gray").grid(
         row=info_row, column=0, columnspan=2, sticky="w", pady=1

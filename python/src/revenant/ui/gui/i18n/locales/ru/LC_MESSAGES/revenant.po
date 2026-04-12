@@ -697,3 +697,19 @@ msgstr "Готово: {succeeded} подписано, {failed} с ошибкам
 #. EN: Cancelling...
 msgid "gui.cancelling_ellipsis"
 msgstr "Отмена..."
+
+#. EN: Show
+msgid "gui.show"
+msgstr "Показать"
+
+#. EN: Hide
+msgid "gui.hide"
+msgstr "Скрыть"
+
+#. EN: Valid:
+msgid "gui.valid_label"
+msgstr "Срок:"
+
+#. EN: Status:
+msgid "gui.status_label"
+msgstr "Статус:"

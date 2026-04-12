@@ -520,3 +520,15 @@ msgstr "Batch complete: {succeeded} signed, {failed} failed."
 
 msgid "gui.cancelling_ellipsis"
 msgstr "Cancelling..."
+
+msgid "gui.show"
+msgstr "Show"
+
+msgid "gui.hide"
+msgstr "Hide"
+
+msgid "gui.valid_label"
+msgstr "Valid:"
+
+msgid "gui.status_label"
+msgstr "Status:"
