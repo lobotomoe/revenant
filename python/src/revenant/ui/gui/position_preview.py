@@ -56,8 +56,8 @@ def draw_position_preview(canvas: tk.Canvas, position: str) -> None:
         )
 
     # Signature stamp
-    sw = int(pw * _SIG_W_RATIO * 2.5)
-    sh = int(ph * _SIG_H_RATIO * 2.5)
+    sw = max(int(pw * _SIG_W_RATIO * 1.4), 12)
+    sh = max(int(ph * _SIG_H_RATIO * 1.8), 8)
     sig_m = 4
 
     halign, valign = _ALIGN.get(position, ("right", "bottom"))
