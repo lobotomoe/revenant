@@ -111,7 +111,7 @@ def sign_one_embedded(
     image_path: str | None = None,
     visible: bool = True,
     font: str | None = None,
-    reason: str = "Signed with Revenant",
+    reason: str = "",
     fields: list[str] | None = None,
 ) -> SigningResult:
     """Orchestrate embedded PDF signing.

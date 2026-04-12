@@ -101,7 +101,7 @@ def _sign_one_embedded_cli(
     dry_run: bool = False,
     visible: bool = True,
     font: str | None = None,
-    reason: str = "Signed with Revenant",
+    reason: str = "",
 ) -> SigningResult:
     """Sign a single PDF with an embedded signature and print progress."""
     pdf_path = Path(pdf_path_str)
@@ -280,7 +280,7 @@ def cmd_sign(args: argparse.Namespace) -> None:
         sys.exit(1)
     image_path = getattr(args, "image", None)
     visible = not getattr(args, "invisible", False)
-    reason = getattr(args, "reason", None) or "Signed with Revenant"
+    reason = getattr(args, "reason", None) or ""
 
     # Font: CLI --font overrides profile default
     font = getattr(args, "font", None)

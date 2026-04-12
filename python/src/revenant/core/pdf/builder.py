@@ -65,7 +65,7 @@ def prepare_pdf_with_sig_field(
     w: float = SIG_WIDTH,
     h: float = SIG_HEIGHT,
     position: str = "bottom-right",
-    reason: str = "Signed with Revenant",
+    reason: str = "",
     name: str | None = None,
     image_path: str | None = None,
     fields: list[str] | None = None,

@@ -39,6 +39,7 @@ export {
   type PageInfo,
   patchByterange,
 } from "./incremental.js";
+export { checkLtvStatus, type LtvStatus } from "./ltv.js";
 export {
   ANNOT_FLAGS_SIG_WIDGET,
   allocateSigObjects,

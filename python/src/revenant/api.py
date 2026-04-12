@@ -137,7 +137,7 @@ def sign(
     y: float | None = None,
     w: float | None = None,
     h: float | None = None,
-    reason: str = "Signed with Revenant",
+    reason: str = "",
     name: str | None = None,
     image_path: str | None = None,
     fields: list[str] | None = None,

@@ -289,6 +289,8 @@ def cmd_setup(args: argparse.Namespace) -> None:
         email=info.get("email"),
         organization=info.get("organization"),
         dn=info.get("dn"),
+        not_before=info.get("not_before"),
+        not_after=info.get("not_after"),
     )
 
     print(f"\nSaved to {CONFIG_FILE}")

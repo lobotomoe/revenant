@@ -26,6 +26,8 @@ const ConfigSchema = z.object({
   email: z.string().optional(),
   organization: z.string().optional(),
   dn: z.string().optional(),
+  not_before: z.string().optional(),
+  not_after: z.string().optional(),
 });
 
 export type ConfigDict = z.infer<typeof ConfigSchema>;

@@ -67,7 +67,7 @@ class EmbeddedSignatureOptions:
     y: float | None = None
     w: float = SIG_WIDTH
     h: float = SIG_HEIGHT
-    reason: str = "Signed with Revenant"
+    reason: str = ""
     name: str | None = None
     image_path: str | None = None
     fields: list[str] | None = None

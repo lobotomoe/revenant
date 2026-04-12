@@ -42,16 +42,22 @@ _OID_ORG = "2.5.4.10"
 
 
 def _extract_info_from_cert_object(cert: asn1_x509.Certificate) -> dict[str, str | None]:
-    """Extract CN, email, org, dn from an asn1crypto certificate object.
+    """Extract CN, email, org, dn, and validity dates from an asn1crypto certificate object.
 
     Also logs warnings for expired or not-yet-valid certificates.
     """
     subject = cert.subject
 
-    # Warn about certificate validity issues
+    # Extract and store certificate validity dates
+    not_before_iso: str | None = None
+    not_after_iso: str | None = None
     try:
         not_before = cert.not_valid_before
         not_after = cert.not_valid_after
+        if not_before:
+            not_before_iso = not_before.isoformat()
+        if not_after:
+            not_after_iso = not_after.isoformat()
         now = datetime.datetime.now(datetime.timezone.utc)
         if not_before and now < not_before:
             _logger.warning("Certificate is not yet valid (notBefore: %s)", not_before)
@@ -71,6 +77,8 @@ def _extract_info_from_cert_object(cert: asn1_x509.Certificate) -> dict[str, str
                 fields[oid_map[oid]] = attr["value"].native
 
     fields["dn"] = subject.human_friendly
+    fields["not_before"] = not_before_iso
+    fields["not_after"] = not_after_iso
     return fields
 
 
@@ -85,7 +93,8 @@ def extract_cert_info_from_cms(cms_der: bytes) -> dict[str, str | None]:
         cms_der: Raw DER-encoded CMS/PKCS#7 bytes.
 
     Returns:
-        dict with keys: name (CN), email, organization, dn (full subject).
+        dict with keys: name (CN), email, organization, dn (full subject),
+        not_before, not_after (ISO 8601 strings or None).
 
     Raises:
         RevenantError if parsing fails or no certificate found.

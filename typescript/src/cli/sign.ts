@@ -331,7 +331,7 @@ export async function cmdSign(args: SignCommandArgs): Promise<void> {
   }
   const imagePath = args.image ?? null;
   const visible = !(args.invisible ?? false);
-  const reason = args.reason ?? "Signed with Revenant";
+  const reason = args.reason ?? "";
 
   // Font: CLI --font overrides profile default
   let font = args.font ?? null;

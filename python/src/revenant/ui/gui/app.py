@@ -36,7 +36,8 @@ from .dialogs import about_footer, login_dialog, show_about, show_settings
 from .i18n import _
 from .platform import build_macos_menubar, set_windows_icon
 from .setup import LoginDialog
-from .sign_form import SignForm, build_server_only, build_unconfigured
+from .sign_form import SignForm
+from .sign_panels import build_server_only, build_unconfigured
 from .utils import bind_macos_shortcuts, check_tkinter, enable_dpi_awareness
 
 _logger = logging.getLogger(__name__)
@@ -115,6 +116,7 @@ class RevenantGUI:
         self.page = tk.StringVar(value="last")
         self.font_key = tk.StringVar(value="noto-sans")
         self.invisible = tk.BooleanVar(value=False)
+        self.reason = tk.StringVar(value="")
         self.status_text = tk.StringVar(value=_("gui.ready"))
         self._signer_info = get_signer_info()
         self._content_frame: tk.Widget | None = None
@@ -211,6 +213,7 @@ class RevenantGUI:
                 page=self.page,
                 font_key=self.font_key,
                 invisible=self.invisible,
+                reason=self.reason,
                 status_text=self.status_text,
                 signer_info=self._signer_info,
                 on_sign_action=self._on_sign,
@@ -227,16 +230,24 @@ class RevenantGUI:
 
     def _on_sign(self) -> None:
         """Collect form values and delegate to signing worker."""
-        from .sign_worker import start_signing
+        from .sign_options import SignOptions
+        from .sign_worker import start_batch_signing, start_signing
 
         if self._sign_form is None:
             return
 
-        # On sandboxed builds (MAS/TestFlight) the system only grants write
-        # access to files the user explicitly selects through a Save Panel.
-        # If the output path was auto-generated we must show one now.
-        if not self._sign_form.confirm_output_for_sandbox():
-            return
+        opts = SignOptions(
+            signing_mode=self.signing_mode.get(),
+            position=self.position.get(),
+            page=self.page.get().strip(),
+            font_key=self.font_key.get(),
+            invisible=self.invisible.get(),
+            reason=self.reason.get().strip(),
+            image_path=self.image_path.get().strip(),
+            signer_name=self._signer_info.get("name"),
+        )
+
+        pdf_paths = self._sign_form.pdf_paths
 
         def _prompt_and_refresh() -> tuple[str, str] | None:
             result = login_dialog(self.root)
@@ -244,21 +255,29 @@ class RevenantGUI:
                 self._sign_form.refresh_credential_status()
             return result
 
-        start_signing(
-            self.root,
-            pdf_path=self.pdf_path.get().strip(),
-            output_path=self.output_path.get().strip(),
-            signing_mode=self.signing_mode.get(),
-            position=self.position.get(),
-            page=self.page.get().strip(),
-            font_key=self.font_key.get(),
-            invisible=self.invisible.get(),
-            image_path=self.image_path.get().strip(),
-            signer_name=self._signer_info.get("name"),
-            sign_btn=self._sign_form.sign_btn,
-            status_text=self.status_text,
-            login_dialog_fn=_prompt_and_refresh,
-        )
+        if len(pdf_paths) == 1:
+            # Single file -- existing behavior with explicit output path
+            if not self._sign_form.confirm_output_for_sandbox():
+                return
+            start_signing(
+                self.root,
+                pdf_path=pdf_paths[0],
+                output_path=self.output_path.get().strip(),
+                opts=opts,
+                sign_btn=self._sign_form.sign_btn,
+                status_text=self.status_text,
+                login_dialog_fn=_prompt_and_refresh,
+            )
+        elif len(pdf_paths) > 1:
+            # Batch -- auto-generated output paths
+            start_batch_signing(
+                self.root,
+                pdf_paths=pdf_paths,
+                opts=opts,
+                sign_btn=self._sign_form.sign_btn,
+                status_text=self.status_text,
+                login_dialog_fn=_prompt_and_refresh,
+            )
 
     # ── Server connection lifecycle ──────────────────────────────
 

@@ -53,6 +53,8 @@ export interface CertInfo {
   email: string | null;
   organization: string | null;
   dn: string | null;
+  notBefore: string | null;
+  notAfter: string | null;
 }
 
 /**
@@ -65,13 +67,17 @@ function extractInfoFromCertObject(cert: pkijs.Certificate): CertInfo {
     email: null,
     organization: null,
     dn: null,
+    notBefore: null,
+    notAfter: null,
   };
 
-  // Check certificate validity
+  // Extract and store certificate validity dates
   try {
     const now = new Date();
     const notBefore = cert.notBefore.value;
     const notAfter = cert.notAfter.value;
+    fields.notBefore = notBefore.toISOString();
+    fields.notAfter = notAfter.toISOString();
     if (now < notBefore) {
       logger.warn(`Certificate is not yet valid (notBefore: ${notBefore.toISOString()})`);
     } else if (now > notAfter) {

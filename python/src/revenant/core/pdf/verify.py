@@ -32,6 +32,7 @@ class VerificationResult(TypedDict):
     valid: bool  # Overall result
     structure_ok: bool  # ByteRange and CMS structure valid
     hash_ok: bool  # Hash matches expected value
+    ltv_enabled: bool  # Contains embedded revocation data
     details: list[str]  # Human-readable messages
     signer: dict[str, str | None] | None  # Certificate info (name, email, org, dn)
 
@@ -64,6 +65,7 @@ def _verify_signature_match(
             "valid": False,
             "structure_ok": False,
             "hash_ok": False,
+            "ltv_enabled": False,
             "details": [f"Structure error: {e}"],
             "signer": None,
         }
@@ -127,11 +129,19 @@ def _verify_signature_match(
         else:
             details.append("Hash: cannot verify without expected hash and CMS is suspect")
 
+    # ── 5. LTV status ────────────────────────────────────────────────
+    from .ltv import check_ltv_status
+
+    ltv = check_ltv_status(cms_der)
+    ltv_label = "LTV enabled" if ltv.ltv_enabled else "Not LTV enabled"
+    details.append(f"LTV: {ltv_label}")
+
     valid = structure_ok and hash_ok
     return {
         "valid": valid,
         "structure_ok": structure_ok,
         "hash_ok": hash_ok,
+        "ltv_enabled": ltv.ltv_enabled,
         "details": details,
         "signer": signer,
     }
@@ -169,6 +179,7 @@ def verify_embedded_signature(
             "valid": False,
             "structure_ok": False,
             "hash_ok": False,
+            "ltv_enabled": False,
             "details": ["Structure error: No /ByteRange found in PDF -- not a signed PDF?"],
             "signer": None,
         }
@@ -287,11 +298,19 @@ def verify_detached_signature(
     else:
         details.append("Could not extract digest info -- hash verification unavailable")
 
+    # LTV status
+    from .ltv import check_ltv_status
+
+    ltv = check_ltv_status(cms_der)
+    ltv_label = "LTV enabled" if ltv.ltv_enabled else "Not LTV enabled"
+    details.append(f"LTV: {ltv_label}")
+
     valid = structure_ok and hash_ok
     return {
         "valid": valid,
         "structure_ok": structure_ok,
         "hash_ok": hash_ok,
+        "ltv_enabled": ltv.ltv_enabled,
         "details": details,
         "signer": signer,
     }

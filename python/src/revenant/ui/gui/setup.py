@@ -439,6 +439,8 @@ class LoginDialog:
                 email=self._identity.get("email"),
                 organization=self._identity.get("organization"),
                 dn=self._identity.get("dn"),
+                not_before=self._identity.get("not_before"),
+                not_after=self._identity.get("not_after"),
             )
         if self._save_creds_var.get():
             _logger.info("Login: saving credentials (checkbox checked)")

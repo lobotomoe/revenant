@@ -187,6 +187,16 @@ Project:
       await cmdInfo({ signature });
     });
 
+  // cert
+  program
+    .command("cert")
+    .description("Show certificate details and expiration")
+    .option("--pdf <path>", "Extract certificate info from a signed PDF (offline)")
+    .action(async (opts) => {
+      const { cmdCert } = await import("./cert.js");
+      await cmdCert({ pdf: opts.pdf ?? null });
+    });
+
   // setup
   program
     .command("setup")

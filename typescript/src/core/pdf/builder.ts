@@ -106,7 +106,7 @@ export async function preparePdfWithSigField(
     width = SIG_WIDTH,
     height = SIG_HEIGHT,
     position = "bottom-right",
-    reason = "Signed with Revenant",
+    reason = "",
     name = null,
     imagePath = null,
     fields = null,

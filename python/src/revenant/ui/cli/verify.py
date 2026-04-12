@@ -16,6 +16,8 @@ from typing import TYPE_CHECKING
 
 from asn1crypto import cms as asn1_cms
 
+from ...core.cert_expiry import format_expiry_summary
+
 if TYPE_CHECKING:
     import argparse
 
@@ -110,7 +112,9 @@ def cmd_info(args: argparse.Namespace) -> None:
         print(f"  Subject: {cert.subject.human_friendly}")
         print(f"  Issuer:  {cert.issuer.human_friendly}")
         print(f"  Serial:  {cert.serial_number}")
-        print(
-            f"  Valid:   {cert['tbs_certificate']['validity']['not_before'].native}"
-            f" - {cert['tbs_certificate']['validity']['not_after'].native}"
-        )
+        not_before = cert["tbs_certificate"]["validity"]["not_before"].native
+        not_after = cert["tbs_certificate"]["validity"]["not_after"].native
+        print(f"  Valid:   {not_before} - {not_after}")
+        if not_after is not None:
+            summary = format_expiry_summary(not_after.isoformat())
+            print(f"  Status:  {summary}")

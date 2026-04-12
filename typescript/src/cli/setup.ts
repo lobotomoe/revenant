@@ -202,6 +202,8 @@ async function tryIdentityManual(): Promise<CertInfo | null> {
     email: email || null,
     organization: org || null,
     dn: null,
+    notBefore: null,
+    notAfter: null,
   };
 }
 
@@ -273,7 +275,14 @@ export async function cmdSetup(presetProfile: string | null = null): Promise<voi
 
   // Step 5: Save everything
   saveServerConfig(profile);
-  saveSignerInfo(info.name ?? "", info.email, info.organization, info.dn);
+  saveSignerInfo(
+    info.name ?? "",
+    info.email,
+    info.organization,
+    info.dn,
+    info.notBefore,
+    info.notAfter,
+  );
 
   console.log(`\nSaved to ${CONFIG_FILE}`);
   console.log(`  Server:  ${profile.displayName}`);

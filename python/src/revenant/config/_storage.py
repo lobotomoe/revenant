@@ -22,7 +22,7 @@ import logging
 import os
 import tempfile
 from pathlib import Path
-from typing import Any, TypedDict, cast
+from typing import TypedDict, cast
 
 from ..constants import MAX_TIMEOUT, MIN_TIMEOUT
 
@@ -45,6 +45,8 @@ class ConfigDict(TypedDict, total=False):
     organization: str
     dn: str
     language: str
+    not_before: str
+    not_after: str
 
 
 def load_raw_config() -> dict[str, object]:
@@ -54,7 +56,7 @@ def load_raw_config() -> dict[str, object]:
     (forward-compatibility with newer config versions).
     """
     try:
-        data: Any = json.loads(CONFIG_FILE.read_text(encoding="utf-8"))
+        data = json.loads(CONFIG_FILE.read_text(encoding="utf-8"))
         if isinstance(data, dict):
             return cast("dict[str, object]", data)
     except FileNotFoundError:
@@ -85,6 +87,8 @@ def _validate_config_dict(data: dict[str, object]) -> ConfigDict:
         "organization",
         "dn",
         "language",
+        "not_before",
+        "not_after",
     ):
         val = _pick_str(data, key)
         if val is not None:

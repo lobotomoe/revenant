@@ -16,6 +16,7 @@ from .incremental import (
     find_root_obj_num,
     patch_byterange,
 )
+from .ltv import LtvStatus, check_ltv_status
 from .objects import (
     ANNOT_FLAGS_SIG_WIDGET,
     BYTERANGE_PLACEHOLDER_STR,
@@ -58,6 +59,7 @@ __all__ = [
     "SIG_MARGIN_V",
     "SIG_WIDTH",
     "CmsInspection",
+    "LtvStatus",
     "SigObjectNums",
     "VerificationResult",
     "allocate_sig_objects",
@@ -65,6 +67,7 @@ __all__ = [
     "build_catalog_override",
     "build_page_override",
     "build_xref_and_trailer",
+    "check_ltv_status",
     "compute_byterange_hash",
     "compute_sig_rect",
     "extract_cms_from_byterange",

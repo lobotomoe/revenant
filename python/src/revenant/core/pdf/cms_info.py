@@ -111,6 +111,7 @@ class CmsInspection(TypedDict):
 
     signer: dict[str, str | None] | None
     digest_algorithm: str | None
+    ltv_enabled: bool
     cms_size: int
     details: list[str]
 
@@ -134,6 +135,7 @@ def inspect_cms_blob(cms_der: bytes) -> CmsInspection:
         return {
             "signer": None,
             "digest_algorithm": None,
+            "ltv_enabled": False,
             "cms_size": len(cms_der),
             "details": details,
         }
@@ -143,6 +145,7 @@ def inspect_cms_blob(cms_der: bytes) -> CmsInspection:
         return {
             "signer": None,
             "digest_algorithm": None,
+            "ltv_enabled": False,
             "cms_size": len(cms_der),
             "details": details,
         }
@@ -164,9 +167,18 @@ def inspect_cms_blob(cms_der: bytes) -> CmsInspection:
         digest_algo = digest_info[0]
         details.append(f"Digest algorithm: {digest_algo.upper().replace('_', '-')}")
 
+    # LTV status
+    from .ltv import check_ltv_status
+
+    ltv = check_ltv_status(cms_der)
+    ltv_label = "LTV enabled" if ltv.ltv_enabled else "Not LTV enabled"
+    details.append(f"LTV: {ltv_label}")
+    details.extend(f"  {d}" for d in ltv.details)
+
     return {
         "signer": signer,
         "digest_algorithm": digest_algo,
+        "ltv_enabled": ltv.ltv_enabled,
         "cms_size": len(cms_der),
         "details": details,
     }

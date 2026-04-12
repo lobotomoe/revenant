@@ -193,7 +193,7 @@ export async function sign(
   const prepareOptions: PrepareOptions = {
     page: options.page ?? "last",
     position: options.position ?? "bottom-right",
-    reason: options.reason ?? "Signed with Revenant",
+    reason: options.reason ?? "",
     name: resolvedName,
     fields: resolvedFields,
     visible,

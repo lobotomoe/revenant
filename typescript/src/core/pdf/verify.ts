@@ -29,6 +29,8 @@ export interface VerificationResult {
   structureOk: boolean;
   /** Hash matches expected value. */
   hashOk: boolean;
+  /** Contains embedded revocation data. */
+  ltvEnabled: boolean;
   /** Human-readable messages. */
   details: string[];
   /** Certificate info (name, email, org, dn). */
@@ -79,6 +81,7 @@ async function verifySignatureMatch(
       valid: false,
       structureOk: false,
       hashOk: false,
+      ltvEnabled: false,
       details: [`Structure error: ${msg}`],
       signer: null,
     };
@@ -148,8 +151,14 @@ async function verifySignatureMatch(
     }
   }
 
+  // 5. LTV status
+  const { checkLtvStatus } = await import("./ltv.js");
+  const ltv = checkLtvStatus(cmsDer);
+  const ltvLabel = ltv.ltvEnabled ? "LTV enabled" : "Not LTV enabled";
+  details.push(`LTV: ${ltvLabel}`);
+
   const valid = structureOk && hashOk;
-  return { valid, structureOk, hashOk, details, signer };
+  return { valid, structureOk, hashOk, ltvEnabled: ltv.ltvEnabled, details, signer };
 }
 
 // -- Public verification API --------------------------------------------------
@@ -172,6 +181,7 @@ export async function verifyEmbeddedSignature(
       valid: false,
       structureOk: false,
       hashOk: false,
+      ltvEnabled: false,
       details: ["Structure error: No /ByteRange found in PDF -- not a signed PDF?"],
       signer: null,
     };
@@ -183,6 +193,7 @@ export async function verifyEmbeddedSignature(
       valid: false,
       structureOk: false,
       hashOk: false,
+      ltvEnabled: false,
       details: ["Structure error: No /ByteRange found in PDF -- not a signed PDF?"],
       signer: null,
     };
@@ -294,6 +305,12 @@ export async function verifyDetachedSignature(
     details.push("Could not extract digest info -- hash verification unavailable");
   }
 
+  // LTV status
+  const { checkLtvStatus } = await import("./ltv.js");
+  const ltv = checkLtvStatus(cmsDer);
+  const ltvLabel = ltv.ltvEnabled ? "LTV enabled" : "Not LTV enabled";
+  details.push(`LTV: ${ltvLabel}`);
+
   const valid = structureOk && hashOk;
-  return { valid, structureOk, hashOk, details, signer };
+  return { valid, structureOk, hashOk, ltvEnabled: ltv.ltvEnabled, details, signer };
 }

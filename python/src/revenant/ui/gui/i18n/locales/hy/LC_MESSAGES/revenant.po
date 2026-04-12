@@ -254,6 +254,10 @@ msgstr "Ստորագրությունը ստուգվում է..."
 msgid "gui.invisible_signature"
 msgstr "Անտեսանելի ստորագրություն"
 
+#. EN: Reason:
+msgid "gui.reason_label"
+msgstr "Reason:"
+
 #. EN: Language:
 msgid "gui.language_label"
 msgstr "Լեզու:"
@@ -661,3 +665,31 @@ msgstr "Տարբերակ {version}"
 #. EN: Warning: account locks after {max_attempts} failed attempts!
 msgid "gui.warning_account_locks_after_max_attempts_failed_attempts"
 msgstr "Զգուշացում. Հաշիվը կարգելափակվի {max_attempts} անհաջող փորձից հետո!"
+
+#. EN: Remove
+msgid "gui.remove"
+msgstr "Remove"
+
+#. EN: Sign {n} PDFs
+msgid "gui.sign_n_pdfs"
+msgstr "Sign {n} PDFs"
+
+#. EN: Batch Signing
+msgid "gui.batch_signing"
+msgstr "Batch Signing"
+
+#. EN: Preparing...
+msgid "gui.preparing_ellipsis"
+msgstr "Preparing..."
+
+#. EN: Signing {n}/{total}: {filename}...
+msgid "gui.signing_n_of_total_filename"
+msgstr "Signing {n}/{total}: {filename}..."
+
+#. EN: Batch complete: {succeeded} signed, {failed} failed.
+msgid "gui.batch_complete_succeeded_failed"
+msgstr "Batch complete: {succeeded} signed, {failed} failed."
+
+#. EN: Cancelling...
+msgid "gui.cancelling_ellipsis"
+msgstr "Cancelling..."

@@ -191,12 +191,16 @@ def test_save_signer_info_full(config_dir):
         email="eve@example.com",
         organization="Acme Corp",
         dn="CN=Eve, O=Acme Corp",
+        not_before="2024-01-15T00:00:00+00:00",
+        not_after="2027-01-15T00:00:00+00:00",
     )
     info = get_signer_info()
     assert info["name"] == "Eve"
     assert info["email"] == "eve@example.com"
     assert info["organization"] == "Acme Corp"
     assert info["dn"] == "CN=Eve, O=Acme Corp"
+    assert info["not_before"] == "2024-01-15T00:00:00+00:00"
+    assert info["not_after"] == "2027-01-15T00:00:00+00:00"
 
 
 def test_save_preserves_existing(config_dir):

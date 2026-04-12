@@ -253,6 +253,10 @@ msgstr ""
 msgid "gui.invisible_signature"
 msgstr ""
 
+#. EN: Reason:
+msgid "gui.reason_label"
+msgstr ""
+
 #. EN: Language:
 msgid "gui.language_label"
 msgstr ""
@@ -659,4 +663,32 @@ msgstr ""
 
 #. EN: Warning: account locks after {max_attempts} failed attempts!
 msgid "gui.warning_account_locks_after_max_attempts_failed_attempts"
+msgstr ""
+
+#. EN: Remove
+msgid "gui.remove"
+msgstr ""
+
+#. EN: Sign {n} PDFs
+msgid "gui.sign_n_pdfs"
+msgstr ""
+
+#. EN: Batch Signing
+msgid "gui.batch_signing"
+msgstr ""
+
+#. EN: Preparing...
+msgid "gui.preparing_ellipsis"
+msgstr ""
+
+#. EN: Signing {n}/{total}: {filename}...
+msgid "gui.signing_n_of_total_filename"
+msgstr ""
+
+#. EN: Batch complete: {succeeded} signed, {failed} failed.
+msgid "gui.batch_complete_succeeded_failed"
+msgstr ""
+
+#. EN: Cancelling...
+msgid "gui.cancelling_ellipsis"
 msgstr ""

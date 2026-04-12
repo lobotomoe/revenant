@@ -3,7 +3,7 @@
 
 from __future__ import annotations
 
-from typing import Any
+from typing import Any  # pickle __setstate__ protocol requires Any
 
 __all__ = [
     "AuthError",

@@ -129,7 +129,7 @@ export async function signOneEmbedded(
       name: options.name,
       position: options.position ?? DEFAULT_POSITION,
       page: options.page ?? "last",
-      reason: options.reason ?? "Signed with Revenant",
+      reason: options.reason ?? "",
       imagePath: options.imagePath,
       fields: options.fields,
       visible: options.visible ?? true,

@@ -1,70 +1,28 @@
 # SPDX-License-Identifier: Apache-2.0
+# pyright: reportUnknownMemberType=false, reportUnknownVariableType=false, reportUnknownArgumentType=false
 """Sign form panel -- file pickers, signature options, and account info."""
 
 from __future__ import annotations
 
 from pathlib import Path
-from typing import TYPE_CHECKING, Any
+from typing import TYPE_CHECKING, Any  # Any: tkinter grid() kwargs require it
 
 if TYPE_CHECKING:
     import tkinter as tk
     from collections.abc import Callable
 
-from ...config import (
-    get_active_profile,
-    get_credential_storage_info,
-)
-from ...core.appearance import AVAILABLE_FONTS, extract_cert_fields
+from ...config import get_active_profile
+from ...core.appearance import AVAILABLE_FONTS
 from ...core.pdf import POSITION_PRESETS
 from .i18n import _
 from .position_preview import PREVIEW_H, PREVIEW_W, draw_position_preview
+from .sign_panels import build_account_panel
 
 # Position labels for the dropdown (full names only, sorted)
 _POSITIONS = sorted(POSITION_PRESETS)
 
 # Page choices (1-based for user display, converted to 0-based internally)
 _PAGES = ["last", "first", "1", "2", "3", "4", "5"]
-
-
-def build_unconfigured(parent: tk.Widget, on_connect_action: Callable[[], None]) -> None:
-    """Build the Sign tab for unconfigured state (Layer 0: connect prompt)."""
-    from tkinter import ttk
-
-    frame = ttk.Frame(parent, padding=40)
-    frame.pack(fill="both", expand=True)
-    frame.columnconfigure(0, weight=1)
-
-    ttk.Label(
-        frame,
-        text=_("gui.connect_to_a_server_to_sign_documents"),
-        justify="center",
-        foreground="gray",
-    ).grid(row=0, column=0, pady=(0, 20))
-    ttk.Button(
-        frame, text=_("gui.connect"), command=on_connect_action, style="Accent.TButton"
-    ).grid(row=1, column=0, ipady=4, ipadx=16)
-
-
-def build_server_only(parent: tk.Widget, on_login_action: Callable[[], None]) -> None:
-    """Build the Sign tab for server-configured state (Layer 1: login prompt).
-
-    Server is connected but no credentials/identity configured yet.
-    """
-    from tkinter import ttk
-
-    frame = ttk.Frame(parent, padding=40)
-    frame.pack(fill="both", expand=True)
-    frame.columnconfigure(0, weight=1)
-
-    ttk.Label(
-        frame,
-        text=_("gui.server_connected_log_in_to_sign_documents"),
-        justify="center",
-        foreground="gray",
-    ).grid(row=0, column=0, pady=(0, 20))
-    ttk.Button(frame, text=_("gui.log_in"), command=on_login_action, style="Accent.TButton").grid(
-        row=1, column=0, ipady=4, ipadx=16
-    )
 
 
 class SignForm:
@@ -87,6 +45,7 @@ class SignForm:
         page: tk.StringVar,
         font_key: tk.StringVar,
         invisible: tk.BooleanVar,
+        reason: tk.StringVar,
         status_text: tk.StringVar,
         signer_info: dict[str, str | None],
         on_sign_action: Callable[[], None],
@@ -101,13 +60,24 @@ class SignForm:
         self._page = page
         self._font_key = font_key
         self._invisible = invisible
+        self._reason = reason
         self._status_text = status_text
         self._signer_info = signer_info
         self._on_sign_action = on_sign_action
         self._on_logout_action = on_logout_action
         self._auto_output = ""
+        self._file_paths: list[str] = []
 
         self._build(parent)
+
+    @property
+    def pdf_paths(self) -> list[str]:
+        """Return selected PDF file paths (1 for single, N for batch)."""
+        if self._file_paths:
+            return list(self._file_paths)
+        # Fallback: single-file mode via StringVar
+        path = self._pdf_path.get().strip()
+        return [path] if path else []
 
     def _build(self, tab: tk.Widget) -> None:
         """Build the signing form inside the Sign tab."""
@@ -121,14 +91,33 @@ class SignForm:
 
         row = 0
 
-        # File pickers: PDF, image, output
-        ttk.Label(frame, text=_("gui.pdf_file_label")).grid(row=row, column=0, sticky="e", **pad)
-        ttk.Entry(frame, textvariable=self._pdf_path).grid(row=row, column=1, sticky="ew", **pad)
-        ttk.Button(frame, text=_("gui.browse_ellipsis"), command=self._browse_pdf).grid(
-            row=row, column=2, **pad
+        # File picker: PDF(s)
+        ttk.Label(frame, text=_("gui.pdf_file_label")).grid(row=row, column=0, sticky="ne", **pad)
+
+        file_frame = ttk.Frame(frame)
+        file_frame.grid(row=row, column=1, sticky="ew", **pad)
+        file_frame.columnconfigure(0, weight=1)
+
+        self._pdf_entry = ttk.Entry(file_frame, textvariable=self._pdf_path)
+        self._pdf_entry.grid(row=0, column=0, sticky="ew")
+
+        import tkinter as real_tk
+
+        self._file_listbox = real_tk.Listbox(file_frame, height=3, selectmode="extended")
+        # Listbox hidden by default -- shown when multiple files selected
+        self._file_listbox_visible = False
+
+        btn_frame = ttk.Frame(frame)
+        btn_frame.grid(row=row, column=2, **pad)
+        ttk.Button(btn_frame, text=_("gui.browse_ellipsis"), command=self._browse_pdf).pack(
+            side="top", fill="x"
+        )
+        self._remove_btn = ttk.Button(
+            btn_frame, text=_("gui.remove"), command=self._remove_selected_files
         )
         row += 1
 
+        # Image picker
         self._image_entry = ttk.Entry(frame, textvariable=self._image_path)
         self._image_entry.grid(row=row, column=1, sticky="ew", **pad)
         ttk.Label(frame, text=_("gui.image_opt_label")).grid(row=row, column=0, sticky="e", **pad)
@@ -138,11 +127,16 @@ class SignForm:
         self._image_browse_btn.grid(row=row, column=2, **pad)
         row += 1
 
-        ttk.Label(frame, text=_("gui.output_opt_label")).grid(row=row, column=0, sticky="e", **pad)
-        ttk.Entry(frame, textvariable=self._output_path).grid(row=row, column=1, sticky="ew", **pad)
-        ttk.Button(frame, text=_("gui.browse_ellipsis"), command=self._browse_output).grid(
-            row=row, column=2, **pad
+        # Output path (hidden in batch mode)
+        self._output_row = row
+        self._output_label = ttk.Label(frame, text=_("gui.output_opt_label"))
+        self._output_label.grid(row=row, column=0, sticky="e", **pad)
+        self._output_entry = ttk.Entry(frame, textvariable=self._output_path)
+        self._output_entry.grid(row=row, column=1, sticky="ew", **pad)
+        self._output_browse_btn = ttk.Button(
+            frame, text=_("gui.browse_ellipsis"), command=self._browse_output
         )
+        self._output_browse_btn.grid(row=row, column=2, **pad)
         row += 1
 
         ttk.Separator(frame, orient="horizontal").grid(
@@ -228,6 +222,10 @@ class SignForm:
         )
         self._invisible_cb.grid(row=4, column=0, columnspan=2, sticky="w", **opt_pad)
 
+        self._reason_entry = ttk.Entry(settings, textvariable=self._reason)
+        ttk.Label(settings, text=_("gui.reason_label")).grid(row=5, column=0, sticky="e", **opt_pad)
+        self._reason_entry.grid(row=5, column=1, sticky="ew", **opt_pad)
+
         # Position preview canvas on the right side
         import tkinter as real_tk
 
@@ -245,49 +243,7 @@ class SignForm:
         # Right: Account info (server name is in ServerBar, not duplicated here)
         right = ttk.LabelFrame(cols, text=_("gui.account"), padding=8, labelanchor="n")
         right.grid(row=0, column=1, sticky="nsew", padx=(8, 0))
-
-        info_row = 0
-        if profile and profile.cert_fields:
-            extracted = extract_cert_fields(profile.cert_fields, self._signer_info)
-            for cf in profile.cert_fields:
-                value = extracted.get(cf.id)
-                if value:
-                    ttk.Label(right, text=f"{cf.label}:", foreground="gray").grid(
-                        row=info_row, column=0, sticky="e", padx=(0, 4), pady=1
-                    )
-                    ttk.Label(right, text=value).grid(row=info_row, column=1, sticky="w", pady=1)
-                    info_row += 1
-        else:
-            # Fallback for custom servers: raw name, org, email
-            for key, label in [
-                ("name", _("gui.name")),
-                ("organization", _("gui.org")),
-                ("email", _("gui.email")),
-            ]:
-                val = self._signer_info.get(key)
-                if val:
-                    ttk.Label(right, text=f"{label}:", foreground="gray").grid(
-                        row=info_row, column=0, sticky="e", padx=(0, 4), pady=1
-                    )
-                    ttk.Label(right, text=val).grid(row=info_row, column=1, sticky="w", pady=1)
-                    info_row += 1
-
-        if info_row == 0:
-            ttk.Label(right, text=_("gui.no_signer"), foreground="gray").grid(
-                row=info_row, column=0, columnspan=2, sticky="w", pady=1
-            )
-            info_row += 1
-
-        import tkinter as tk
-
-        self._storage_var = tk.StringVar(value=get_credential_storage_info())
-        ttk.Label(right, textvariable=self._storage_var, foreground="gray").grid(
-            row=info_row, column=0, columnspan=2, sticky="w", pady=1
-        )
-
-        ttk.Button(right, text=_("gui.log_out"), command=self._on_logout_action).grid(
-            row=info_row + 1, column=0, columnspan=2, sticky="w", pady=(6, 0)
-        )
+        self._storage_var = build_account_panel(right, self._signer_info, self._on_logout_action)
 
         # ── Sign button ──────────────────────────────────────────
         self.sign_btn = ttk.Button(
@@ -303,6 +259,8 @@ class SignForm:
 
     def refresh_credential_status(self) -> None:
         """Update the credential storage label to reflect current state."""
+        from ...config import get_credential_storage_info
+
         self._storage_var.set(get_credential_storage_info())
 
     def confirm_output_for_sandbox(self) -> bool:
@@ -440,23 +398,85 @@ class SignForm:
     def _browse_pdf(self) -> None:
         from tkinter import filedialog
 
-        path = filedialog.askopenfilename(
+        paths = filedialog.askopenfilenames(
             title=_("gui.select_pdf"),
             filetypes=[(_("gui.pdf_files"), "*.pdf"), (_("gui.all_files"), "*.*")],
         )
-        if not path:
+        if not paths:
             return
-        self._pdf_path.set(path)
-        if not self._output_path.get():
-            from ..helpers import default_detached_output_path, default_output_path
 
-            pdf_p = Path(path)
-            if self._signing_mode.get() == "detached":
-                auto = str(default_detached_output_path(pdf_p))
+        if len(paths) == 1 and not self._file_paths:
+            # Single file selected, no existing batch -- use simple mode
+            self._pdf_path.set(paths[0])
+            self._file_paths = []
+            self._switch_to_single_mode()
+            if not self._output_path.get():
+                self._auto_fill_output(paths[0])
+        else:
+            # Multiple files or adding to existing batch
+            for p in paths:
+                if p not in self._file_paths:
+                    self._file_paths.append(p)
+            if len(self._file_paths) == 1:
+                self._pdf_path.set(self._file_paths[0])
+                self._switch_to_single_mode()
             else:
-                auto = str(default_output_path(pdf_p))
-            self._output_path.set(auto)
-            self._auto_output = auto
+                self._switch_to_batch_mode()
+
+    def _remove_selected_files(self) -> None:
+        """Remove selected files from the batch listbox."""
+        selection = list(self._file_listbox.curselection())
+        for idx in reversed(selection):
+            self._file_paths.pop(idx)
+            self._file_listbox.delete(idx)
+
+        if len(self._file_paths) <= 1:
+            if self._file_paths:
+                self._pdf_path.set(self._file_paths[0])
+            self._file_paths = []
+            self._switch_to_single_mode()
+
+    def _switch_to_batch_mode(self) -> None:
+        """Switch UI to multi-file mode."""
+        self._pdf_entry.grid_remove()
+        if not self._file_listbox_visible:
+            self._file_listbox.grid(row=0, column=0, sticky="ew")
+            self._remove_btn.pack(side="top", fill="x", pady=(2, 0))
+            self._file_listbox_visible = True
+        self._file_listbox.delete(0, "end")
+        for p in self._file_paths:
+            self._file_listbox.insert("end", Path(p).name)
+        # Hide output row in batch mode (auto-generated per file)
+        self._output_label.grid_remove()
+        self._output_entry.grid_remove()
+        self._output_browse_btn.grid_remove()
+        self.sign_btn.configure(text=_("gui.sign_n_pdfs").format(n=len(self._file_paths)))
+
+    def _switch_to_single_mode(self) -> None:
+        """Switch UI back to single-file mode."""
+        if self._file_listbox_visible:
+            self._file_listbox.grid_remove()
+            self._remove_btn.pack_forget()
+            self._file_listbox_visible = False
+        self._pdf_entry.grid(row=0, column=0, sticky="ew")
+        # Restore output row
+        pad: dict[str, Any] = {"padx": 8, "pady": 4}
+        self._output_label.grid(row=self._output_row, column=0, sticky="e", **pad)
+        self._output_entry.grid(row=self._output_row, column=1, sticky="ew", **pad)
+        self._output_browse_btn.grid(row=self._output_row, column=2, **pad)
+        self.sign_btn.configure(text=_("gui.sign_pdf"))
+
+    def _auto_fill_output(self, pdf_path: str) -> None:
+        """Auto-fill output path from input PDF path."""
+        from ..helpers import default_detached_output_path, default_output_path
+
+        pdf_p = Path(pdf_path)
+        if self._signing_mode.get() == "detached":
+            auto = str(default_detached_output_path(pdf_p))
+        else:
+            auto = str(default_output_path(pdf_p))
+        self._output_path.set(auto)
+        self._auto_output = auto
 
     def _browse_image(self) -> None:
         from tkinter import filedialog

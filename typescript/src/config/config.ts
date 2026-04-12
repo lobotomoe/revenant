@@ -105,6 +105,8 @@ export interface SignerInfo {
   email: string | null;
   organization: string | null;
   dn: string | null;
+  notBefore: string | null;
+  notAfter: string | null;
 }
 
 export function getSignerInfo(): SignerInfo {
@@ -114,6 +116,8 @@ export function getSignerInfo(): SignerInfo {
     email: config.email ?? null,
     organization: config.organization ?? null,
     dn: config.dn ?? null,
+    notBefore: config.not_before ?? null,
+    notAfter: config.not_after ?? null,
   };
 }
 
@@ -122,6 +126,8 @@ export function saveSignerInfo(
   email?: string | null,
   organization?: string | null,
   dn?: string | null,
+  notBefore?: string | null,
+  notAfter?: string | null,
 ): void {
   const config = loadRawConfig();
   config.name = name;
@@ -130,6 +136,8 @@ export function saveSignerInfo(
     ["email", email],
     ["organization", organization],
     ["dn", dn],
+    ["not_before", notBefore],
+    ["not_after", notAfter],
   ] as const;
 
   for (const [key, value] of optionalFields) {
@@ -149,7 +157,7 @@ export async function resetAll(): Promise<void> {
   saveConfig({});
 }
 
-const IDENTITY_KEYS = ["name", "email", "organization", "dn"] as const;
+const IDENTITY_KEYS = ["name", "email", "organization", "dn", "not_before", "not_after"] as const;
 
 export async function logout(): Promise<void> {
   await clearCredentials();

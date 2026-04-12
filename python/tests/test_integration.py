@@ -885,3 +885,175 @@ def test_enum_certificates():
         assert isinstance(cert_der, bytes)
         # X.509 certificates start with ASN.1 SEQUENCE tag
         assert cert_der[0] == 0x30, "Certificate DER must start with SEQUENCE tag"
+
+
+# ── Certificate expiration info ──────────────────────────────────
+
+
+@requires_creds
+def test_discover_identity_includes_validity_dates():
+    """discover_identity_from_server() must return not_before and not_after."""
+    transport = SoapSigningTransport(URL)
+    info = discover_identity_from_server(transport, USER, PASS, timeout=30)
+
+    assert info.get("not_before") is not None, "not_before must be present"
+    assert info.get("not_after") is not None, "not_after must be present"
+
+    # Dates must be valid ISO 8601
+    import datetime
+
+    not_before = datetime.datetime.fromisoformat(info["not_before"])
+    not_after = datetime.datetime.fromisoformat(info["not_after"])
+    assert not_after > not_before, "Certificate validity range must be positive"
+
+
+@requires_creds
+def test_cert_expiry_from_server():
+    """Certificate from server should have a computable expiry status."""
+    from revenant.core.cert_expiry import days_remaining, expiry_status
+
+    transport = SoapSigningTransport(URL)
+    info = discover_identity_from_server(transport, USER, PASS, timeout=30)
+
+    not_after = info.get("not_after")
+    assert not_after is not None
+
+    remaining = days_remaining(not_after)
+    status = expiry_status(not_after)
+
+    # The test account's cert should currently be valid
+    assert remaining > 0, f"Test cert appears expired ({remaining} days)"
+    assert status in ("valid", "expiring_soon")
+
+
+@requires_creds
+def test_cert_info_from_signed_pdf_includes_dates():
+    """Certificate info extracted from a signed PDF must include validity dates."""
+    from revenant.core.cert_info import extract_cert_info_from_pdf
+
+    signed = sign_pdf_embedded(
+        TINY_PDF,
+        TRANSPORT,
+        USER,
+        PASS,
+        120,
+        name="Cert Date Test",
+    )
+
+    info = extract_cert_info_from_pdf(signed)
+    assert info.get("not_before") is not None, "not_before must be present in PDF cert"
+    assert info.get("not_after") is not None, "not_after must be present in PDF cert"
+
+
+# ── LTV status ───────────────────────────────────────────────────
+
+
+@requires_creds
+def test_ltv_status_from_signed_pdf():
+    """EKENG CoSign signatures should NOT be LTV-enabled (no embedded CRL/OCSP)."""
+    from revenant.core.pdf import check_ltv_status
+    from revenant.core.pdf.cms_extraction import BYTERANGE_PATTERN, extract_cms_from_byterange_match
+
+    signed = sign_pdf_embedded(
+        TINY_PDF,
+        TRANSPORT,
+        USER,
+        PASS,
+        120,
+        name="LTV Test",
+    )
+
+    import re
+
+    br_matches = list(re.finditer(BYTERANGE_PATTERN, signed))
+    assert br_matches, "Signed PDF must contain ByteRange"
+
+    cms_der = extract_cms_from_byterange_match(signed, br_matches[-1])
+    ltv = check_ltv_status(cms_der)
+
+    assert not ltv.ltv_enabled, "EKENG CoSign should not be LTV-enabled"
+    assert not ltv.has_crl, "EKENG should not embed CRLs"
+    assert not ltv.has_ocsp, "EKENG should not embed OCSP responses"
+
+
+@requires_creds
+def test_verify_includes_ltv_field():
+    """Verification result must include ltv_enabled field."""
+    signed = sign_pdf_embedded(
+        TINY_PDF,
+        TRANSPORT,
+        USER,
+        PASS,
+        120,
+        name="LTV Verify Test",
+    )
+
+    results = verify_all_embedded_signatures(signed)
+    assert len(results) >= 1
+    result = results[0]
+    assert "ltv_enabled" in result, "VerificationResult must include ltv_enabled"
+    assert result["ltv_enabled"] is False, "EKENG should not be LTV-enabled"
+    # LTV status must appear in details
+    ltv_details = [d for d in result["details"] if "LTV" in d]
+    assert ltv_details, "LTV status line must be in verification details"
+
+
+# ── Batch signing (sequential multi-file) ────────────────────────
+
+
+@requires_creds
+def test_batch_sign_multiple_pdfs(tmp_path):
+    """sign_one_embedded can sign multiple files sequentially."""
+    from revenant.ui.workflows import sign_one_embedded
+
+    # Create 3 slightly different PDFs
+    pdfs = []
+    for i in range(3):
+        content = TINY_PDF.replace(b"612 792", f"612 {792 + i}".encode())
+        pdfs.append(content)
+
+    results = []
+    for i, pdf_bytes in enumerate(pdfs):
+        out = tmp_path / f"signed_{i}.pdf"
+        result = sign_one_embedded(
+            pdf_bytes,
+            out,
+            URL,
+            USER,
+            PASS,
+            120,
+            name=f"Batch Signer {i}",
+        )
+        results.append(result)
+
+    for i, result in enumerate(results):
+        assert result.ok, f"File {i} signing failed: {result.error_message}"
+        assert result.output_path is not None
+        assert result.output_path.exists()
+
+    # Verify each signed file
+    for i, result in enumerate(results):
+        assert result.output_path is not None
+        signed_bytes = result.output_path.read_bytes()
+        vr = verify_all_embedded_signatures(signed_bytes)
+        assert len(vr) == 1
+        assert vr[0]["valid"], f"File {i} verification failed: {vr[0]['details']}"
+
+
+@requires_creds
+def test_empty_reason_produces_no_reason_in_pdf():
+    """Empty reason string should not insert 'Signed with Revenant' into the PDF."""
+    signed = sign_pdf_embedded(
+        TINY_PDF,
+        TRANSPORT,
+        USER,
+        PASS,
+        120,
+        name="No Reason Test",
+        reason="",
+    )
+
+    assert isinstance(signed, bytes)
+    assert b"Signed with Revenant" not in signed
+    result = verify_embedded_signature(signed)
+    assert result["valid"]

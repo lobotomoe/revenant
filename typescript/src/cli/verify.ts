@@ -9,6 +9,7 @@
 import { execFileSync } from "node:child_process";
 import { existsSync, readFileSync, statSync } from "node:fs";
 
+import { formatExpirySummary } from "../core/cert-expiry.js";
 import { extractCertInfoFromCms } from "../core/cert-info.js";
 import { getErrorMessage, isNodeError } from "../errors.js";
 
@@ -116,6 +117,9 @@ export async function cmdInfo(args: InfoCommandArgs): Promise<void> {
     if (info.organization) console.log(`  Organization: ${info.organization}`);
     if (info.email) console.log(`  Email: ${info.email}`);
     if (info.dn) console.log(`  DN: ${info.dn}`);
+    if (info.notAfter) {
+      console.log(`  Status: ${formatExpirySummary(info.notAfter)}`);
+    }
   } catch (e) {
     process.stderr.write(`  Error parsing signature: ${getErrorMessage(e)}\n`);
   }

@@ -17,7 +17,7 @@ from __future__ import annotations
 import logging
 import threading
 from pathlib import Path
-from typing import TYPE_CHECKING, Any
+from typing import TYPE_CHECKING, Any  # Any: tkinter grid() kwargs require it
 
 if TYPE_CHECKING:
     import tkinter as tk

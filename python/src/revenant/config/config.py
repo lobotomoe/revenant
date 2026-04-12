@@ -151,7 +151,8 @@ def get_signer_info() -> dict[str, str | None]:
     Get all saved signer info from config.
 
     Returns:
-        dict with keys: name, email, organization, dn (any may be None).
+        dict with keys: name, email, organization, dn, not_before, not_after
+        (any may be None).
     """
     config = load_config()
     return {
@@ -159,6 +160,8 @@ def get_signer_info() -> dict[str, str | None]:
         "email": config.get("email"),
         "organization": config.get("organization"),
         "dn": config.get("dn"),
+        "not_before": config.get("not_before"),
+        "not_after": config.get("not_after"),
     }
 
 
@@ -167,6 +170,8 @@ def save_signer_info(
     email: str | None = None,
     organization: str | None = None,
     dn: str | None = None,
+    not_before: str | None = None,
+    not_after: str | None = None,
 ) -> None:
     """Save signer identity to config file.
 
@@ -175,7 +180,14 @@ def save_signer_info(
     """
     config = load_raw_config()
     config["name"] = name
-    for key, value in (("email", email), ("organization", organization), ("dn", dn)):
+    optional_fields = (
+        ("email", email),
+        ("organization", organization),
+        ("dn", dn),
+        ("not_before", not_before),
+        ("not_after", not_after),
+    )
+    for key, value in optional_fields:
         if value:
             config[key] = value
         else:
@@ -203,7 +215,7 @@ def reset_all() -> None:
 
 
 # Identity keys cleared on logout (credentials handled by clear_credentials)
-_IDENTITY_KEYS = ("name", "email", "organization", "dn")
+_IDENTITY_KEYS = ("name", "email", "organization", "dn", "not_before", "not_after")
 
 
 def logout() -> None:

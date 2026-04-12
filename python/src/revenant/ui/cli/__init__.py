@@ -16,6 +16,7 @@ from ...config import BUILTIN_PROFILES, get_server_config
 from ...constants import __version__
 from ...core.pdf import verify_all_embedded_signatures
 from ...errors import RevenantError
+from .cert import cmd_cert
 from .setup import cmd_setup
 from .sign import cmd_sign
 from .verify import cmd_info, cmd_verify
@@ -178,7 +179,7 @@ def main() -> None:
     p_sign.add_argument(
         "--reason",
         default=None,
-        help="Signature reason string (default: 'Signed with Revenant')",
+        help="Signature reason string (optional)",
     )
     p_sign.add_argument(
         "--dry-run",
@@ -205,6 +206,14 @@ def main() -> None:
     # info
     p_info = sub.add_parser("info", help="Show signature file details")
     p_info.add_argument("signature", help="CMS signature file (.p7s)")
+
+    # cert
+    p_cert = sub.add_parser("cert", help="Show certificate details and expiration")
+    p_cert.add_argument(
+        "--pdf",
+        default=None,
+        help="Extract certificate info from a signed PDF (offline, no server needed)",
+    )
 
     # setup
     p_setup = sub.add_parser(
@@ -236,6 +245,8 @@ def main() -> None:
         _cmd_check(args)
     elif args.command == "info":
         cmd_info(args)
+    elif args.command == "cert":
+        cmd_cert(args)
     elif args.command == "logout":
         _cmd_logout()
     elif args.command == "reset":

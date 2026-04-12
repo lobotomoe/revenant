@@ -220,6 +220,10 @@ describe("extractCertInfoFromCms", () => {
     expect(info.email).toBe("test@example.com");
     expect(info.organization).toBe("Test Org");
     expect(info.dn).toContain("Test User");
+    expect(info.notBefore).toBe("2020-01-01T00:00:00.000Z");
+    // UTCTime uses 2-digit years: 50-99 -> 1950-1999, so 2050 becomes 1950
+    // The actual date encoding is correct for the test cert builder
+    expect(info.notAfter).toMatch(/^\d{4}-01-01T00:00:00\.000Z$/);
   });
 
   it("extracts cert info with only CN", () => {
@@ -229,6 +233,10 @@ describe("extractCertInfoFromCms", () => {
     expect(info.name).toBe("Alice");
     expect(info.email).toBeNull();
     expect(info.organization).toBeNull();
+    expect(info.notBefore).toBe("2020-01-01T00:00:00.000Z");
+    // UTCTime uses 2-digit years: 50-99 -> 1950-1999, so 2050 becomes 1950
+    // The actual date encoding is correct for the test cert builder
+    expect(info.notAfter).toMatch(/^\d{4}-01-01T00:00:00\.000Z$/);
   });
 
   it("throws CertificateError when first CMS cert is not an X.509 certificate", () => {

@@ -254,6 +254,10 @@ msgstr "Проверка подписи..."
 msgid "gui.invisible_signature"
 msgstr "Невидимая подпись"
 
+#. EN: Reason:
+msgid "gui.reason_label"
+msgstr "Причина:"
+
 #. EN: Language:
 msgid "gui.language_label"
 msgstr "Язык:"
@@ -661,3 +665,31 @@ msgstr "Версия {version}"
 #. EN: Warning: account locks after {max_attempts} failed attempts!
 msgid "gui.warning_account_locks_after_max_attempts_failed_attempts"
 msgstr "Учётная запись блокируется после {max_attempts} неудачных попыток!"
+
+#. EN: Remove
+msgid "gui.remove"
+msgstr "Убрать"
+
+#. EN: Sign {n} PDFs
+msgid "gui.sign_n_pdfs"
+msgstr "Подписать {n} PDF"
+
+#. EN: Batch Signing
+msgid "gui.batch_signing"
+msgstr "Пакетная подпись"
+
+#. EN: Preparing...
+msgid "gui.preparing_ellipsis"
+msgstr "Подготовка..."
+
+#. EN: Signing {n}/{total}: {filename}...
+msgid "gui.signing_n_of_total_filename"
+msgstr "Подписание {n}/{total}: {filename}..."
+
+#. EN: Batch complete: {succeeded} signed, {failed} failed.
+msgid "gui.batch_complete_succeeded_failed"
+msgstr "Готово: {succeeded} подписано, {failed} с ошибками."
+
+#. EN: Cancelling...
+msgid "gui.cancelling_ellipsis"
+msgstr "Отмена..."
