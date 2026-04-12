@@ -162,8 +162,7 @@ class SignForm:
 
         # Settings sub-frame on the left side
         settings = ttk.Frame(left)
-        settings.pack(side="left", fill="both", expand=True)
-        settings.columnconfigure(1, weight=1)
+        settings.pack(side="left", fill="y")
 
         # Mode selector
         mode_frame = ttk.Frame(settings)
@@ -189,7 +188,7 @@ class SignForm:
         ttk.Label(settings, text=_("gui.position_label")).grid(
             row=1, column=0, sticky="e", **opt_pad
         )
-        self._pos_combo.grid(row=1, column=1, sticky="ew", **opt_pad)
+        self._pos_combo.grid(row=1, column=1, sticky="w", **opt_pad)
 
         page_validate = frame.register(self._validate_page)
         self._page_combo = ttk.Combobox(
@@ -200,7 +199,7 @@ class SignForm:
             validatecommand=(page_validate, "%P"),
         )
         ttk.Label(settings, text=_("gui.page_label")).grid(row=2, column=0, sticky="e", **opt_pad)
-        self._page_combo.grid(row=2, column=1, sticky="ew", **opt_pad)
+        self._page_combo.grid(row=2, column=1, sticky="w", **opt_pad)
 
         profile = get_active_profile()
         default_font = profile.font if profile else "noto-sans"
@@ -212,7 +211,7 @@ class SignForm:
             state="readonly",
         )
         ttk.Label(settings, text=_("gui.font_label")).grid(row=3, column=0, sticky="e", **opt_pad)
-        self._font_combo.grid(row=3, column=1, sticky="ew", **opt_pad)
+        self._font_combo.grid(row=3, column=1, sticky="w", **opt_pad)
 
         self._invisible_cb = ttk.Checkbutton(
             settings,
@@ -224,7 +223,7 @@ class SignForm:
 
         self._reason_entry = ttk.Entry(settings, textvariable=self._reason)
         ttk.Label(settings, text=_("gui.reason_label")).grid(row=5, column=0, sticky="e", **opt_pad)
-        self._reason_entry.grid(row=5, column=1, sticky="ew", **opt_pad)
+        self._reason_entry.grid(row=5, column=1, sticky="w", **opt_pad)
 
         # Position preview canvas on the right side
         import tkinter as real_tk
