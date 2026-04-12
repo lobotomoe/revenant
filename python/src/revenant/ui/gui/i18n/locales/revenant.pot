@@ -697,18 +697,22 @@ msgstr ""
 msgid "gui.cancelling_ellipsis"
 msgstr ""
 
-#. EN: Show
-msgid "gui.show"
+#. EN: Show password
+msgid "gui.show_password"
 msgstr ""
 
-#. EN: Hide
-msgid "gui.hide"
+#. EN: Certificate validity unknown
+msgid "gui.cert_validity_unknown"
 msgstr ""
 
-#. EN: Valid:
-msgid "gui.valid_label"
+#. EN: {start} - {end} ({days} days remaining)
+msgid "gui.cert_valid_range"
 msgstr ""
 
-#. EN: Status:
-msgid "gui.status_label"
+#. EN: {start} - {end} ({days} days left!)
+msgid "gui.cert_expiring_soon_range"
+msgstr ""
+
+#. EN: EXPIRED: {start} - {end} ({days} days ago)
+msgid "gui.cert_expired_range"
 msgstr ""

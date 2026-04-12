@@ -698,18 +698,22 @@ msgstr "Готово: {succeeded} подписано, {failed} с ошибкам
 msgid "gui.cancelling_ellipsis"
 msgstr "Отмена..."
 
-#. EN: Show
-msgid "gui.show"
-msgstr "Показать"
+#. EN: Show password
+msgid "gui.show_password"
+msgstr "Показать пароль"
 
-#. EN: Hide
-msgid "gui.hide"
-msgstr "Скрыть"
+#. EN: Certificate validity unknown
+msgid "gui.cert_validity_unknown"
+msgstr "Срок действия неизвестен"
 
-#. EN: Valid:
-msgid "gui.valid_label"
-msgstr "Срок:"
+#. EN: {start} - {end} ({days} days remaining)
+msgid "gui.cert_valid_range"
+msgstr "{start} - {end} ({days} дн. осталось)"
 
-#. EN: Status:
-msgid "gui.status_label"
-msgstr "Статус:"
+#. EN: {start} - {end} ({days} days left!)
+msgid "gui.cert_expiring_soon_range"
+msgstr "{start} - {end} ({days} дн. осталось!)"
+
+#. EN: EXPIRED: {start} - {end} ({days} days ago)
+msgid "gui.cert_expired_range"
+msgstr "ИСТЕК: {start} - {end} ({days} дн. назад)"

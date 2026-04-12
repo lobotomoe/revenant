@@ -698,18 +698,22 @@ msgstr "Batch complete: {succeeded} signed, {failed} failed."
 msgid "gui.cancelling_ellipsis"
 msgstr "Cancelling..."
 
-#. EN: Show
-msgid "gui.show"
-msgstr "Show"
+#. EN: Show password
+msgid "gui.show_password"
+msgstr "Show password"
 
-#. EN: Hide
-msgid "gui.hide"
-msgstr "Hide"
+#. EN: Certificate validity unknown
+msgid "gui.cert_validity_unknown"
+msgstr "Certificate validity unknown"
 
-#. EN: Valid:
-msgid "gui.valid_label"
-msgstr "Valid:"
+#. EN: {start} - {end} ({days} days remaining)
+msgid "gui.cert_valid_range"
+msgstr "{start} - {end} ({days} days remaining)"
 
-#. EN: Status:
-msgid "gui.status_label"
-msgstr "Status:"
+#. EN: {start} - {end} ({days} days left!)
+msgid "gui.cert_expiring_soon_range"
+msgstr "{start} - {end} ({days} days left!)"
+
+#. EN: EXPIRED: {start} - {end} ({days} days ago)
+msgid "gui.cert_expired_range"
+msgstr "EXPIRED: {start} - {end} ({days} days ago)"

@@ -24,6 +24,7 @@ from ...config import (
 from ...core.cert_info import discover_identity_from_server
 from ...errors import AuthError, RevenantError, TLSError
 from .i18n import _
+from .sign_panels import format_cert_validity
 from .utils import run_in_thread
 
 if TYPE_CHECKING:
@@ -183,13 +184,15 @@ class LoginDialog:
         )
         self._pass_entry.pack(side="left")
         self._pass_visible = False
-        self._toggle_btn = ttk.Button(
+        import tkinter as real_tk
+
+        self._show_pass_var = real_tk.BooleanVar(value=False)
+        ttk.Checkbutton(
             pwd_frame,
-            text=_("gui.show"),
-            width=5,
+            text=_("gui.show_password"),
+            variable=self._show_pass_var,
             command=self._toggle_password_visibility,
-        )
-        self._toggle_btn.pack(side="left", padx=(4, 0))
+        ).pack(side="left", padx=(8, 0))
 
     def _build_identity(self) -> None:
         """Step 2: Discover signer identity."""
@@ -271,25 +274,14 @@ class LoginDialog:
                     row += 1
 
         # Show certificate validity period
-        from ...core.cert_expiry import format_expiry_summary, format_validity_period
-
-        not_before = info.get("not_before")
         not_after = info.get("not_after")
-        if not_before or not_after:
-            validity = format_validity_period(not_before, not_after)
-            summary = format_expiry_summary(not_after)
+        if not_after:
+            text, color = format_cert_validity(info.get("not_before"), not_after)
             self._ttk.Label(
                 self._id_frame,
-                text=f"{_('gui.valid_label')} {validity}",
-                foreground="gray",
-            ).grid(row=row, column=0, sticky="w", padx=16, pady=(4, 0))
-            row += 1
-            color = "red" if "EXPIRED" in summary else "orange" if "soon" in summary else "gray"
-            self._ttk.Label(
-                self._id_frame,
-                text=f"{_('gui.status_label')} {summary}",
+                text=text,
                 foreground=color,
-            ).grid(row=row, column=0, sticky="w", padx=16)
+            ).grid(row=row, column=0, sticky="w", padx=16, pady=(4, 0))
 
     def _show_fallbacks(self) -> None:
         """Show recovery options after identity discovery failure.
@@ -382,9 +374,8 @@ class LoginDialog:
 
     def _toggle_password_visibility(self) -> None:
         """Toggle password field between masked and plain text."""
-        self._pass_visible = not self._pass_visible
+        self._pass_visible = self._show_pass_var.get()
         self._pass_entry.configure(show="" if self._pass_visible else "\u2022")
-        self._toggle_btn.configure(text=_("gui.hide") if self._pass_visible else _("gui.show"))
 
     # ── Navigation ──────────────────────────────────────────────────
 

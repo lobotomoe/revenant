@@ -13,9 +13,41 @@ if TYPE_CHECKING:
     import tkinter as tk
     from collections.abc import Callable
 
+import datetime
+
 from ...config import get_active_profile, get_credential_storage_info
 from ...core.appearance import extract_cert_fields
+from ...core.cert_expiry import days_remaining, expiry_status
 from .i18n import _
+
+
+def format_cert_validity(not_before: str | None, not_after: str | None) -> tuple[str, str]:
+    """Format certificate validity with i18n support.
+
+    Returns:
+        (display_text, color) -- color is "gray", "orange", or "red".
+    """
+    if not not_after:
+        return _("gui.cert_validity_unknown"), "gray"
+
+    start = ""
+    if not_before:
+        dt = datetime.datetime.fromisoformat(not_before)
+        start = dt.strftime("%Y-%m-%d")
+
+    dt_end = datetime.datetime.fromisoformat(not_after)
+    end = dt_end.strftime("%Y-%m-%d")
+    remaining = days_remaining(not_after)
+    status = expiry_status(not_after)
+
+    if status == "expired":
+        text = _("gui.cert_expired_range").format(start=start, end=end, days=abs(remaining))
+        return text, "red"
+    if status == "expiring_soon":
+        text = _("gui.cert_expiring_soon_range").format(start=start, end=end, days=remaining)
+        return text, "orange"
+    text = _("gui.cert_valid_range").format(start=start, end=end, days=remaining)
+    return text, "gray"
 
 
 def build_unconfigured(parent: tk.Widget, on_connect_action: Callable[[], None]) -> None:
@@ -103,13 +135,10 @@ def build_account_panel(
         info_row += 1
 
     # Certificate validity
-    from ...core.cert_expiry import format_expiry_summary
-
     not_after = signer_info.get("not_after")
     if not_after:
-        summary = format_expiry_summary(not_after)
-        color = "red" if "EXPIRED" in summary else "orange" if "soon" in summary else "gray"
-        ttk.Label(parent, text=summary, foreground=color).grid(
+        text, color = format_cert_validity(signer_info.get("not_before"), not_after)
+        ttk.Label(parent, text=text, foreground=color).grid(
             row=info_row, column=0, columnspan=2, sticky="w", pady=1
         )
         info_row += 1
