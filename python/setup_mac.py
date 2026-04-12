@@ -75,6 +75,7 @@ OPTIONS = {
         "defusedxml",
         "PIL",
         "tkinter",
+        "encodings",
     ],
     "includes": [
         "keyring.backends",

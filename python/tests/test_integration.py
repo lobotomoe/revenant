@@ -945,6 +945,35 @@ def test_cert_info_from_signed_pdf_includes_dates():
     assert info.get("not_after") is not None, "not_after must be present in PDF cert"
 
 
+@requires_creds
+def test_cert_parsing_handles_bmpstring_encoding():
+    """EKENG certs use BMPString (UTF-16-BE) for DN fields -- must decode correctly."""
+    from revenant.core.cert_info import extract_cert_info_from_x509
+    from revenant.network.soap_transport import enum_certificates
+
+    certs = enum_certificates(URL, USER, PASS, timeout=30)
+    assert certs, "Must get at least one certificate"
+
+    info = extract_cert_info_from_x509(certs[0])
+
+    # Name must be readable text, not hex garbage or encoding errors
+    name = info["name"]
+    assert name is not None, "CN must be present"
+    assert len(name) > 3, f"CN suspiciously short: {name!r}"
+    assert "\\x" not in name, f"CN contains hex escapes: {name!r}"
+    assert "utf" not in name.lower(), f"CN contains encoding artifact: {name!r}"
+
+    # Validity dates must parse without encoding errors
+    assert info.get("not_before") is not None, "not_before must survive BMPString parsing"
+    assert info.get("not_after") is not None, "not_after must survive BMPString parsing"
+
+    # Verify the full round-trip: cert -> info -> isoformat
+    import datetime
+
+    datetime.datetime.fromisoformat(info["not_before"])
+    datetime.datetime.fromisoformat(info["not_after"])
+
+
 # ── LTV status ───────────────────────────────────────────────────
 
 
