@@ -69,7 +69,7 @@ msgid "gui.connect"
 msgstr "Connect"
 
 msgid "gui.connect_to_a_server_to_sign_documents"
-msgstr "Connect to a server\\nto sign documents."
+msgstr "Connect to a server\nto sign documents."
 
 msgid "gui.connect_to_server"
 msgstr "Connect to Server"
@@ -87,19 +87,19 @@ msgid "gui.could_not_determine_identity_from_server"
 msgstr "Could not determine identity from server."
 
 msgid "gui.could_not_read_password_from_system_keychain_pleas_a490f2d1"
-msgstr "Could not read password from system keychain.\\nPlease re-enter your password."
+msgstr "Could not read password from system keychain.\nPlease re-enter your password."
 
 msgid "gui.could_not_save_password_to_system_keychain_access_04b14699"
-msgstr "Could not save password to system keychain\\n(access was denied or unavailable).\\n\\nYour password was saved to the config file instead.\\nTo use secure storage, allow keychain access\\nwhen prompted."
+msgstr "Could not save password to system keychain\n(access was denied or unavailable).\n\nYour password was saved to the config file instead.\nTo use secure storage, allow keychain access\nwhen prompted."
 
 msgid "gui.credentials"
 msgstr "Credentials"
 
 msgid "gui.credentials_must_contain_only_latin_characters_ple_e9a0742d"
-msgstr "Credentials must contain only Latin characters.\\nPlease check your keyboard layout."
+msgstr "Credentials must contain only Latin characters.\nPlease check your keyboard layout."
 
 msgid "gui.cross_platform_client_for_arx_cosign_electronic_signatures"
-msgstr "Cross-platform client for ARX CoSign\\nelectronic signatures."
+msgstr "Cross-platform client for ARX CoSign\nelectronic signatures."
 
 msgid "gui.custom_server"
 msgstr "Custom server"
@@ -168,10 +168,10 @@ msgid "gui.file"
 msgstr "File"
 
 msgid "gui.file_already_exists_filename_overwrite"
-msgstr "File already exists:\\n{filename}\\n\\nOverwrite?"
+msgstr "File already exists:\n{filename}\n\nOverwrite?"
 
 msgid "gui.file_not_found_path"
-msgstr "File not found:\\n{path}"
+msgstr "File not found:\n{path}"
 
 msgid "gui.font_label"
 msgstr "Font:"
@@ -216,7 +216,7 @@ msgid "gui.log_out"
 msgstr "Log Out"
 
 msgid "gui.log_out_server_connection_will_be_preserved"
-msgstr "Log out?\\nServer connection will be preserved."
+msgstr "Log out?\nServer connection will be preserved."
 
 msgid "gui.logging_out_ellipsis"
 msgstr "Logging out..."
@@ -240,13 +240,13 @@ msgid "gui.no_server_configured"
 msgstr "No server configured"
 
 msgid "gui.no_server_configured_click_setup_to_configure"
-msgstr "No server configured.\\nClick 'Setup...' to configure."
+msgstr "No server configured.\nClick 'Setup...' to configure."
 
 msgid "gui.no_signer"
 msgstr "(no signer)"
 
 msgid "gui.note_cryptographic_verification_requires_the_origi_d0fbbcbb"
-msgstr "  Note: cryptographic verification requires the original PDF.\\n  Add the PDF to verify the signature integrity."
+msgstr "  Note: cryptographic verification requires the original PDF.\n  Add the PDF to verify the signature integrity."
 
 msgid "gui.ok_upper"
 msgstr "OK"
@@ -264,7 +264,7 @@ msgid "gui.output_opt_label"
 msgstr "Output (opt):"
 
 msgid "gui.output_path_must_be_absolute_use_browse_to_select_a_location"
-msgstr "Output path must be absolute.\\nUse 'Browse...' to select a location."
+msgstr "Output path must be absolute.\nUse 'Browse...' to select a location."
 
 msgid "gui.page_label"
 msgstr "Page:"
@@ -282,10 +282,10 @@ msgid "gui.pdf_files"
 msgstr "PDF files"
 
 msgid "gui.permission_denied_path_try_saving_to_a_different_l_51ac0570"
-msgstr "Permission denied:\\n{path}\\n\\nTry saving to a different location\\nusing 'Browse...'."
+msgstr "Permission denied:\n{path}\n\nTry saving to a different location\nusing 'Browse...'."
 
 msgid "gui.permission_denied_path_try_selecting_the_file_agai_de400967"
-msgstr "Permission denied:\\n{path}\\n\\nTry selecting the file again using 'Browse...'."
+msgstr "Permission denied:\n{path}\n\nTry selecting the file again using 'Browse...'."
 
 msgid "gui.pkcs_7_signature"
 msgstr "PKCS#7 signature"
@@ -342,7 +342,7 @@ msgid "gui.select_a_cosign_server_label"
 msgstr "Select a CoSign server:"
 
 msgid "gui.select_a_pdf_file_and_click_verify_to_check_signat_8fbc47f0"
-msgstr "Select a PDF file and click Verify to check signatures.\\n\\nModes:\\n  PDF only -- verify embedded signatures\\n  PDF + .p7s -- verify detached signature\\n  .p7s only -- inspect certificate (no crypto verification)"
+msgstr "Select a PDF file and click Verify to check signatures.\n\nModes:\n  PDF only -- verify embedded signatures\n  PDF + .p7s -- verify detached signature\n  .p7s only -- inspect certificate (no crypto verification)"
 
 msgid "gui.select_a_server"
 msgstr "Select a server."
@@ -366,7 +366,7 @@ msgid "gui.server_address_not_found_check_the_server_url"
 msgstr "Server address not found. Check the server URL."
 
 msgid "gui.server_connected_log_in_to_sign_documents"
-msgstr "Server connected.\\nLog in to sign documents."
+msgstr "Server connected.\nLog in to sign documents."
 
 msgid "gui.server_error_error"
 msgstr "Server error: {error}"
@@ -450,10 +450,10 @@ msgid "gui.telegram"
 msgstr "Telegram"
 
 msgid "gui.this_pdf_is_size_mb_mb_files_over_30_mb_may_take_a_64b3d55a"
-msgstr "This PDF is {size_mb} MB.\\n\\nFiles over 30 MB may take a long time to sign\\nor fail on the server.\\n\\nContinue?"
+msgstr "This PDF is {size_mb} MB.\n\nFiles over 30 MB may take a long time to sign\nor fail on the server.\n\nContinue?"
 
 msgid "gui.this_will_also_remove_your_credentials_and_signer_identity"
-msgstr "This will also remove your credentials\\nand signer identity."
+msgstr "This will also remove your credentials\nand signer identity."
 
 msgid "gui.unavailable_error"
 msgstr "Unavailable: {error}"
