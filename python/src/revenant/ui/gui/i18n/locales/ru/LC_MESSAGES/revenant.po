@@ -256,7 +256,7 @@ msgstr "Невидимая подпись"
 
 #. EN: Reason:
 msgid "gui.reason_label"
-msgstr "Причина:"
+msgstr "Основание:"
 
 #. EN: Invalid page specification
 msgid "gui.invalid_page_specification"
