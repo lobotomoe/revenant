@@ -717,3 +717,31 @@ msgstr "{start} - {end} ({days} дн. осталось!)"
 #. EN: EXPIRED: {start} - {end} ({days} days ago)
 msgid "gui.cert_expired_range"
 msgstr "ИСТЕК: {start} - {end} ({days} дн. назад)"
+
+#. EN: Bottom center
+msgid "gui.pos_bottom_center"
+msgstr "Снизу по центру"
+
+#. EN: Bottom left
+msgid "gui.pos_bottom_left"
+msgstr "Снизу слева"
+
+#. EN: Bottom right
+msgid "gui.pos_bottom_right"
+msgstr "Снизу справа"
+
+#. EN: Top left
+msgid "gui.pos_top_left"
+msgstr "Сверху слева"
+
+#. EN: Top right
+msgid "gui.pos_top_right"
+msgstr "Сверху справа"
+
+#. EN: Last
+msgid "gui.page_last"
+msgstr "Последняя"
+
+#. EN: First
+msgid "gui.page_first"
+msgstr "Первая"

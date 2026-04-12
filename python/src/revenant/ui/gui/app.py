@@ -230,6 +230,7 @@ class RevenantGUI:
 
     def _on_sign(self) -> None:
         """Collect form values and delegate to signing worker."""
+        from .sign_form import page_key_from_display, position_key_from_display
         from .sign_options import SignOptions
         from .sign_worker import start_batch_signing, start_signing
 
@@ -238,8 +239,8 @@ class RevenantGUI:
 
         opts = SignOptions(
             signing_mode=self.signing_mode.get(),
-            position=self.position.get(),
-            page=self.page.get().strip(),
+            position=position_key_from_display(self.position.get()),
+            page=page_key_from_display(self.page.get().strip()),
             font_key=self.font_key.get(),
             invisible=self.invisible.get(),
             reason=self.reason.get().strip(),

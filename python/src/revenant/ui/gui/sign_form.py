@@ -13,16 +13,74 @@ if TYPE_CHECKING:
 
 from ...config import get_active_profile
 from ...core.appearance import AVAILABLE_FONTS
-from ...core.pdf import POSITION_PRESETS
 from .i18n import _
 from .position_preview import PREVIEW_H, PREVIEW_W, draw_position_preview
 from .sign_panels import build_account_panel
 
-# Position labels for the dropdown (full names only, sorted)
-_POSITIONS = sorted(POSITION_PRESETS)
+# Page/position display: translated labels mapped to internal keys.
+# All _() calls use string literals so the i18n consistency checker finds them.
 
-# Page choices (1-based for user display, converted to 0-based internally)
-_PAGES = ["last", "first", "1", "2", "3", "4", "5"]
+
+def _page_pairs() -> list[tuple[str, str]]:
+    """Return (internal_key, display_label) pairs for page choices."""
+    return [
+        ("last", _("gui.page_last")),
+        ("first", _("gui.page_first")),
+        ("1", "1"),
+        ("2", "2"),
+        ("3", "3"),
+        ("4", "4"),
+        ("5", "5"),
+    ]
+
+
+def page_display_values() -> list[str]:
+    return [display for _, display in _page_pairs()]
+
+
+def page_key_from_display(display: str) -> str:
+    for key, label in _page_pairs():
+        if label == display:
+            return key
+    return display
+
+
+def page_display_from_key(key: str) -> str:
+    for k, label in _page_pairs():
+        if k == key:
+            return label
+    return key
+
+
+def _position_pairs() -> list[tuple[str, str]]:
+    """Return (internal_key, display_label) pairs for positions, sorted by key."""
+    pairs = [
+        ("bottom-center", _("gui.pos_bottom_center")),
+        ("bottom-left", _("gui.pos_bottom_left")),
+        ("bottom-right", _("gui.pos_bottom_right")),
+        ("top-left", _("gui.pos_top_left")),
+        ("top-right", _("gui.pos_top_right")),
+    ]
+    pairs.sort(key=lambda p: p[0])
+    return pairs
+
+
+def position_display_names() -> list[str]:
+    return [display for _, display in _position_pairs()]
+
+
+def position_key_from_display(display: str) -> str:
+    for key, label in _position_pairs():
+        if label == display:
+            return key
+    return display
+
+
+def position_display_from_key(key: str) -> str:
+    for k, label in _position_pairs():
+        if k == key:
+            return label
+    return key
 
 
 class SignForm:
@@ -182,19 +240,22 @@ class SignForm:
             command=self._on_mode_change,
         ).pack(side="left")
 
+        # Set the display name for the current position
+        self._position.set(position_display_from_key(self._position.get()))
         self._pos_combo = ttk.Combobox(
-            settings, textvariable=self._position, values=_POSITIONS, state="readonly"
+            settings, textvariable=self._position, values=position_display_names(), state="readonly"
         )
         ttk.Label(settings, text=_("gui.position_label")).grid(
             row=1, column=0, sticky="e", **opt_pad
         )
         self._pos_combo.grid(row=1, column=1, sticky="w", **opt_pad)
 
+        self._page.set(page_display_from_key(self._page.get()))
         page_validate = frame.register(self._validate_page)
         self._page_combo = ttk.Combobox(
             settings,
             textvariable=self._page,
-            values=_PAGES,
+            values=page_display_values(),
             validate="key",
             validatecommand=(page_validate, "%P"),
         )
@@ -312,19 +373,28 @@ class SignForm:
 
     def _draw_position_preview(self) -> None:
         """Draw a mini page diagram showing where the signature stamp will land."""
-        draw_position_preview(self._preview, self._position.get())
+        key = position_key_from_display(self._position.get())
+        draw_position_preview(self._preview, key)
 
     # ── Form state handlers ──────────────────────────────────────
 
     @staticmethod
     def _validate_page(value: str) -> bool:
-        """Allow empty, digits, or partial matches of 'first'/'last'."""
+        """Allow empty, digits, or partial matches of translated page names."""
         if not value:
             return True
         if value.isdigit():
             return True
-        # Allow typing "first" or "last" character by character
-        return "first".startswith(value.lower()) or "last".startswith(value.lower())
+        lower = value.lower()
+        # Allow typing translated "first"/"last" character by character
+        first_display = _("gui.page_first").lower()
+        last_display = _("gui.page_last").lower()
+        return (
+            first_display.startswith(lower)
+            or last_display.startswith(lower)
+            or "first".startswith(lower)
+            or "last".startswith(lower)
+        )
 
     def _on_invisible_toggle(self) -> None:
         """Enable/disable visual controls based on invisible checkbox."""
