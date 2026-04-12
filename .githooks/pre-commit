@@ -35,6 +35,11 @@ if [ -n "$PY_CHANGED" ]; then
     printf "${RED}[pre-commit]${NC} pyright failed\n"
     FAILED=1
   fi
+
+  if ! (cd python/scripts && python check_translations.py); then
+    printf "${RED}[pre-commit]${NC} i18n translation check failed (run: cd python/scripts && python check_translations.py)\n"
+    FAILED=1
+  fi
 fi
 
 if [ -n "$TS_CHANGED" ]; then

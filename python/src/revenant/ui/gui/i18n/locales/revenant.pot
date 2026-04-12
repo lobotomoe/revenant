@@ -257,6 +257,10 @@ msgstr ""
 msgid "gui.reason_label"
 msgstr ""
 
+#. EN: Invalid page specification
+msgid "gui.invalid_page_specification"
+msgstr ""
+
 #. EN: Language:
 msgid "gui.language_label"
 msgstr ""

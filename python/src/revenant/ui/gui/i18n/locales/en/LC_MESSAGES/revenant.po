@@ -194,6 +194,9 @@ msgstr "Invisible signature"
 msgid "gui.reason_label"
 msgstr "Reason:"
 
+msgid "gui.invalid_page_specification"
+msgstr "Invalid page specification"
+
 msgid "gui.language_label"
 msgstr "Language:"
 

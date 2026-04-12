@@ -258,6 +258,10 @@ msgstr "Անտեսանելի ստորագրություն"
 msgid "gui.reason_label"
 msgstr "Reason:"
 
+#. EN: Invalid page specification
+msgid "gui.invalid_page_specification"
+msgstr "Invalid page specification"
+
 #. EN: Language:
 msgid "gui.language_label"
 msgstr "Լեզու:"

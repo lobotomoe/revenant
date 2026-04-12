@@ -258,6 +258,10 @@ msgstr "Невидимая подпись"
 msgid "gui.reason_label"
 msgstr "Причина:"
 
+#. EN: Invalid page specification
+msgid "gui.invalid_page_specification"
+msgstr "Неверный номер страницы"
+
 #. EN: Language:
 msgid "gui.language_label"
 msgstr "Язык:"
