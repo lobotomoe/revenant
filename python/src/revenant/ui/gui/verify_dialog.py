@@ -21,6 +21,7 @@ if TYPE_CHECKING:
 
     from ...network.soap import ServerVerifyResult
 
+from ...config import get_active_profile
 from ...core.pdf import (
     CmsInspection,
     VerificationResult,
@@ -290,7 +291,9 @@ class _VerifyResultDialog:
             return
 
         try:
-            results = verify_all_embedded_signatures(pdf_bytes)
+            profile = get_active_profile()
+            tsl_url = profile.tsl_url if profile else None
+            results = verify_all_embedded_signatures(pdf_bytes, tsl_url=tsl_url)
         except RevenantError as e:
             msg = str(e)
             self._win.after(0, lambda m=msg: self._show_error(m))

@@ -35,6 +35,9 @@ export interface VerifyEntry {
   valid: boolean;
   signerName: string;
   detailLines: string[];
+  chainValid: boolean | null;
+  trustStatus: string | null;
+  trustAnchor: string | null;
 }
 
 export interface VerifyResult {
@@ -243,6 +246,9 @@ export function formatVerifyResults(results: VerificationResult[]): VerifyResult
       valid,
       signerName,
       detailLines,
+      chainValid: result.chainValid,
+      trustStatus: result.trustStatus,
+      trustAnchor: result.trustAnchor,
     });
   }
 

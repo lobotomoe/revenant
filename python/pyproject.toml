@@ -29,7 +29,7 @@ classifiers = [
     "Topic :: Security :: Cryptography",
     "Typing :: Typed",
 ]
-dependencies = ["pikepdf>=8.0,<11", "asn1crypto>=1.5,<2", "tlslite-ng>=0.8.0,<0.9", "defusedxml>=0.7,<1"]
+dependencies = ["pikepdf>=8.0,<11", "asn1crypto>=1.5,<2", "tlslite-ng>=0.8.0,<0.9", "defusedxml>=0.7,<1", "cryptography>=42.0,<48"]
 
 [project.optional-dependencies]
 secure = ["keyring>=21.0,<26"]

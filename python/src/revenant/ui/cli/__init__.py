@@ -12,7 +12,7 @@ import argparse
 import sys
 from pathlib import Path
 
-from ...config import BUILTIN_PROFILES, get_server_config
+from ...config import BUILTIN_PROFILES, get_active_profile, get_server_config
 from ...constants import __version__
 from ...core.pdf import verify_all_embedded_signatures
 from ...errors import RevenantError
@@ -60,7 +60,9 @@ def _cmd_check(args: argparse.Namespace) -> None:
     print(f"Checking {pdf_path.name} ({format_size_kb(len(pdf_bytes))})...")
 
     try:
-        results = verify_all_embedded_signatures(pdf_bytes)
+        profile = get_active_profile()
+        tsl_url = profile.tsl_url if profile else None
+        results = verify_all_embedded_signatures(pdf_bytes, tsl_url=tsl_url)
     except RevenantError as e:
         print(f"  ERROR: {e}", file=sys.stderr)
         sys.exit(1)

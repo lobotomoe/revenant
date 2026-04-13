@@ -100,5 +100,16 @@ export const MAX_TIMEOUT = 3600;
 /** Default position preset for embedded signatures. */
 export const DEFAULT_POSITION = "bottom-right";
 
+// -- TSL / chain validation --------------------------------------------------
+
+/** Trust Service List cache time-to-live (seconds) -- 24 hours. */
+export const TSL_CACHE_TTL = 86400;
+
+/** TSL fetch timeout (seconds). */
+export const TSL_FETCH_TIMEOUT = 30;
+
+/** Maximum AIA intermediate cert fetches per chain. */
+export const MAX_AIA_FETCHES = 5;
+
 /** PDF file magic bytes. */
 export const PDF_MAGIC = new Uint8Array([0x25, 0x50, 0x44, 0x46, 0x2d]); // %PDF-

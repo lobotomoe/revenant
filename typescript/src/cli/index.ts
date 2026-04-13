@@ -50,7 +50,10 @@ async function cmdCheck(pdfPath: string, options: { server?: boolean }): Promise
 
   let results: VerificationResult[];
   try {
-    results = await verifyAllEmbeddedSignatures(pdfBytes);
+    const { getActiveProfile } = await import("../config/index.js");
+    const profile = getActiveProfile();
+    const tslUrl = profile?.tslUrl ?? null;
+    results = await verifyAllEmbeddedSignatures(pdfBytes, tslUrl);
   } catch (e) {
     if (e instanceof RevenantError) {
       process.stderr.write(`  ERROR: ${e.message}\n`);

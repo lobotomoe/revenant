@@ -14,14 +14,8 @@ import { SHA1_DIGEST_SIZE } from "../constants.js";
 import { AuthError, CertificateError, RevenantError } from "../errors.js";
 import { logger } from "../logger.js";
 import type { SigningTransport } from "../network/protocol.js";
+import { toArrayBuffer } from "../utils.js";
 import { extractCmsFromByterangeMatch, findByteRanges } from "./pdf/cms-extraction.js";
-
-/** Get a proper ArrayBuffer from a Uint8Array. */
-function toArrayBuffer(data: Uint8Array): ArrayBuffer {
-  const buf = new ArrayBuffer(data.byteLength);
-  new Uint8Array(buf).set(data);
-  return buf;
-}
 
 // OIDs for common subject fields
 const OID_CN = "2.5.4.3";
@@ -117,7 +111,7 @@ function extractInfoFromCertObject(cert: pkijs.Certificate): CertInfo {
   return fields;
 }
 
-function getOidName(oid: string): string {
+export function getOidName(oid: string): string {
   const oidNames: Record<string, string> = {
     "2.5.4.3": "CN",
     "2.5.4.4": "SN",

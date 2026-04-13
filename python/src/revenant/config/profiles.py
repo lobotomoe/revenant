@@ -71,6 +71,7 @@ class ServerProfile:
     sig_fields: tuple[SigField, ...] = ()
     font: str = "noto-sans"
     cli_description: str = ""
+    tsl_url: str | None = None
 
     def has_identity_method(self, method: str) -> bool:
         return method in self.identity_methods
@@ -101,6 +102,7 @@ BUILTIN_PROFILES: dict[str, ServerProfile] = {
         ),
         font="ghea-grapalat",
         cli_description="Cross-platform CLI for ARX CoSign electronic signatures (EKENG profile).",
+        tsl_url="https://www.gov.am/files/TSL/AM-TL-1.xml",
     ),
 }
 

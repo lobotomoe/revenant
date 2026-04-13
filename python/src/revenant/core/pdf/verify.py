@@ -35,12 +35,16 @@ class VerificationResult(TypedDict):
     ltv_enabled: bool  # Contains embedded revocation data
     details: list[str]  # Human-readable messages
     signer: dict[str, str | None] | None  # Certificate info (name, email, org, dn)
+    chain_valid: bool | None  # None = not attempted, True/False = result
+    trust_anchor: str | None  # CA name from TSL
+    trust_status: str | None  # "trusted" | "untrusted" | "unknown"
 
 
 def _verify_signature_match(
     pdf_bytes: bytes,
     br_match: re.Match[bytes],
     expected_hash: bytes | None = None,
+    tsl_url: str | None = None,
 ) -> VerificationResult:
     """Core verification logic for a single ByteRange match.
 
@@ -68,6 +72,9 @@ def _verify_signature_match(
             "ltv_enabled": False,
             "details": [f"Structure error: {e}"],
             "signer": None,
+            "chain_valid": None,
+            "trust_anchor": None,
+            "trust_status": None,
         }
 
     # ── 2. CMS structure check ───────────────────────────────────
@@ -136,6 +143,27 @@ def _verify_signature_match(
     ltv_label = "LTV enabled" if ltv.ltv_enabled else "Not LTV enabled"
     details.append(f"LTV: {ltv_label}")
 
+    # ── 6. Chain validation (optional, best-effort) ────────────────────
+    chain_valid: bool | None = None
+    trust_anchor: str | None = None
+    trust_status: str | None = "unknown"
+
+    if tsl_url:
+        try:
+            from ..chain import validate_chain_for_profile
+
+            chain_result = validate_chain_for_profile(cms_der, tsl_url)
+            chain_valid = chain_result.chain_valid
+            trust_anchor = chain_result.trust_anchor
+            if chain_valid is True:
+                trust_status = "trusted"
+            elif chain_valid is False:
+                trust_status = "untrusted"
+            details.extend(chain_result.details)
+        except Exception:
+            _logger.debug("Chain validation failed (non-fatal)", exc_info=True)
+            details.append("Chain: validation unavailable")
+
     valid = structure_ok and hash_ok
     return {
         "valid": valid,
@@ -144,11 +172,16 @@ def _verify_signature_match(
         "ltv_enabled": ltv.ltv_enabled,
         "details": details,
         "signer": signer,
+        "chain_valid": chain_valid,
+        "trust_anchor": trust_anchor,
+        "trust_status": trust_status,
     }
 
 
 def verify_embedded_signature(
-    pdf_bytes: bytes, expected_hash: bytes | None = None
+    pdf_bytes: bytes,
+    expected_hash: bytes | None = None,
+    tsl_url: str | None = None,
 ) -> VerificationResult:
     """
     Verify the last embedded PDF signature.
@@ -182,9 +215,12 @@ def verify_embedded_signature(
             "ltv_enabled": False,
             "details": ["Structure error: No /ByteRange found in PDF -- not a signed PDF?"],
             "signer": None,
+            "chain_valid": None,
+            "trust_anchor": None,
+            "trust_status": None,
         }
 
-    result = _verify_signature_match(pdf_bytes, br_matches[-1], expected_hash)
+    result = _verify_signature_match(pdf_bytes, br_matches[-1], expected_hash, tsl_url)
 
     # pikepdf structural check (informational, does not override signature validity).
     # Some valid PDFs have non-standard page trees that pikepdf rejects.
@@ -201,7 +237,10 @@ def verify_embedded_signature(
     return result
 
 
-def verify_all_embedded_signatures(pdf_bytes: bytes) -> list[VerificationResult]:
+def verify_all_embedded_signatures(
+    pdf_bytes: bytes,
+    tsl_url: str | None = None,
+) -> list[VerificationResult]:
     """
     Verify ALL embedded signatures in a PDF.
 
@@ -233,7 +272,7 @@ def verify_all_embedded_signatures(pdf_bytes: bytes) -> list[VerificationResult]
 
     results: list[VerificationResult] = []
     for br in br_matches:
-        result = _verify_signature_match(pdf_bytes, br)
+        result = _verify_signature_match(pdf_bytes, br, tsl_url=tsl_url)
         result["details"].append(pikepdf_detail)
         results.append(result)
 
@@ -246,6 +285,7 @@ def verify_all_embedded_signatures(pdf_bytes: bytes) -> list[VerificationResult]
 def verify_detached_signature(
     data_bytes: bytes,
     cms_der: bytes,
+    tsl_url: str | None = None,
 ) -> VerificationResult:
     """Verify a detached CMS/PKCS#7 signature against original data.
 
@@ -305,6 +345,27 @@ def verify_detached_signature(
     ltv_label = "LTV enabled" if ltv.ltv_enabled else "Not LTV enabled"
     details.append(f"LTV: {ltv_label}")
 
+    # Chain validation (optional, best-effort)
+    chain_valid: bool | None = None
+    trust_anchor: str | None = None
+    trust_status: str | None = "unknown"
+
+    if tsl_url:
+        try:
+            from ..chain import validate_chain_for_profile
+
+            chain_result = validate_chain_for_profile(cms_der, tsl_url)
+            chain_valid = chain_result.chain_valid
+            trust_anchor = chain_result.trust_anchor
+            if chain_valid is True:
+                trust_status = "trusted"
+            elif chain_valid is False:
+                trust_status = "untrusted"
+            details.extend(chain_result.details)
+        except Exception:
+            _logger.debug("Chain validation failed (non-fatal)", exc_info=True)
+            details.append("Chain: validation unavailable")
+
     valid = structure_ok and hash_ok
     return {
         "valid": valid,
@@ -313,4 +374,7 @@ def verify_detached_signature(
         "ltv_enabled": ltv.ltv_enabled,
         "details": details,
         "signer": signer,
+        "chain_valid": chain_valid,
+        "trust_anchor": trust_anchor,
+        "trust_status": trust_status,
     }

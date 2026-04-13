@@ -7,14 +7,8 @@ import * as asn1js from "asn1js";
 import * as pkijs from "pkijs";
 
 import { RevenantError } from "../../errors.js";
+import { toArrayBuffer } from "../../utils.js";
 import { ASN1_SEQUENCE_TAG, MIN_CMS_SIZE } from "./asn1.js";
-
-/** Get a proper ArrayBuffer from a Uint8Array. */
-function toArrayBuffer(data: Uint8Array): ArrayBuffer {
-  const buf = new ArrayBuffer(data.byteLength);
-  new Uint8Array(buf).set(data);
-  return buf;
-}
 
 /** OID for messageDigest attribute in CMS SignerInfo. */
 const OID_MESSAGE_DIGEST = "1.2.840.113549.1.9.4";

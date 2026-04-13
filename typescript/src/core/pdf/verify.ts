@@ -35,6 +35,12 @@ export interface VerificationResult {
   details: string[];
   /** Certificate info (name, email, org, dn). */
   signer: SignerInfo | null;
+  /** Chain validation result (null = not attempted). */
+  chainValid: boolean | null;
+  /** CA name from TSL. */
+  trustAnchor: string | null;
+  /** "trusted" | "untrusted" | "unknown". */
+  trustStatus: string | null;
 }
 
 // -- Helpers ------------------------------------------------------------------
@@ -62,6 +68,7 @@ async function verifySignatureMatch(
   pdfBytes: Uint8Array,
   brMatch: ByteRangeMatch,
   expectedHash: Uint8Array | null = null,
+  tslUrl: string | null = null,
 ): Promise<VerificationResult> {
   const details: string[] = [];
   let structureOk = true;
@@ -84,6 +91,9 @@ async function verifySignatureMatch(
       ltvEnabled: false,
       details: [`Structure error: ${msg}`],
       signer: null,
+      chainValid: null,
+      trustAnchor: null,
+      trustStatus: null,
     };
   }
 
@@ -157,8 +167,37 @@ async function verifySignatureMatch(
   const ltvLabel = ltv.ltvEnabled ? "LTV enabled" : "Not LTV enabled";
   details.push(`LTV: ${ltvLabel}`);
 
+  // 6. Chain validation (optional, best-effort)
+  let chainValid: boolean | null = null;
+  let trustAnchor: string | null = null;
+  let trustStatus: string | null = "unknown";
+
+  if (tslUrl) {
+    try {
+      const { validateChainForProfile } = await import("../chain.js");
+      const chainResult = await validateChainForProfile(cmsDer, tslUrl);
+      chainValid = chainResult.chainValid;
+      trustAnchor = chainResult.trustAnchor;
+      if (chainValid === true) trustStatus = "trusted";
+      else if (chainValid === false) trustStatus = "untrusted";
+      details.push(...chainResult.details);
+    } catch {
+      details.push("Chain: validation unavailable");
+    }
+  }
+
   const valid = structureOk && hashOk;
-  return { valid, structureOk, hashOk, ltvEnabled: ltv.ltvEnabled, details, signer };
+  return {
+    valid,
+    structureOk,
+    hashOk,
+    ltvEnabled: ltv.ltvEnabled,
+    details,
+    signer,
+    chainValid,
+    trustAnchor,
+    trustStatus,
+  };
 }
 
 // -- Public verification API --------------------------------------------------
@@ -174,6 +213,7 @@ async function verifySignatureMatch(
 export async function verifyEmbeddedSignature(
   pdfBytes: Uint8Array,
   expectedHash: Uint8Array | null = null,
+  tslUrl: string | null = null,
 ): Promise<VerificationResult> {
   const brMatches = findByteRanges(pdfBytes);
   if (brMatches.length === 0) {
@@ -184,6 +224,9 @@ export async function verifyEmbeddedSignature(
       ltvEnabled: false,
       details: ["Structure error: No /ByteRange found in PDF -- not a signed PDF?"],
       signer: null,
+      chainValid: null,
+      trustAnchor: null,
+      trustStatus: null,
     };
   }
 
@@ -196,9 +239,12 @@ export async function verifyEmbeddedSignature(
       ltvEnabled: false,
       details: ["Structure error: No /ByteRange found in PDF -- not a signed PDF?"],
       signer: null,
+      chainValid: null,
+      trustAnchor: null,
+      trustStatus: null,
     };
   }
-  const result = await verifySignatureMatch(pdfBytes, lastMatch, expectedHash);
+  const result = await verifySignatureMatch(pdfBytes, lastMatch, expectedHash, tslUrl);
 
   // pdf-lib structural check (informational, does not override signature validity)
   try {
@@ -223,6 +269,7 @@ export async function verifyEmbeddedSignature(
  */
 export async function verifyAllEmbeddedSignatures(
   pdfBytes: Uint8Array,
+  tslUrl: string | null = null,
 ): Promise<VerificationResult[]> {
   const brMatches = findByteRanges(pdfBytes);
   if (brMatches.length === 0) {
@@ -244,7 +291,7 @@ export async function verifyAllEmbeddedSignatures(
 
   const results: VerificationResult[] = [];
   for (const brMatch of brMatches) {
-    const result = await verifySignatureMatch(pdfBytes, brMatch);
+    const result = await verifySignatureMatch(pdfBytes, brMatch, null, tslUrl);
     result.details.push(pdfLibDetail);
     results.push(result);
   }
@@ -263,6 +310,7 @@ export async function verifyAllEmbeddedSignatures(
 export async function verifyDetachedSignature(
   dataBytes: Uint8Array,
   cmsDer: Uint8Array,
+  tslUrl: string | null = null,
 ): Promise<VerificationResult> {
   const details: string[] = [];
   let structureOk = true;
@@ -311,6 +359,35 @@ export async function verifyDetachedSignature(
   const ltvLabel = ltv.ltvEnabled ? "LTV enabled" : "Not LTV enabled";
   details.push(`LTV: ${ltvLabel}`);
 
+  // Chain validation (optional, best-effort)
+  let chainValid: boolean | null = null;
+  let trustAnchor: string | null = null;
+  let trustStatus: string | null = "unknown";
+
+  if (tslUrl) {
+    try {
+      const { validateChainForProfile } = await import("../chain.js");
+      const chainResult = await validateChainForProfile(cmsDer, tslUrl);
+      chainValid = chainResult.chainValid;
+      trustAnchor = chainResult.trustAnchor;
+      if (chainValid === true) trustStatus = "trusted";
+      else if (chainValid === false) trustStatus = "untrusted";
+      details.push(...chainResult.details);
+    } catch {
+      details.push("Chain: validation unavailable");
+    }
+  }
+
   const valid = structureOk && hashOk;
-  return { valid, structureOk, hashOk, ltvEnabled: ltv.ltvEnabled, details, signer };
+  return {
+    valid,
+    structureOk,
+    hashOk,
+    ltvEnabled: ltv.ltvEnabled,
+    details,
+    signer,
+    chainValid,
+    trustAnchor,
+    trustStatus,
+  };
 }

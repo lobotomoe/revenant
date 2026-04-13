@@ -34,6 +34,7 @@ export interface ServerProfile {
   readonly sigFields: readonly SigField[];
   readonly font: string;
   readonly cliDescription: string;
+  readonly tslUrl?: string;
 }
 
 export function hasIdentityMethod(profile: ServerProfile, method: string): boolean {
@@ -72,6 +73,7 @@ export const BUILTIN_PROFILES: ReadonlyMap<string, ServerProfile> = new Map([
       sigFields: [{ certField: "name" }, { certField: "gov_id", label: "SSN" }, { auto: "date" }],
       font: "ghea-grapalat",
       cliDescription: "Cross-platform CLI for ARX CoSign electronic signatures (EKENG profile).",
+      tslUrl: "https://www.gov.am/files/TSL/AM-TL-1.xml",
     },
   ],
 ]);

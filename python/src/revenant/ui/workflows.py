@@ -61,6 +61,9 @@ class VerifyEntry:
     valid: bool
     signer_name: str
     detail_lines: list[str]
+    chain_valid: bool | None = None
+    trust_status: str | None = None
+    trust_anchor: str | None = None
 
 
 @dataclass(frozen=True, slots=True)
@@ -260,6 +263,9 @@ def format_verify_results(results: list[VerificationResult]) -> VerifyResult:
                 valid=valid,
                 signer_name=signer_name,
                 detail_lines=detail_lines,
+                chain_valid=result.get("chain_valid"),
+                trust_status=result.get("trust_status"),
+                trust_anchor=result.get("trust_anchor"),
             )
         )
 

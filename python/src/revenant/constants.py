@@ -30,6 +30,7 @@ __all__ = [
     "ENV_TIMEOUT",
     "ENV_URL",
     "ENV_USER",
+    "MAX_AIA_FETCHES",
     "MAX_RESPONSE_SIZE",
     "MAX_TIMEOUT",
     "MIN_SIGNATURE_B64_LEN",
@@ -38,6 +39,8 @@ __all__ = [
     "PDF_WARN_SIZE",
     "RECV_BUFFER_SIZE",
     "SHA1_DIGEST_SIZE",
+    "TSL_CACHE_TTL",
+    "TSL_FETCH_TIMEOUT",
     "XML_PREVIEW_LENGTH",
     "__version__",
 ]
@@ -120,6 +123,18 @@ MAX_TIMEOUT = 3600
 
 # Default position preset for embedded signatures
 DEFAULT_POSITION = "bottom-right"
+
+
+# ── TSL / chain validation ─────────────────────────────────────────
+
+# Trust Service List cache time-to-live (seconds) -- 24 hours
+TSL_CACHE_TTL = 86400
+
+# TSL fetch timeout (seconds)
+TSL_FETCH_TIMEOUT = 30
+
+# Maximum AIA intermediate cert fetches per chain
+MAX_AIA_FETCHES = 5
 
 # PDF file magic bytes
 PDF_MAGIC = b"%PDF-"

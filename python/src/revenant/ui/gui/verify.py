@@ -24,6 +24,7 @@ if TYPE_CHECKING:
 
     from ...network.soap import ServerVerifyResult
 
+from ...config import get_active_profile
 from ...core.pdf import (
     CmsInspection,
     VerificationResult,
@@ -45,6 +46,12 @@ from .verify_dialog import (
 )
 
 _logger = logging.getLogger(__name__)
+
+
+def _get_tsl_url() -> str | None:
+    """Get TSL URL from the active server profile, if configured."""
+    profile = get_active_profile()
+    return profile.tsl_url if profile else None
 
 
 class VerifyPanel:
@@ -234,7 +241,7 @@ class VerifyPanel:
             return
 
         try:
-            results = verify_all_embedded_signatures(pdf_bytes)
+            results = verify_all_embedded_signatures(pdf_bytes, tsl_url=_get_tsl_url())
         except RevenantError as e:
             msg = str(e)
             self._root.after(0, lambda m=msg: self._finish_error(m))
@@ -258,7 +265,9 @@ class VerifyPanel:
             return
 
         try:
-            detached_result = verify_detached_signature(pdf_bytes, cms_bytes)
+            detached_result = verify_detached_signature(
+                pdf_bytes, cms_bytes, tsl_url=_get_tsl_url()
+            )
         except Exception as e:
             _logger.exception("Unexpected error during detached verification")
             msg = _("gui.unexpected_error_error").format(error=e)
@@ -268,7 +277,7 @@ class VerifyPanel:
         # Also check for embedded signatures in the PDF
         embedded_results: list[VerificationResult] = []
         try:
-            embedded_results = verify_all_embedded_signatures(pdf_bytes)
+            embedded_results = verify_all_embedded_signatures(pdf_bytes, tsl_url=_get_tsl_url())
         except RevenantError as e:
             _logger.debug("No embedded signatures in detached PDF: %s", e)
 
