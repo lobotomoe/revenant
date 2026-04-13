@@ -11,3 +11,6 @@ pyright>=1.1,<2.0
 pillow>=12.1.1,<13
 keyring>=21.0,<26
 fonttools>=4.0,<5
+# Backports for Python 3.10 (markers stripped since pip-compile runs on 3.12+)
+exceptiongroup>=1.0
+tomli>=2.0
