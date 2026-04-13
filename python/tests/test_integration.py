@@ -1086,3 +1086,64 @@ def test_empty_reason_produces_no_reason_in_pdf():
     assert b"Signed with Revenant" not in signed
     result = verify_embedded_signature(signed)
     assert result["valid"]
+
+
+# ── Chain validation against TSL ────────────────────────────────────
+
+
+@requires_creds
+def test_chain_validation_with_tsl():
+    """Sign a PDF and validate the chain against the Armenian TSL.
+
+    The test account's cert may or may not chain to a TSL-listed CA
+    (depends on which CA hierarchy the server uses). We verify that
+    chain validation runs without error and produces a definitive result.
+    """
+    signed = sign_pdf_embedded(TINY_PDF, TRANSPORT, USER, PASS, 120)
+
+    tsl_url = "https://www.gov.am/files/TSL/AM-TL-1.xml"
+    result = verify_embedded_signature(signed, tsl_url=tsl_url)
+
+    assert result["valid"]
+    # Chain validation must produce a result (not None = it ran)
+    assert result["chain_valid"] is not None or result["trust_status"] in ("trusted", "untrusted")
+    assert result["trust_status"] in ("trusted", "untrusted", "unknown")
+
+
+@requires_creds
+def test_chain_validation_without_tsl():
+    """Verify that chain fields are None when no TSL URL is provided."""
+    signed = sign_pdf_embedded(TINY_PDF, TRANSPORT, USER, PASS, 120)
+
+    result = verify_embedded_signature(signed)
+
+    assert result["valid"]
+    assert result["chain_valid"] is None
+    assert result["trust_status"] == "unknown"
+    assert result["trust_anchor"] is None
+
+
+def test_tsl_parser_with_real_tsl():
+    """Fetch and parse the real Armenian TSL."""
+    from revenant.core.tsl import clear_cache, fetch_trust_store
+
+    clear_cache()
+    store = fetch_trust_store("https://www.gov.am/files/TSL/AM-TL-1.xml")
+
+    assert store.scheme_operator == "EKENG CJSC"
+    assert len(store.ca_anchors) >= 3
+    assert any(a.service_name == "CA of RoA" for a in store.ca_anchors)
+
+
+@requires_creds
+def test_chain_validation_detached_with_tsl():
+    """Sign detached and validate chain against TSL."""
+    cms = sign_pdf_detached(TINY_PDF, TRANSPORT, USER, PASS, 120)
+    from revenant.core.pdf import verify_detached_signature
+
+    tsl_url = "https://www.gov.am/files/TSL/AM-TL-1.xml"
+    result = verify_detached_signature(TINY_PDF, cms, tsl_url=tsl_url)
+
+    assert result["valid"]
+    # Chain validation ran (produced a definitive result)
+    assert result["chain_valid"] is not None or result["trust_status"] in ("trusted", "untrusted")
