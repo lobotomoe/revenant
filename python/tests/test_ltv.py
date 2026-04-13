@@ -43,7 +43,7 @@ def _mock_signer(
     return signer
 
 
-def test_ltv_unparseable_cms():
+def test_ltv_unparsable_cms():
     """Completely invalid CMS data should return ltv_enabled=False."""
     result = check_ltv_status(b"not cms")
     assert result.ltv_enabled is False
@@ -161,5 +161,5 @@ def test_ltv_crl_access_error():
     with patch("asn1crypto.cms.ContentInfo.load", return_value=mock_ci):
         result = check_ltv_status(cms_der)
 
-    # TypeError gets caught at the outer level, returns unparseable
+    # TypeError gets caught at the outer level, returns not parsable
     assert result.ltv_enabled is False
