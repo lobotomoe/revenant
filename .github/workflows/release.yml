@@ -61,7 +61,7 @@ jobs:
       WINDOWS_SIGN: ${{ secrets.WINDOWS_CERTIFICATE_BASE64 != '' && 'true' || '' }}
 
     steps:
-      - uses: step-security/harden-runner@fe104658747b27e96e4f7e80cd0a94068e53901d # v2.16.1
+      - uses: step-security/harden-runner@f808768d1510423e83855289c910610ca9b43176 # v2.17.0
         with:
           egress-policy: audit
 
@@ -120,7 +120,7 @@ jobs:
 
       - name: Upload unsigned .app bundle
         if: runner.os == 'macOS'
-        uses: actions/upload-artifact@bbbca2ddaa5d8feaa63e36b76fdaad77386f024f # v7.0.0
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
           name: app-unsigned-${{ matrix.platform }}
           path: python/dist/Revenant-unsigned.tar.gz
@@ -128,7 +128,7 @@ jobs:
 
       - name: Upload unsigned CLI binary
         if: runner.os == 'macOS'
-        uses: actions/upload-artifact@bbbca2ddaa5d8feaa63e36b76fdaad77386f024f # v7.0.0
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
           name: cli-unsigned-${{ matrix.platform }}
           path: python/dist/revenant
@@ -203,7 +203,7 @@ jobs:
       # -- Upload artifacts (Linux/Windows) ------------------------------
       - name: Upload CLI artifact
         if: runner.os == 'Linux'
-        uses: actions/upload-artifact@bbbca2ddaa5d8feaa63e36b76fdaad77386f024f # v7.0.0
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
           name: cli-${{ matrix.platform }}
           path: python/dist/revenant-cli-${{ matrix.platform }}
@@ -211,7 +211,7 @@ jobs:
 
       - name: Upload standalone artifact (Windows)
         if: matrix.standalone
-        uses: actions/upload-artifact@bbbca2ddaa5d8feaa63e36b76fdaad77386f024f # v7.0.0
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
           name: standalone-${{ matrix.platform }}
           path: python/dist/revenant-${{ matrix.platform }}.zip
@@ -219,7 +219,7 @@ jobs:
 
       - name: Upload GUI artifact
         if: runner.os == 'Linux'
-        uses: actions/upload-artifact@bbbca2ddaa5d8feaa63e36b76fdaad77386f024f # v7.0.0
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
           name: gui-${{ matrix.platform }}
           path: python/dist/${{ matrix.gui_artifact }}
@@ -227,7 +227,7 @@ jobs:
 
       - name: Upload MSIX artifact
         if: matrix.platform == 'windows-x64'
-        uses: actions/upload-artifact@bbbca2ddaa5d8feaa63e36b76fdaad77386f024f # v7.0.0
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
           name: msix-${{ matrix.platform }}
           path: python/dist/RevenantSign.msix
@@ -254,7 +254,7 @@ jobs:
             arch: x86_64
 
     steps:
-      - uses: step-security/harden-runner@fe104658747b27e96e4f7e80cd0a94068e53901d # v2.16.1
+      - uses: step-security/harden-runner@f808768d1510423e83855289c910610ca9b43176 # v2.17.0
         with:
           egress-policy: audit
 
@@ -286,7 +286,7 @@ jobs:
         run: tar czf dist/Revenant-MAS-unsigned.tar.gz -C dist Revenant.app
 
       - name: Upload MAS unsigned .app
-        uses: actions/upload-artifact@bbbca2ddaa5d8feaa63e36b76fdaad77386f024f # v7.0.0
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
           name: mas-unsigned-${{ matrix.arch }}
           path: python/dist/Revenant-MAS-unsigned.tar.gz
@@ -309,7 +309,7 @@ jobs:
       MACOS_NOTARIZE: ${{ secrets.APPSTORE_API_KEY_BASE64 != '' && 'true' || '' }}
 
     steps:
-      - uses: step-security/harden-runner@fe104658747b27e96e4f7e80cd0a94068e53901d # v2.16.1
+      - uses: step-security/harden-runner@f808768d1510423e83855289c910610ca9b43176 # v2.17.0
         with:
           egress-policy: audit
 
@@ -501,14 +501,14 @@ jobs:
           mv Revenant.dmg Revenant-gui-macos-universal.dmg
 
       - name: Upload CLI artifact
-        uses: actions/upload-artifact@bbbca2ddaa5d8feaa63e36b76fdaad77386f024f # v7.0.0
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
           name: cli-macos-universal
           path: python/dist/revenant-cli-macos-universal
           if-no-files-found: error
 
       - name: Upload GUI artifact
-        uses: actions/upload-artifact@bbbca2ddaa5d8feaa63e36b76fdaad77386f024f # v7.0.0
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
           name: gui-macos-universal
           path: python/dist/Revenant-gui-macos-universal.dmg
@@ -530,7 +530,7 @@ jobs:
       MAS_SIGN: ${{ secrets.MAS_CERTIFICATE_BASE64 != '' && 'true' || '' }}
 
     steps:
-      - uses: step-security/harden-runner@fe104658747b27e96e4f7e80cd0a94068e53901d # v2.16.1
+      - uses: step-security/harden-runner@f808768d1510423e83855289c910610ca9b43176 # v2.17.0
         with:
           egress-policy: audit
 
@@ -630,7 +630,7 @@ jobs:
 
       - name: Upload MAS artifact
         if: env.MAS_SIGN
-        uses: actions/upload-artifact@bbbca2ddaa5d8feaa63e36b76fdaad77386f024f # v7.0.0
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
           name: mas-macos-universal
           path: python/dist/Revenant-MAS.pkg
@@ -647,7 +647,7 @@ jobs:
       attestations: write
 
     steps:
-      - uses: step-security/harden-runner@fe104658747b27e96e4f7e80cd0a94068e53901d # v2.16.1
+      - uses: step-security/harden-runner@f808768d1510423e83855289c910610ca9b43176 # v2.17.0
         with:
           egress-policy: audit
 
@@ -710,7 +710,7 @@ jobs:
       id-token: write
 
     steps:
-      - uses: step-security/harden-runner@fe104658747b27e96e4f7e80cd0a94068e53901d # v2.16.1
+      - uses: step-security/harden-runner@f808768d1510423e83855289c910610ca9b43176 # v2.17.0
         with:
           egress-policy: audit
 
@@ -740,7 +740,7 @@ jobs:
         run: python -m build python/
 
       - name: Publish to TestPyPI
-        uses: pypa/gh-action-pypi-publish@ed0c53931b1dc9bd32cbe73a98c7f6766f8a527e # release/v1
+        uses: pypa/gh-action-pypi-publish@cef221092ed1bacb1cc03d23a2d87d1d172e277b # release/v1
         with:
           repository-url: https://test.pypi.org/legacy/
           packages-dir: python/dist/
@@ -758,7 +758,7 @@ jobs:
       id-token: write
 
     steps:
-      - uses: step-security/harden-runner@fe104658747b27e96e4f7e80cd0a94068e53901d # v2.16.1
+      - uses: step-security/harden-runner@f808768d1510423e83855289c910610ca9b43176 # v2.17.0
         with:
           egress-policy: audit
 
@@ -786,7 +786,7 @@ jobs:
         run: python -m build python/
 
       - name: Publish to PyPI
-        uses: pypa/gh-action-pypi-publish@ed0c53931b1dc9bd32cbe73a98c7f6766f8a527e # release/v1
+        uses: pypa/gh-action-pypi-publish@cef221092ed1bacb1cc03d23a2d87d1d172e277b # release/v1
         with:
           packages-dir: python/dist/
           attestations: true
@@ -807,7 +807,7 @@ jobs:
         working-directory: typescript
 
     steps:
-      - uses: step-security/harden-runner@fe104658747b27e96e4f7e80cd0a94068e53901d # v2.16.1
+      - uses: step-security/harden-runner@f808768d1510423e83855289c910610ca9b43176 # v2.17.0
         with:
           egress-policy: audit
 
@@ -815,7 +815,7 @@ jobs:
         with:
           persist-credentials: false
 
-      - uses: pnpm/action-setup@fc06bc1257f339d1d5d8b3a19a8cae5388b55320 # v4
+      - uses: pnpm/action-setup@08c4be7e2e672a47d11bd04269e27e5f3e8529cb # v4
         with:
           version: 9
 
@@ -864,7 +864,7 @@ jobs:
         working-directory: typescript
 
     steps:
-      - uses: step-security/harden-runner@fe104658747b27e96e4f7e80cd0a94068e53901d # v2.16.1
+      - uses: step-security/harden-runner@f808768d1510423e83855289c910610ca9b43176 # v2.17.0
         with:
           egress-policy: audit
 
@@ -872,7 +872,7 @@ jobs:
         with:
           persist-credentials: false
 
-      - uses: pnpm/action-setup@fc06bc1257f339d1d5d8b3a19a8cae5388b55320 # v4
+      - uses: pnpm/action-setup@08c4be7e2e672a47d11bd04269e27e5f3e8529cb # v4
         with:
           version: 9
 
@@ -911,7 +911,7 @@ jobs:
       contents: read
 
     steps:
-      - uses: step-security/harden-runner@fe104658747b27e96e4f7e80cd0a94068e53901d # v2.16.1
+      - uses: step-security/harden-runner@f808768d1510423e83855289c910610ca9b43176 # v2.17.0
         with:
           egress-policy: audit
 
@@ -971,7 +971,7 @@ jobs:
       contents: read
 
     steps:
-      - uses: step-security/harden-runner@fe104658747b27e96e4f7e80cd0a94068e53901d # v2.16.1
+      - uses: step-security/harden-runner@f808768d1510423e83855289c910610ca9b43176 # v2.17.0
         with:
           egress-policy: audit
 
