@@ -80,11 +80,6 @@
     "cms",
     "oasis-dss"
   ],
-  "pnpm": {
-    "overrides": {
-      "minimatch@<10.2.1": ">=10.2.1"
-    }
-  },
   "homepage": "https://github.com/lobotomoe/revenant/tree/main/typescript#readme",
   "bugs": "https://github.com/lobotomoe/revenant/issues",
   "repository": {
