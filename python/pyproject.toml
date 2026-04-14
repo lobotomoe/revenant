@@ -33,7 +33,7 @@ dependencies = ["pikepdf>=8.0,<11", "asn1crypto>=1.5,<2", "tlslite-ng>=0.8.0,<0.
 
 [project.optional-dependencies]
 secure = ["keyring>=21.0,<26"]
-dev = ["pytest>=7.0,<10", "pytest-cov>=4.0,<8", "ruff>=0.9,<1.0", "pyright>=1.1,<2.0", "pillow>=12.1.1,<13", "keyring>=21.0,<26", "fonttools>=4.0,<5"]
+dev = ["pytest>=9.0.3,<10", "pytest-cov>=4.0,<8", "ruff>=0.9,<1.0", "pyright>=1.1,<2.0", "pillow>=12.2.0,<13", "keyring>=21.0,<26", "fonttools>=4.0,<5"]
 build = ["pyinstaller>=6.0,<7"]
 build-win = ["nuitka>=2.0,<5", "ordered-set>=4.0,<5", "zstandard>=0.20,<1"]
 build-mac = ["py2app>=0.28,<1", "keyring>=21.0,<26"]

@@ -5,10 +5,10 @@ tlslite-ng>=0.8.0,<0.9
 defusedxml>=0.7,<1
 cryptography>=42.0,<48
 # Dev extras (must match pyproject.toml [project.optional-dependencies] dev, minus ruff)
-pytest>=7.0,<10
+pytest>=9.0.3,<10
 pytest-cov>=4.0,<8
 pyright>=1.1,<2.0
-pillow>=12.1.1,<13
+pillow>=12.2.0,<13
 keyring>=21.0,<26
 fonttools>=4.0,<5
 # Backports for Python 3.10 (markers stripped since pip-compile runs on 3.12+)
