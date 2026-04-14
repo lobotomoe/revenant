@@ -36,6 +36,9 @@ from .i18n import _
 from .verify_dialog import (
     COLOR_FAILED,
     COLOR_HEADER,
+    COLOR_TRUST_NONE,
+    COLOR_TRUST_OK,
+    COLOR_TRUST_WARN,
     COLOR_VALID,
     COLOR_WARNING,
     format_detached_result,
@@ -127,6 +130,9 @@ class VerifyPanel:
             "header", foreground=COLOR_HEADER, font=("TkDefaultFont", 10, "bold")
         )
         self._text.tag_configure("placeholder", foreground="#999999")
+        self._text.tag_configure("trust_ok", foreground=COLOR_TRUST_OK)
+        self._text.tag_configure("trust_warn", foreground=COLOR_TRUST_WARN)
+        self._text.tag_configure("trust_none", foreground=COLOR_TRUST_NONE)
 
         # Initial placeholder
         self._text.configure(state="normal")

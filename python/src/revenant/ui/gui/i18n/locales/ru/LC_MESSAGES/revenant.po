@@ -650,6 +650,50 @@ msgstr "Проверить"
 msgid "gui.verify_signature"
 msgstr "Проверка подписи"
 
+#. EN: Details:
+msgid "gui.verify_details_header"
+msgstr "Детали:"
+
+#. EN: Integrity check FAILED
+msgid "gui.verify_integrity_failed"
+msgstr "Проверка целостности НЕ ПРОЙДЕНА"
+
+#. EN: OK
+msgid "gui.verify_integrity_ok"
+msgstr "OK"
+
+#. EN: Organization:
+msgid "gui.verify_org_label"
+msgstr "Организация:"
+
+#. EN: Signature:
+msgid "gui.verify_signature_label"
+msgstr "Подпись:"
+
+#. EN: Signer:
+msgid "gui.verify_signer_label"
+msgstr "Подписант:"
+
+#. EN: Trust:
+msgid "gui.verify_trust_label"
+msgstr "Доверие:"
+
+#. EN: Not checked
+msgid "gui.verify_trust_not_checked"
+msgstr "Не проверено"
+
+#. EN: Not publicly trusted
+msgid "gui.verify_trust_not_trusted"
+msgstr "Нет публичного доверия"
+
+#. EN: Matched ({anchor}), not fully verified
+msgid "gui.verify_trust_partial"
+msgstr "Совпадение ({anchor}), не полностью проверено"
+
+#. EN: Trusted ({anchor})
+msgid "gui.verify_trust_trusted"
+msgstr "Доверенный ({anchor})"
+
 #. EN: Verifying detached signature...
 msgid "gui.verifying_detached_signature_ellipsis"
 msgstr "Проверка отделённой подписи..."

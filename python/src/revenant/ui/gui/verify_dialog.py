@@ -44,6 +44,9 @@ COLOR_VALID = "#228B22"
 COLOR_FAILED = "#CC0000"
 COLOR_HEADER = "#AAAAAA"
 COLOR_WARNING = "#CC8800"
+COLOR_TRUST_OK = "#228B22"
+COLOR_TRUST_WARN = "#CC8800"
+COLOR_TRUST_NONE = "#888888"
 
 # Dialog dimensions
 _DIALOG_WIDTH = 520
@@ -51,6 +54,54 @@ _DIALOG_HEIGHT = 380
 
 
 # ── Formatting helpers ───────────────────────────────────────────
+
+
+def _format_trust_line(entry: object) -> tuple[str, str]:
+    """Build a human-readable trust status line and its color tag.
+
+    Returns:
+        (text, tag) for append().
+    """
+    chain_valid = getattr(entry, "chain_valid", None)
+    trust_anchor = getattr(entry, "trust_anchor", None)
+
+    if chain_valid is True and trust_anchor:
+        return _("gui.verify_trust_trusted").format(anchor=trust_anchor), "trust_ok"
+    if chain_valid is False:
+        return _("gui.verify_trust_not_trusted"), "trust_warn"
+    if chain_valid is None and trust_anchor:
+        # SKI/AKI match but crypto failed
+        return _("gui.verify_trust_partial").format(anchor=trust_anchor), "trust_warn"
+    return _("gui.verify_trust_not_checked"), "trust_none"
+
+
+def _format_entry_summary(append: AppendFn, entry: object) -> None:
+    """Render the human-readable summary block for one signature."""
+    from ..workflows import VerifyEntry
+
+    if not isinstance(entry, VerifyEntry):
+        return
+
+    # Signer
+    append(_("gui.verify_signer_label") + " ", "header")
+    append(entry.signer_name + "\n")
+
+    # Organization
+    if entry.signer_org:
+        append(_("gui.verify_org_label") + " ", "header")
+        append(entry.signer_org + "\n")
+
+    # Signature integrity
+    append(_("gui.verify_signature_label") + " ", "header")
+    if entry.valid:
+        append(_("gui.verify_integrity_ok") + "\n", "valid")
+    else:
+        append(_("gui.verify_integrity_failed") + "\n", "failed")
+
+    # Trust chain
+    append(_("gui.verify_trust_label") + " ", "header")
+    trust_text, trust_tag = _format_trust_line(entry)
+    append(trust_text + "\n", trust_tag)
 
 
 def format_results(
@@ -75,6 +126,12 @@ def format_results(
                 "header",
             )
 
+        # Human-readable summary
+        _format_entry_summary(append, entry)
+        append("\n")
+
+        # Technical details (collapsible in spirit -- indented and dimmed)
+        append(_("gui.verify_details_header") + "\n", "header")
         for line in entry.detail_lines:
             append(f"  {line}\n")
 
@@ -104,6 +161,31 @@ def format_detached_result(append: AppendFn, result: VerificationResult) -> None
     """Format detached signature verification result."""
     append(_("gui.detached_signature") + "\n", "header")
 
+    # Build a temporary VerifyEntry to reuse summary formatting
+    from ..workflows import VerifyEntry
+
+    signer = result.get("signer")
+    signer_name = (signer.get("name") or "Unknown") if signer else "Unknown"
+    signer_org = (signer.get("organization") if signer else None) or None
+
+    entry = VerifyEntry(
+        index=0,
+        total=1,
+        valid=result["valid"],
+        signer_name=signer_name,
+        detail_lines=[],
+        chain_valid=result.get("chain_valid"),
+        trust_status=result.get("trust_status"),
+        trust_anchor=result.get("trust_anchor"),
+        signer_org=signer_org,
+        hash_ok=result.get("hash_ok", False),
+        structure_ok=result.get("structure_ok", False),
+        ltv_enabled=result.get("ltv_enabled", False),
+    )
+    _format_entry_summary(append, entry)
+    append("\n")
+
+    append(_("gui.verify_details_header") + "\n", "header")
     for line in result["details"]:
         for sub in line.split("\n"):
             append(f"  {sub}\n")
@@ -252,6 +334,9 @@ class _VerifyResultDialog:
         self._text.tag_configure(
             "header", foreground=COLOR_HEADER, font=("TkDefaultFont", 10, "bold")
         )
+        self._text.tag_configure("trust_ok", foreground=COLOR_TRUST_OK)
+        self._text.tag_configure("trust_warn", foreground=COLOR_TRUST_WARN)
+        self._text.tag_configure("trust_none", foreground=COLOR_TRUST_NONE)
 
         # OK button
         ttk.Button(outer, text=_("gui.ok_upper"), command=self._win.destroy).grid(

@@ -485,6 +485,39 @@ msgstr "Verify"
 msgid "gui.verify_signature"
 msgstr "Verify Signature"
 
+msgid "gui.verify_details_header"
+msgstr "Details:"
+
+msgid "gui.verify_integrity_failed"
+msgstr "Integrity check FAILED"
+
+msgid "gui.verify_integrity_ok"
+msgstr "OK"
+
+msgid "gui.verify_org_label"
+msgstr "Organization:"
+
+msgid "gui.verify_signature_label"
+msgstr "Signature:"
+
+msgid "gui.verify_signer_label"
+msgstr "Signer:"
+
+msgid "gui.verify_trust_label"
+msgstr "Trust:"
+
+msgid "gui.verify_trust_not_checked"
+msgstr "Not checked"
+
+msgid "gui.verify_trust_not_trusted"
+msgstr "Not publicly trusted"
+
+msgid "gui.verify_trust_partial"
+msgstr "Matched ({anchor}), not fully verified"
+
+msgid "gui.verify_trust_trusted"
+msgstr "Trusted ({anchor})"
+
 msgid "gui.verifying_detached_signature_ellipsis"
 msgstr "Verifying detached signature..."
 

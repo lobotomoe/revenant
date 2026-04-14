@@ -64,6 +64,11 @@ class VerifyEntry:
     chain_valid: bool | None = None
     trust_status: str | None = None
     trust_anchor: str | None = None
+    signer_email: str | None = None
+    signer_org: str | None = None
+    hash_ok: bool = False
+    structure_ok: bool = False
+    ltv_enabled: bool = False
 
 
 @dataclass(frozen=True, slots=True)
@@ -248,6 +253,8 @@ def format_verify_results(results: list[VerificationResult]) -> VerifyResult:
     for i, result in enumerate(results):
         signer = result.get("signer")
         signer_name = (signer.get("name") or "Unknown") if signer else "Unknown"
+        signer_email = (signer.get("email") if signer else None) or None
+        signer_org = (signer.get("organization") if signer else None) or None
         valid = result["valid"]
         if not valid:
             failed += 1
@@ -266,6 +273,11 @@ def format_verify_results(results: list[VerificationResult]) -> VerifyResult:
                 chain_valid=result.get("chain_valid"),
                 trust_status=result.get("trust_status"),
                 trust_anchor=result.get("trust_anchor"),
+                signer_email=signer_email,
+                signer_org=signer_org,
+                hash_ok=result.get("hash_ok", False),
+                structure_ok=result.get("structure_ok", False),
+                ltv_enabled=result.get("ltv_enabled", False),
             )
         )
 

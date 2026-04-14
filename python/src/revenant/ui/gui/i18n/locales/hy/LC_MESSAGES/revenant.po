@@ -650,6 +650,50 @@ msgstr "Ստուգել"
 msgid "gui.verify_signature"
 msgstr "Ստորագրության ստուգում"
 
+#. EN: Details:
+msgid "gui.verify_details_header"
+msgstr "Մանրամասներ:"
+
+#. EN: Integrity check FAILED
+msgid "gui.verify_integrity_failed"
+msgstr "Ամբողջականության ստուգումը ԱՆՀԱՋՈՂ"
+
+#. EN: OK
+msgid "gui.verify_integrity_ok"
+msgstr "OK"
+
+#. EN: Organization:
+msgid "gui.verify_org_label"
+msgstr "Կազմակերպություն:"
+
+#. EN: Signature:
+msgid "gui.verify_signature_label"
+msgstr "Ստորագրություն:"
+
+#. EN: Signer:
+msgid "gui.verify_signer_label"
+msgstr "Ստորագրող:"
+
+#. EN: Trust:
+msgid "gui.verify_trust_label"
+msgstr "Վստահություն:"
+
+#. EN: Not checked
+msgid "gui.verify_trust_not_checked"
+msgstr "Չստուգված"
+
+#. EN: Not publicly trusted
+msgid "gui.verify_trust_not_trusted"
+msgstr "Հանրային վստահություն չկա"
+
+#. EN: Matched ({anchor}), not fully verified
+msgid "gui.verify_trust_partial"
+msgstr "Համապատասխանում ({anchor}), ոչ լիովին ստուգված"
+
+#. EN: Trusted ({anchor})
+msgid "gui.verify_trust_trusted"
+msgstr "Վստահելի ({anchor})"
+
 #. EN: Verifying detached signature...
 msgid "gui.verifying_detached_signature_ellipsis"
 msgstr "Անջատված ստորագրությունը ստուգվում է..."
