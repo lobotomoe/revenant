@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.2.0] - 2026-04-14
+
 ### Added
 
 - **PKI chain validation** against ETSI Trust Service Lists (TSL) -- verifies signer certificate chains to trusted CAs (Python and TypeScript)
@@ -173,7 +175,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Pyright strict mode type checking with 0 errors
 - 96%+ test coverage (600+ tests)
 
-[Unreleased]: https://github.com/lobotomoe/revenant/compare/v1.1.1...HEAD
+[Unreleased]: https://github.com/lobotomoe/revenant/compare/v1.2.0...HEAD
+[1.2.0]: https://github.com/lobotomoe/revenant/compare/v1.1.1...v1.2.0
 [1.1.1]: https://github.com/lobotomoe/revenant/compare/v1.1.0...v1.1.1
 [1.1.0]: https://github.com/lobotomoe/revenant/compare/v1.0.0...v1.1.0
 [1.0.0]: https://github.com/lobotomoe/revenant/compare/v0.2.6...v1.0.0

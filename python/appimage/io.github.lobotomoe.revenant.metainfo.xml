@@ -76,6 +76,16 @@
   </branding>
 
   <releases>
+    <release version="1.2.0" date="2026-04-14">
+      <description>
+        <p>PKI certificate chain validation and improved verification UX.</p>
+        <ul>
+          <li>Validate signer certificate chains against ETSI Trust Service Lists (TSL)</li>
+          <li>Human-readable trust status in verify results (trusted / not publicly trusted)</li>
+          <li>Test coverage expanded to 95%+ (740 tests)</li>
+        </ul>
+      </description>
+    </release>
     <release version="1.1.1" date="2026-04-10">
       <description>
         <p>Improved Russian and Armenian translations, added English locale.</p>

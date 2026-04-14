@@ -1176,7 +1176,7 @@ def test_version_fallback_on_missing_package():
         import revenant.constants
 
         importlib.reload(revenant.constants)
-        assert revenant.constants.__version__ == "1.1.1"
+        assert revenant.constants.__version__ == "1.2.0"
 
     # Reload again to restore real version
     importlib.reload(revenant.constants)
