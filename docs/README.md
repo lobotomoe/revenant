@@ -36,14 +36,21 @@ EKENG is configured as a built-in server profile in [`python/src/revenant/config
 |---|---|
 | [wsdl_dss.xml](wsdl_dss.xml) | Saved WSDL from the CoSign appliance |
 
+### Verification & Trust
+
+| Document | Description |
+|---|---|
+| [verification.md](verification.md) | Post-sign verification: hash checks, CMS quirks, chain validation, TSL trust anchors |
+
 ## Known limitations
 
 Protocol and server-side limitations that affect all clients. For client-specific limitations, see [`python/README.md`](../python/README.md#known-limitations) or [`typescript/README.md`](../typescript/README.md).
 
-- **SHA-1 only** — the server rejects SHA-256. SHA-1 is cryptographically broken (collision attacks are practical since 2017), but remains widely supported by PDF validators for legacy compatibility. This is a server-side limitation.
-- **Non-standard CMS OIDs** — the server returns `sha1WithRSAEncryption` as digestAlgorithm (wrong per RFC 5652). See [verification.md](verification.md).
-- **No timestamp (TSA)** — the WSDL defines timestamp options but the server ignores them.
-- **Document size limit** — 35 MB reliable, 36+ MB intermittent failures. See [soap-api.md](soap-api.md#document-size-limits).
+- **SHA-1 only** -- the server rejects SHA-256. SHA-1 is cryptographically broken (collision attacks are practical since 2017), but remains widely supported by PDF validators for legacy compatibility. This is a server-side limitation.
+- **Non-standard CMS OIDs** -- the server returns `sha1WithRSAEncryption` as digestAlgorithm (wrong per RFC 5652). See [verification.md](verification.md).
+- **No timestamp (TSA)** -- the WSDL defines timestamp options but the server ignores them.
+- **Document size limit** -- 35 MB reliable, 36+ MB intermittent failures. See [soap-api.md](soap-api.md#document-size-limits).
+- **No CRL/OCSP revocation checking** -- chain validation verifies trust anchors but does not check certificate revocation status.
 
 ## Dependencies
 
@@ -53,7 +60,7 @@ Protocol and server-side limitations that affect all clients. For client-specifi
 - `asn1crypto` -- ASN.1/DER parsing for certificate extraction (PKCS#7, X.509). Pure Python.
 - `tlslite-ng` -- pure-Python TLS for legacy servers (TLS 1.0 / RC4). Standard servers use `urllib`.
 - `defusedxml` -- safe XML parsing (prevents XML bomb / billion laughs attacks on SOAP responses).
-- `openssl` -- `verify` CLI command (optional, for detached signature verification).
+- `cryptography` -- PKI certificate chain validation (X.509 chain building, trust anchor verification).
 
 ### TypeScript/Node.js
 

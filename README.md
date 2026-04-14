@@ -81,14 +81,25 @@ pip install revenant     # or inside a venv
 npm install revenant-sign
 ```
 
+## Features
+
+- **Embedded and detached PDF signing** with customizable visual appearance
+- **Signature verification** -- hash integrity, CMS structure, certificate chain
+- **PKI chain validation** against ETSI Trust Service Lists (TSL)
+- **Localization** -- English, Russian, Armenian
+- **Batch signing** -- sign multiple files in one session
+- **Cross-platform GUI** (tkinter) and CLI
+- **macOS universal binaries** (arm64 + x86_64)
+- **Legacy TLS support** -- TLS 1.0 / RC4 for servers that require it
+
 ## Compatibility
 
 Signed PDFs verified against third-party services that accept EKENG digital signatures:
 
-- [x] [ekeng.am/sign_check](https://www.ekeng.am/en/sec_sub/sign_check) — EKENG signature validator
-- [x] [e-request.am](https://e-request.am/) — e-request.am document upload
-- [ ] [self-portal.taxservice.am](https://self-portal.taxservice.am) — Tax Service self-portal
-- [ ] [file-online.taxservice.am](https://file-online.taxservice.am) — Tax Service online filing
+- [x] [ekeng.am/sign_check](https://www.ekeng.am/en/sec_sub/sign_check) -- EKENG signature validator
+- [x] [e-request.am](https://e-request.am/) -- e-request.am document upload
+- [ ] [self-portal.taxservice.am](https://self-portal.taxservice.am) -- Tax Service self-portal
+- [ ] [file-online.taxservice.am](https://file-online.taxservice.am) -- Tax Service online filing
 
 ## Documentation
 

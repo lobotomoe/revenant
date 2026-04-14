@@ -7,6 +7,24 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- **PKI chain validation** against ETSI Trust Service Lists (TSL) -- verifies signer certificate chains to trusted CAs (Python and TypeScript)
+- TSL parser and cache with configurable TTL (24h default)
+- Per-profile `tsl_url` field; EKENG profile uses the Armenian TSL
+- Trust status display in GUI verify panel (trusted / not publicly trusted / not checked)
+- Improved verify result formatting -- human-readable summary above technical details
+
+### Improved
+
+- Test coverage expanded to 95%+ (740 tests)
+- New test modules: chain validation, LTV, ASN.1 BER edge cases, i18n
+
+### Fixed
+
+- CVE-2026-40192 (pillow), CVE-2025-71176 (pytest)
+- CI: added `cryptography` and Python 3.10 backports to dev requirements
+
 ## [1.1.1] - 2026-04-10
 
 ### Improved

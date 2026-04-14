@@ -281,23 +281,44 @@ with `UserID`/`Password` elements, not regular user credentials.
 **REST/JSON API** (port 8081): Documented in SAPI 8.0 guide as an alternative
 to SOAP. Port 8081 is not exposed on this appliance.
 
-## PKI chain
+## PKI hierarchies
+
+EKENG operates two separate PKI hierarchies on the same CoSign server:
+
+### Citizen PKI (in TSL)
+
+Certificates for Armenian citizens. These CAs are listed in the [Armenian TSL](https://www.gov.am/files/TSL/AM-TL-1.xml) and qualify as trusted electronic signatures.
+
+| CA | Root | In TSL |
+|---|---|---|
+| CA of RoA (EKENG CJSC) | National Root CA (Gov of RoA, 2013) | Yes |
+| Citizen CA (EKENG CJSC) | National Root CA (Gov of RA, 2012) | Yes |
+| RACitizen (EKENG CJSC) | National Root CA | Yes |
+
+EKENG distributes root certificates via [Certificate.exe](https://www.ekeng.am/ru/sec_sub/necessary_programs) -- an InstallShield installer that adds 4 CA certs to the Windows trusted root store via `certutil`.
+
+### Staff PKI (not in TSL)
+
+Certificates for government staff and foreign nationals. The root CA is **not** in the TSL.
 
 ```
 Subject:  O=Staff of Government of RA, CN=<signer name> <signer id>
 Issuer:   C=AM, O=Staff of Government of RA, CN=Staff of Government of RA Root CA
-Validity: 2026-01-29 to 2029-01-29
 Key:      RSA 2048-bit, sha1WithRSAEncryption
-Signature: sha1WithRSAEncryption
-Serial:   77:bc:3a:d5:ff:06:48:08:99:72:17:64:7e:7e:93:20
 EKU:      TLS Server/Client Auth, Code Signing, Email Protection, Time Stamping
 CRL:      http://www.gov.am/CAStaff/GovRootCA.crl
-CA cert:  http://www.gov.am/CAStaff/GovRootCA.crt
+AIA:      http://www.gov.am/CAStaff/GovRootCA.crt
 ```
 
-The signer certificate is embedded in every CMS signature. The CA root
-certificate is publicly available and the chain validates with
-`openssl verify`.
+The "Staff of Government of RA Root CA" is self-signed (2009, expires 2038) and trusted only within government systems. Signatures from staff accounts will report `chain_valid: false` against the TSL -- the signature is cryptographically valid but not publicly trusted.
+
+### Chain validation behavior
+
+| Account type | Root CA | TSL status | `chain_valid` |
+|---|---|---|---|
+| Armenian citizen | National Root CA -> Citizen CA / CA of RoA | In TSL | `true` |
+| Government staff / foreign | Staff of Government of RA Root CA | Not in TSL | `false` |
+| No TSL configured | -- | -- | `null` |
 
 ## e-keng / e-request validator
 

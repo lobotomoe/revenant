@@ -63,9 +63,58 @@ This catches all corruption scenarios:
 - Original PDF bytes corrupted during incremental update -> hash mismatch
 - Object serialization errors (e.g. `None` vs `null`) -> PDF readability check fails
 
-### Future: pyhanko
+### Note on pyhanko
 
-[pyhanko](https://github.com/MatthiasValworthy/pyHanko) is a Python library for PDF signature creation and validation that handles non-standard CMS structures. If the library matures into a production-ready, well-maintained option, it could replace the current manual verification with proper cryptographic CMS validation (signature math, certificate chain, revocation checks) — not just structural/hash checks.
+[pyhanko](https://github.com/MatthiasValworthy/pyHanko) is a Python library for PDF signature creation and validation that handles non-standard CMS structures. Revenant implements its own chain validation (TSL-based, using `cryptography` for X.509 verification) rather than depending on pyhanko, which is a heavier dependency with different design goals. CRL/OCSP revocation checking may be added in a future version.
+
+## PKI chain validation
+
+Since v1.1, revenant can validate the signer's certificate chain against a Trust Service List (TSL). This answers: "is this signature from a publicly trusted CA?"
+
+### How it works
+
+1. **TSL fetch** -- downloads and caches the country's Trust Service List XML (ETSI TS 119 612). The TSL lists all trusted CA certificates.
+2. **Chain building** -- extracts certificates from the CMS SignedData, builds a chain from leaf to root using SKI/AKI matching. Missing intermediates are fetched via AIA URLs.
+3. **Anchor matching** -- checks if the chain terminates at a CA listed in the TSL.
+4. **Cryptographic verification** -- validates the chain using `cryptography.x509.verification` (Python) or `pkijs.CertificateChainValidationEngine` (TypeScript).
+
+### Trust status
+
+| Status | Meaning |
+|---|---|
+| `trusted` | Chain terminates at a TSL-listed CA. Signature is publicly trusted. |
+| `untrusted` | Valid signature, but the root CA is not in the TSL. |
+| `unknown` | Chain validation was not attempted (no TSL URL configured). |
+
+The `valid` field remains unchanged -- it reflects hash integrity and CMS structure only. Trust is reported separately via `chain_valid`, `trust_anchor`, and `trust_status`.
+
+### TSL configuration
+
+The TSL URL is per-profile. The built-in EKENG profile uses the Armenian TSL:
+
+```
+https://www.gov.am/files/TSL/AM-TL-1.xml
+```
+
+Custom profiles have no TSL by default. Add one via `ServerProfile.tsl_url` (Python) or `tslUrl` (TypeScript).
+
+### Armenian PKI hierarchies
+
+The Armenian TSL lists EKENG CJSC as the trust service provider with three CA anchors:
+
+| CA | Type | Signs |
+|---|---|---|
+| RACitizen | CA/QC | Citizen certificates |
+| CA of RoA | CA/QC | Citizen certificates |
+| Citizen CA | CA/QC | Citizen certificates |
+
+Certificates issued under "Staff of Government of RA Root CA" (used for government staff and foreign accounts) are **not in the TSL** and will report `chain_valid: false`.
+
+### Limitations
+
+- **No CRL/OCSP** -- revocation status is not checked. Chain validation confirms trust anchor only.
+- **TSL cache** -- cached for 24 hours. No signature verification on the TSL XML itself.
+- **BMPString certs** -- some certificates with BMPString-encoded fields fail `cryptography` parsing. Revenant falls back to SKI/AKI matching without cryptographic verification.
 
 ## CLI `check` command
 
@@ -79,16 +128,20 @@ npx revenant check signed.pdf    # TypeScript CLI
 Output:
 ```
 Checking signed.pdf (275.0 KB)...
-  ByteRange OK — signed data: 265237 bytes
+  ByteRange OK -- signed data: 265237 bytes
   CMS blob: 1867 bytes
   CMS: valid ASN.1 structure
-  pikepdf: valid PDF, 1 page(s)
-  Hash OK — SHA-1 consistent: 2202bf4ad83cc553348195a580ab3640450e581a
+  Signer: Aleksandr Kraiz 3105951040
+  Hash OK -- SHA-1 matches CMS messageDigest: 9488fb8869c8...
+  LTV: Not LTV enabled
+  Chain: signer cert: Common Name: Aleksandr Kraiz 3105951040
+  Chain: no trusted CA found (operator: EKENG CJSC)
+  pikepdf: valid PDF, 2 page(s)
 
-  RESULT: Signature structure is VALID
+  RESULT: Signature VALID
 ```
 
-Without the expected hash, `check` verifies structure, CMS format, and PDF readability. It cannot detect content tampering (since it doesn't know the original hash), but it confirms the PDF is well-formed and the signature field is structurally correct.
+Without the expected hash, `check` verifies structure, CMS format, PDF readability, and (if a TSL is configured) certificate chain trust. It cannot detect content tampering (since it doesn't know the original hash), but it confirms the PDF is well-formed, the signature field is structurally correct, and reports the trust status.
 
 ## ByteRange layout
 
