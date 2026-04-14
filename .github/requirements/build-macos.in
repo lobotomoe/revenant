@@ -3,7 +3,10 @@ pikepdf>=8.0,<11
 asn1crypto>=1.5,<2
 tlslite-ng>=0.8.0,<0.9
 defusedxml>=0.7,<1
+cryptography>=42.0,<48
 # Build extras (must match pyproject.toml [project.optional-dependencies] build + build-mac)
 pyinstaller>=6.0,<7
 py2app>=0.28,<1
 keyring>=21.0,<26
+# Python 3.13+ removed setuptools from stdlib; py2app needs it
+setuptools>=64
