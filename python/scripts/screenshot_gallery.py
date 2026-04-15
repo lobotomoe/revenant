@@ -324,13 +324,6 @@ def run(output_dir: Path, *, dry_run: bool = False) -> None:
     finally:
         shutil.rmtree(tmp, ignore_errors=True)
 
-    if not dry_run:
-        zip_path = output_dir.with_suffix(".zip")
-        with zipfile.ZipFile(zip_path, "w", zipfile.ZIP_DEFLATED) as zf:
-            for f in sorted(output_dir.rglob("*.png")):
-                zf.write(f, f.relative_to(output_dir))
-        _logger.info("Archive: %s", zip_path)
-
     total = len(list(output_dir.rglob("*.png")))
     _logger.info("Done: %d screenshots in %s", total, output_dir)
 
@@ -422,6 +415,13 @@ def main() -> None:
 
     if args.background is not None and not args.dry_run:
         compose_store_images(output_dir, args.background, output_dir)
+
+    if not args.dry_run:
+        zip_path = output_dir.with_suffix(".zip")
+        with zipfile.ZipFile(zip_path, "w", zipfile.ZIP_DEFLATED) as zf:
+            for f in sorted(output_dir.rglob("*.png")):
+                zf.write(f, f.relative_to(output_dir))
+        _logger.info("Archive: %s", zip_path)
 
 
 if __name__ == "__main__":

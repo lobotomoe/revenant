@@ -528,6 +528,9 @@ jobs:
           pip install --require-hashes --no-deps -r ../.github/requirements/dev.txt
           pip install --no-deps -e .
 
+      - name: Compile translations
+        run: python scripts/compile_translations.py
+
       - name: Generate screenshots (Linux)
         if: runner.os == 'Linux'
         run: xvfb-run -a python scripts/screenshot_gallery.py ../screenshots --background ../docs/store/bg.jpg
