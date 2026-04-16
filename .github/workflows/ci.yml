@@ -518,7 +518,7 @@ jobs:
         if: runner.os == 'Linux'
         run: |
           sudo apt-get update
-          sudo apt-get install -y python3-tk xvfb
+          sudo apt-get install -y python3-tk xvfb openbox
 
       - name: Install dependencies
         run: |
@@ -534,7 +534,13 @@ jobs:
 
       - name: Generate screenshots (Linux)
         if: runner.os == 'Linux'
-        run: xvfb-run -a python scripts/screenshot_gallery.py ../screenshots --background ../docs/store/bg.jpg
+        run: |
+          # Start Xvfb + openbox WM so windows have native Linux decorations
+          Xvfb :99 -screen 0 1920x1080x24 &
+          export DISPLAY=:99
+          openbox &
+          sleep 1
+          python scripts/screenshot_gallery.py ../screenshots --background ../docs/store/bg.jpg
 
       - name: Generate screenshots (macOS/Windows)
         if: runner.os != 'Linux'
