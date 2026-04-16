@@ -655,11 +655,30 @@ jobs:
         with:
           persist-credentials: false
 
-      - name: Download release artifacts
+      # Download all artifacts, each in its own subdirectory (no merge).
+      # This preserves screenshot artifacts from different platforms, which
+      # would otherwise clobber each other since they share identical
+      # internal paths (en/, hy/, ru/, store/).
+      - name: Download all artifacts
         uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
         with:
-          path: artifacts
-          merge-multiple: true
+          path: staging
+
+      - name: Assemble release assets
+        run: |
+          mkdir -p artifacts
+          for dir in staging/*/; do
+            name=$(basename "$dir")
+            if [[ "$name" == screenshots-* ]]; then
+              platform="${name#screenshots-}"
+              (cd "$dir" && zip -r "$GITHUB_WORKSPACE/artifacts/screenshots-${platform}.zip" .)
+            else
+              # Non-screenshot artifacts: flatten into artifacts/.
+              # Collisions mirror the previous merge-multiple behavior
+              # (intermediate artifacts are removed in the cleanup step).
+              cp -rf "$dir"/. artifacts/
+            fi
+          done
 
       # Remove intermediate unsigned artifacts (uploaded for the merge jobs
       # but not intended for the GitHub Release)
@@ -668,17 +687,6 @@ jobs:
           cd artifacts
           rm -rf Revenant.app revenant
           ls -la
-
-      - name: Package screenshots
-        run: |
-          cd artifacts
-          for dir in en hy ru store; do
-            if [ -d "$dir" ]; then
-              zip -r screenshots.zip "$dir"
-            fi
-          done
-          # Clean up raw directories so they don't interfere with release upload
-          rm -rf en hy ru store
 
       - name: Generate checksums
         run: |
