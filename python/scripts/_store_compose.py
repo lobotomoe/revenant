@@ -23,18 +23,19 @@ _logger = logging.getLogger(__name__)
 
 _REF_HEIGHT = 1800
 _REF_TITLE_SIZE = 92
-_REF_SHADOW_BLUR = 4
-_REF_SHADOW_OFFSET_Y = 4
-_SHADOW_ALPHA = 64  # 25% of 255
+_REF_SHADOW_BLUR = 16
+_REF_SHADOW_OFFSET_Y = 10
+_SHADOW_ALPHA = 80
 
-_MAX_WINDOW_W_RATIO = 0.72
-_MAX_WINDOW_H_RATIO = 0.58
-_WINDOW_TOP_RATIO = 0.38
-_TITLE_GAP_PX = 40  # gap between title bottom and window top (at ref height)
+_MAX_WINDOW_W_RATIO = 0.80
+_MAX_WINDOW_H_RATIO = 0.72
+_WINDOW_TOP_RATIO = 0.22
+_TITLE_GAP_PX = 60
+_MAX_UPSCALE = 2.5  # allow upscaling (windows are small vs Retina/HD canvases)
 
 # Title text shadow
-_TITLE_SHADOW_OFFSET = 2
-_TITLE_SHADOW_ALPHA = 80  # ~31% opacity
+_TITLE_SHADOW_OFFSET = 3
+_TITLE_SHADOW_ALPHA = 100
 
 # ── Per-platform canvas sizes ────────────────────────────────────────
 
@@ -142,11 +143,11 @@ def compose(
         combined.paste(overlay, (ox, oy), overlay)
         window = combined
 
-    # Scale window to fit canvas
+    # Scale window to fit canvas (upscale allowed -- raw captures are small vs HD canvases)
     max_w = int(cw * _MAX_WINDOW_W_RATIO)
     max_h = int(ch * _MAX_WINDOW_H_RATIO)
-    ratio = min(max_w / window.width, max_h / window.height, 1.0)
-    if ratio < 1.0:
+    ratio = min(max_w / window.width, max_h / window.height, _MAX_UPSCALE)
+    if abs(ratio - 1.0) > 0.01:
         new_size = (int(window.width * ratio), int(window.height * ratio))
         window = window.resize(new_size, Image.Resampling.LANCZOS)
 
