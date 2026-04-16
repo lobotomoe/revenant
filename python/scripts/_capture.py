@@ -187,6 +187,10 @@ def _windows(window: tk.Tk | tk.Toplevel, output: Path) -> None:
     user32.ReleaseDC(hwnd, hwnd_dc)
 
     img = Image.frombuffer("RGBA", (width, height), bytes(buf), "raw", "BGRA", 0, 1)
+
+    # Trim DWM 1px borders (rendered as black by PrintWindow)
+    img = img.crop((1, 0, img.width, img.height - 1))
+
     img.convert("RGB").save(str(output))
 
 

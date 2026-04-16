@@ -242,6 +242,14 @@ def run(output_dir: Path, *, dry_run: bool = False) -> None:
             root = tk.Tk()
             root.withdraw()
 
+            # Set window icon (matches production app)
+            ico = Path(__file__).parent.parent / "icons" / "revenant.ico"
+            if ico.exists():
+                try:
+                    root.iconbitmap(default=str(ico))
+                except tk.TclError:
+                    pass
+
             style = ttk.Style(root)
             for preferred in ("aqua", "vista", "clam", "default"):
                 if preferred in style.theme_names():
