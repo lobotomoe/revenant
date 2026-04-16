@@ -198,8 +198,16 @@ def _windows(window: tk.Tk | tk.Toplevel, output: Path) -> None:
 
     img = Image.frombuffer("RGBA", (full_w, full_h), bytes(buf), "raw", "BGRA", 0, 1)
 
-    # Crop to visible bounds (remove invisible DWM resize borders)
-    img = img.crop((crop_left, crop_top, full_w - crop_right, full_h - crop_bottom))
+    # Crop to visible bounds (remove invisible DWM resize borders).
+    # DWM reports bounds 1px inside the actual border line, so add 1px extra.
+    img = img.crop(
+        (
+            crop_left + 1,
+            crop_top,
+            full_w - crop_right - 1,
+            full_h - crop_bottom - 1,
+        )
+    )
 
     img.convert("RGB").save(str(output))
 
