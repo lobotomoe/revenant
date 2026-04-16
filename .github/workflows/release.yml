@@ -655,38 +655,65 @@ jobs:
         with:
           persist-credentials: false
 
-      # Download all artifacts, each in its own subdirectory (no merge).
-      # This preserves screenshot artifacts from different platforms, which
-      # would otherwise clobber each other since they share identical
-      # internal paths (en/, hy/, ru/, store/).
+      # Download every artifact into its own subdirectory. No merge-multiple
+      # because screenshot artifacts share identical internal paths across
+      # platforms (en/, hy/, ru/, store/) and would overwrite each other.
       - name: Download all artifacts
         uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
         with:
           path: staging
 
       - name: Assemble release assets
+        shell: bash
         run: |
+          set -euo pipefail
           mkdir -p artifacts
-          for dir in staging/*/; do
-            name=$(basename "$dir")
-            if [[ "$name" == screenshots-* ]]; then
-              platform="${name#screenshots-}"
-              (cd "$dir" && zip -r "$GITHUB_WORKSPACE/artifacts/screenshots-${platform}.zip" .)
+
+          # Explicit list of artifact names whose contents belong in the
+          # GitHub Release. Anything else in staging/ (e.g. *-unsigned-*,
+          # screenshots-*) is handled separately or dropped.
+          release_artifacts=(
+            cli-linux-x64
+            cli-linux-arm64
+            cli-macos-universal
+            gui-linux-x64
+            gui-linux-arm64
+            gui-macos-universal
+            standalone-windows-x64
+            msix-windows-x64
+            mas-macos-universal
+          )
+
+          missing=()
+          for name in "${release_artifacts[@]}"; do
+            dir="staging/$name"
+            if [ -d "$dir" ]; then
+              cp -r "$dir"/. artifacts/
             else
-              # Non-screenshot artifacts: flatten into artifacts/.
-              # Collisions mirror the previous merge-multiple behavior
-              # (intermediate artifacts are removed in the cleanup step).
-              cp -rf "$dir"/. artifacts/
+              missing+=("$name")
             fi
           done
+          if [ ${#missing[@]} -gt 0 ]; then
+            echo "FATAL: missing release artifacts: ${missing[*]}" >&2
+            exit 1
+          fi
 
-      # Remove intermediate unsigned artifacts (uploaded for the merge jobs
-      # but not intended for the GitHub Release)
-      - name: Clean up intermediate artifacts
-        run: |
-          cd artifacts
-          rm -rf Revenant.app revenant
-          ls -la
+          # Screenshots: one zip per platform, human-readable names.
+          declare -A platform_name=(
+            [ubuntu-latest]=linux
+            [macos-latest]=macos
+            [windows-latest]=windows
+          )
+          for dir in staging/screenshots-*/; do
+            [ -d "$dir" ] || continue
+            runner=$(basename "$dir")
+            runner="${runner#screenshots-}"
+            label="${platform_name[$runner]:-$runner}"
+            (cd "$dir" && zip -qr "$GITHUB_WORKSPACE/artifacts/screenshots-${label}.zip" .)
+          done
+
+          echo "--- artifacts/ ---"
+          ls -la artifacts/
 
       - name: Generate checksums
         run: |
