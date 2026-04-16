@@ -28,9 +28,13 @@ _REF_SHADOW_OFFSET_Y = 4
 _SHADOW_ALPHA = 64  # 25% of 255
 
 _MAX_WINDOW_W_RATIO = 0.72
-_MAX_WINDOW_H_RATIO = 0.62
-_WINDOW_TOP_RATIO = 0.34
-_TITLE_GAP_PX = 24  # gap between title bottom and window top (at ref height)
+_MAX_WINDOW_H_RATIO = 0.58
+_WINDOW_TOP_RATIO = 0.38
+_TITLE_GAP_PX = 40  # gap between title bottom and window top (at ref height)
+
+# Title text shadow
+_TITLE_SHADOW_OFFSET = 2
+_TITLE_SHADOW_ALPHA = 80  # ~31% opacity
 
 # ── Per-platform canvas sizes ────────────────────────────────────────
 
@@ -150,20 +154,22 @@ def compose(
     wx = (cw - window.width) // 2
     wy = int(ch * _WINDOW_TOP_RATIO)
 
-    # Drop shadow
-    blur = max(int(_REF_SHADOW_BLUR * scale), 1)
-    offset_y = max(int(_REF_SHADOW_OFFSET_Y * scale), 1)
-    pad = blur * 4
-    shadow = Image.new("RGBA", (window.width + pad * 2, window.height + pad * 2), (0, 0, 0, 0))
-    shadow_fill = Image.new("RGBA", window.size, (0, 0, 0, _SHADOW_ALPHA))
-    shadow.paste(shadow_fill, (pad, pad))
-    shadow = shadow.filter(ImageFilter.GaussianBlur(radius=blur))
-    bg.paste(shadow, (wx - pad, wy + offset_y - pad), shadow)
+    # Drop shadow -- skip if image already has native shadow (macOS screencapture -l)
+    has_native_shadow = window.mode == "RGBA" and window.split()[-1].getextrema()[0] == 0
+    if not has_native_shadow:
+        blur = max(int(_REF_SHADOW_BLUR * scale), 1)
+        offset_y = max(int(_REF_SHADOW_OFFSET_Y * scale), 1)
+        pad = blur * 4
+        shadow = Image.new("RGBA", (window.width + pad * 2, window.height + pad * 2), (0, 0, 0, 0))
+        shadow_fill = Image.new("RGBA", window.size, (0, 0, 0, _SHADOW_ALPHA))
+        shadow.paste(shadow_fill, (pad, pad))
+        shadow = shadow.filter(ImageFilter.GaussianBlur(radius=blur))
+        bg.paste(shadow, (wx - pad, wy + offset_y - pad), shadow)
 
     # Window
     bg.paste(window, (wx, wy), window)
 
-    # Title text
+    # Title text with drop shadow
     font = load_title_font(ch)
     draw = ImageDraw.Draw(bg)
     bbox = draw.textbbox((0, 0), title, font=font)
@@ -173,6 +179,10 @@ def compose(
     tx = (cw - text_w) // 2
     ty = wy - text_h - gap
     ty = max(ty, gap)
+    shadow_off = max(int(_TITLE_SHADOW_OFFSET * scale), 1)
+    draw.text(
+        (tx + shadow_off, ty + shadow_off), title, font=font, fill=(0, 0, 0, _TITLE_SHADOW_ALPHA)
+    )
     draw.text((tx, ty), title, font=font, fill=(255, 255, 255, 255))
 
     output.parent.mkdir(parents=True, exist_ok=True)

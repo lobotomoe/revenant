@@ -16,7 +16,7 @@ On macOS, Screen Recording permission must be granted to the terminal
 CI runners (GitHub Actions) have this by default.
 """
 
-# pyright: reportPrivateUsage=false, reportUnknownMemberType=false
+# pyright: reportPrivateUsage=false, reportUnknownMemberType=false, reportUnknownVariableType=false
 from __future__ import annotations
 
 import argparse
@@ -104,16 +104,56 @@ def _capture(window: tk.Tk | tk.Toplevel, output: Path, *, dry_run: bool = False
     _logger.info("  captured: %s (%dx%d)", output.name, w, h)
 
 
-def _capture_macos(window: tk.Tk | tk.Toplevel, output: Path) -> None:
-    """macOS: use ``screencapture -R x,y,w,h`` (region capture)."""
-    x = window.winfo_rootx()
-    y = window.winfo_rooty()
-    w = window.winfo_width()
-    h = window.winfo_height()
-    region = f"{x},{y},{w},{h}"
+def _get_cg_window_id(title: str) -> int | None:
+    """Find the CGWindowID for a window by its title (macOS only)."""
+    try:
+        import Quartz  # type: ignore[import-not-found]  # pyobjc, optional
+    except ImportError:
+        return None
 
+    windows = Quartz.CGWindowListCopyWindowInfo(  # pyright: ignore[reportUnknownVariableType]
+        Quartz.kCGWindowListOptionOnScreenOnly,
+        Quartz.kCGNullWindowID,
+    )
+    if windows is None:
+        return None
+    for w in windows:  # pyright: ignore[reportUnknownVariableType]
+        owner: str = w.get("kCGWindowOwnerName", "")
+        name: str = w.get("kCGWindowName", "")
+        if owner == "Python" and title and title in name:
+            wid: object = w.get("kCGWindowNumber")
+            if isinstance(wid, int):
+                return wid
+    return None
+
+
+def _frame_bbox(window: tk.Tk | tk.Toplevel) -> tuple[int, int, int, int]:
+    """Return (x, y, w, h) of the full window frame including title bar."""
+    x = window.winfo_rootx()
+    y = window.winfo_y()
+    title_bar = window.winfo_rooty() - y
+    w = window.winfo_width()
+    h = title_bar + window.winfo_height()
+    return x, y, w, h
+
+
+def _capture_macos(window: tk.Tk | tk.Toplevel, output: Path) -> None:
+    """macOS: native window capture via screencapture -l, region fallback."""
+    wid = _get_cg_window_id(window.title())
+    if wid is not None:
+        result = subprocess.run(
+            ["screencapture", "-x", "-l", str(wid), str(output)],
+            capture_output=True,
+            text=True,
+            timeout=10,
+        )
+        if result.returncode == 0 and output.exists() and output.stat().st_size > 0:
+            return
+
+    # Fallback: region capture including title bar
+    x, y, w, h = _frame_bbox(window)
     result = subprocess.run(
-        ["screencapture", "-x", "-R", region, str(output)],
+        ["screencapture", "-x", "-R", f"{x},{y},{w},{h}", str(output)],
         capture_output=True,
         text=True,
         timeout=10,
@@ -129,13 +169,10 @@ def _capture_macos(window: tk.Tk | tk.Toplevel, output: Path) -> None:
 
 
 def _capture_imagegrab(window: tk.Tk | tk.Toplevel, output: Path) -> None:
-    """Linux/Windows: use Pillow ImageGrab."""
+    """Linux/Windows: use Pillow ImageGrab with full frame bbox."""
     from PIL import ImageGrab
 
-    x = window.winfo_rootx()
-    y = window.winfo_rooty()
-    w = window.winfo_width()
-    h = window.winfo_height()
+    x, y, w, h = _frame_bbox(window)
     img = ImageGrab.grab(bbox=(x, y, x + w, y + h))
     img.save(str(output))
 
