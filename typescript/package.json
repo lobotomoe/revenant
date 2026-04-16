@@ -1,6 +1,6 @@
 {
   "name": "revenant-sign",
-  "version": "1.2.0",
+  "version": "1.2.1",
   "packageManager": "pnpm@10.4.0",
   "description": "Cross-platform client for ARX CoSign electronic signatures via SOAP API",
   "license": "Apache-2.0",

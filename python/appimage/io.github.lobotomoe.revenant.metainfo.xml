@@ -76,6 +76,11 @@
   </branding>
 
   <releases>
+    <release version="1.2.1" date="2026-04-16">
+      <description>
+        <p>Completed Armenian locale -- 21 untranslated strings fixed.</p>
+      </description>
+    </release>
     <release version="1.2.0" date="2026-04-14">
       <description>
         <p>PKI certificate chain validation and improved verification UX.</p>
