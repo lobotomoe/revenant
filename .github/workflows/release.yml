@@ -667,14 +667,23 @@ jobs:
         run: |
           cd artifacts
           rm -rf Revenant.app revenant
-          # Remove directories (screenshots, scorecard, etc.) -- release assets are all files
-          find . -maxdepth 1 -type d ! -name . -exec rm -rf {} +
           ls -la
+
+      - name: Package screenshots
+        run: |
+          cd artifacts
+          for dir in en hy ru store; do
+            if [ -d "$dir" ]; then
+              zip -r screenshots.zip "$dir"
+            fi
+          done
+          # Clean up raw directories so they don't interfere with release upload
+          rm -rf en hy ru store
 
       - name: Generate checksums
         run: |
           cd artifacts
-          sha256sum * > SHA256SUMS.txt
+          find . -maxdepth 1 -type f ! -name SHA256SUMS.txt -exec sha256sum {} + > SHA256SUMS.txt
           cat SHA256SUMS.txt
 
       - name: Attest build provenance
