@@ -39,9 +39,9 @@ _TITLE_SHADOW_ALPHA = 80  # ~31% opacity
 # ── Per-platform canvas sizes ────────────────────────────────────────
 
 CANVAS_SIZES: dict[str, tuple[int, int]] = {
-    "Darwin": (2880, 1800),
-    "Windows": (1366, 768),
-    "Linux": (1280, 800),
+    "Darwin": (2880, 1800),   # Mac App Store (Retina 2.5x, exact)
+    "Windows": (1920, 1080),  # Microsoft Store (min 1366x768, max 4K)
+    "Linux": (1920, 1080),    # Snap Store recommended
 }
 
 
