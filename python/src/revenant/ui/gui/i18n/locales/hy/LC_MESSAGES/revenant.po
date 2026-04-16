@@ -256,11 +256,11 @@ msgstr "Անտեսանելի ստորագրություն"
 
 #. EN: Reason:
 msgid "gui.reason_label"
-msgstr "Reason:"
+msgstr "Պատճառ:"
 
 #. EN: Invalid page specification
 msgid "gui.invalid_page_specification"
-msgstr "Invalid page specification"
+msgstr "Էջի անվավեր նշում"
 
 #. EN: Language:
 msgid "gui.language_label"
@@ -716,76 +716,76 @@ msgstr "Զգուշացում. Հաշիվը կարգելափակվի {max_attempt
 
 #. EN: Remove
 msgid "gui.remove"
-msgstr "Remove"
+msgstr "Հեռացնել"
 
 #. EN: Sign {n} PDFs
 msgid "gui.sign_n_pdfs"
-msgstr "Sign {n} PDFs"
+msgstr "Ստորագրել {n} PDF"
 
 #. EN: Batch Signing
 msgid "gui.batch_signing"
-msgstr "Batch Signing"
+msgstr "Խմբային ստորագրում"
 
 #. EN: Preparing...
 msgid "gui.preparing_ellipsis"
-msgstr "Preparing..."
+msgstr "Նախապատրաստում..."
 
 #. EN: Signing {n}/{total}: {filename}...
 msgid "gui.signing_n_of_total_filename"
-msgstr "Signing {n}/{total}: {filename}..."
+msgstr "Ստորագրում {n}/{total}: {filename}..."
 
 #. EN: Batch complete: {succeeded} signed, {failed} failed.
 msgid "gui.batch_complete_succeeded_failed"
-msgstr "Batch complete: {succeeded} signed, {failed} failed."
+msgstr "Ավարտված: {succeeded} ստորագրված, {failed} ձախողված:"
 
 #. EN: Cancelling...
 msgid "gui.cancelling_ellipsis"
-msgstr "Cancelling..."
+msgstr "Չեղարկում..."
 
 #. EN: Show password
 msgid "gui.show_password"
-msgstr "Show password"
+msgstr "Ցույց տալ գաղտնաբառը"
 
 #. EN: Certificate validity unknown
 msgid "gui.cert_validity_unknown"
-msgstr "Certificate validity unknown"
+msgstr "Վկայագրի վավերականությունն անհայտ է"
 
 #. EN: {start} - {end} ({days} days remaining)
 msgid "gui.cert_valid_range"
-msgstr "{start} - {end} ({days} days remaining)"
+msgstr "{start} - {end} ({days} օր մնացել է)"
 
 #. EN: {start} - {end} ({days} days left!)
 msgid "gui.cert_expiring_soon_range"
-msgstr "{start} - {end} ({days} days left!)"
+msgstr "{start} - {end} ({days} օր մնացել է!)"
 
 #. EN: EXPIRED: {start} - {end} ({days} days ago)
 msgid "gui.cert_expired_range"
-msgstr "EXPIRED: {start} - {end} ({days} days ago)"
+msgstr "ԺԱՄԿԵՏՆ ԱՆՑԱԾ: {start} - {end} ({days} օր առաջ)"
 
 #. EN: Bottom center
 msgid "gui.pos_bottom_center"
-msgstr "Bottom center"
+msgstr "Ներքև կենտրոն"
 
 #. EN: Bottom left
 msgid "gui.pos_bottom_left"
-msgstr "Bottom left"
+msgstr "Ներքև ձախ"
 
 #. EN: Bottom right
 msgid "gui.pos_bottom_right"
-msgstr "Bottom right"
+msgstr "Ներքև աջ"
 
 #. EN: Top left
 msgid "gui.pos_top_left"
-msgstr "Top left"
+msgstr "Վերև ձախ"
 
 #. EN: Top right
 msgid "gui.pos_top_right"
-msgstr "Top right"
+msgstr "Վերև աջ"
 
 #. EN: Last
 msgid "gui.page_last"
-msgstr "Last"
+msgstr "Վերջին"
 
 #. EN: First
 msgid "gui.page_first"
-msgstr "First"
+msgstr "Առաջին"
