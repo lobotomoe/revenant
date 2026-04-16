@@ -63,12 +63,6 @@
 
   <content_rating type="oars-1.1" />
 
-  <screenshots>
-    <screenshot type="default">
-      <caption>Signing a PDF document with Revenant</caption>
-      <image type="source" width="1280" height="800">https://raw.githubusercontent.com/lobotomoe/revenant/main/docs/screenshots/main-window.png</image>
-    </screenshot>
-  </screenshots>
 
   <branding>
     <color type="primary" scheme_preference="light">#4a90d9</color>
