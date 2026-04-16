@@ -138,20 +138,30 @@ def _windows(window: tk.Tk | tk.Toplevel, output: Path) -> None:
 
     hwnd = int(window.wm_frame(), 0)
 
-    # Tight visible bounds (excludes invisible resize borders)
-    rect = wintypes.RECT()
+    # Full window rect (includes invisible DWM resize borders)
+    full = wintypes.RECT()
+    user32.GetWindowRect(hwnd, ctypes.byref(full))
+    full_w = full.right - full.left
+    full_h = full.bottom - full.top
+
+    # Visible bounds (tight, excludes invisible resize borders)
+    visible = wintypes.RECT()
     hr = dwmapi.DwmGetWindowAttribute(
-        hwnd, DWMWA_EXTENDED_FRAME_BOUNDS, ctypes.byref(rect), ctypes.sizeof(rect)
+        hwnd, DWMWA_EXTENDED_FRAME_BOUNDS, ctypes.byref(visible), ctypes.sizeof(visible)
     )
     if hr != 0:
-        user32.GetWindowRect(hwnd, ctypes.byref(rect))
+        visible = full
 
-    width = rect.right - rect.left
-    height = rect.bottom - rect.top
+    # Crop offsets: how many pixels of invisible border on each side
+    crop_left = visible.left - full.left
+    crop_top = visible.top - full.top
+    crop_right = full.right - visible.right
+    crop_bottom = full.bottom - visible.bottom
 
+    # Capture at FULL size (PrintWindow renders entire window including borders)
     hwnd_dc = user32.GetWindowDC(hwnd)
     mem_dc = gdi32.CreateCompatibleDC(hwnd_dc)
-    bitmap = gdi32.CreateCompatibleBitmap(hwnd_dc, width, height)
+    bitmap = gdi32.CreateCompatibleBitmap(hwnd_dc, full_w, full_h)
     old = gdi32.SelectObject(mem_dc, bitmap)
 
     user32.PrintWindow(hwnd, mem_dc, PW_RENDERFULLCONTENT)
@@ -173,23 +183,23 @@ def _windows(window: tk.Tk | tk.Toplevel, output: Path) -> None:
 
     bmi = BITMAPINFOHEADER()
     bmi.biSize = ctypes.sizeof(BITMAPINFOHEADER)
-    bmi.biWidth = width
-    bmi.biHeight = -height  # top-down
+    bmi.biWidth = full_w
+    bmi.biHeight = -full_h  # top-down
     bmi.biPlanes = 1
     bmi.biBitCount = 32
 
-    buf = ctypes.create_string_buffer(width * height * 4)
-    gdi32.GetDIBits(mem_dc, bitmap, 0, height, buf, ctypes.byref(bmi), 0)
+    buf = ctypes.create_string_buffer(full_w * full_h * 4)
+    gdi32.GetDIBits(mem_dc, bitmap, 0, full_h, buf, ctypes.byref(bmi), 0)
 
     gdi32.SelectObject(mem_dc, old)
     gdi32.DeleteObject(bitmap)
     gdi32.DeleteDC(mem_dc)
     user32.ReleaseDC(hwnd, hwnd_dc)
 
-    img = Image.frombuffer("RGBA", (width, height), bytes(buf), "raw", "BGRA", 0, 1)
+    img = Image.frombuffer("RGBA", (full_w, full_h), bytes(buf), "raw", "BGRA", 0, 1)
 
-    # Trim DWM 1px borders (rendered as black by PrintWindow)
-    img = img.crop((1, 0, img.width, img.height - 1))
+    # Crop to visible bounds (remove invisible DWM resize borders)
+    img = img.crop((crop_left, crop_top, full_w - crop_right, full_h - crop_bottom))
 
     img.convert("RGB").save(str(output))
 
