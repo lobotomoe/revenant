@@ -33,6 +33,10 @@ _WINDOW_TOP_RATIO = 0.22
 _TITLE_GAP_PX = 60
 _MAX_UPSCALE = 2.5  # allow upscaling (windows are small vs Retina/HD canvases)
 
+# Ratio for detecting full-scene overlays (dialog + parent window captured
+# together, as macOS screencapture does for transient dialogs).
+_FULL_SCENE_OVERLAY_RATIO = 0.9
+
 # Title text shadow
 _TITLE_SHADOW_OFFSET = 3
 _TITLE_SHADOW_ALPHA = 100
@@ -128,20 +132,34 @@ def compose(
     # Load main window
     window = Image.open(window_path).convert("RGBA")
 
-    # If there's an overlay (dialog), composite it onto the window first
+    # If there's an overlay (dialog), composite it onto the window first.
+    #
+    # Capture behaviour differs across platforms:
+    #   macOS: screencapture of a transient/modal dialog includes the parent
+    #          window behind it (parent appears with a dimmed titlebar).
+    #   Windows/Linux: dialog is captured in isolation.
+    #
+    # Detect the full-scene case by comparing dimensions -- if the overlay is
+    # roughly the size of the main window, it already contains the parent and
+    # is the scene; otherwise composite the dialog on top of the main window.
     if overlay_path is not None:
         overlay = Image.open(overlay_path).convert("RGBA")
-        combined_w = max(window.width, overlay.width + 40)
-        combined_h = max(window.height + 20, overlay.height + 60)
-        combined = Image.new("RGBA", (combined_w, combined_h), (0, 0, 0, 0))
-        # Main window in background
-        wx_off = (combined_w - window.width) // 2
-        combined.paste(window, (wx_off, 0))
-        # Dialog centered on top
-        ox = (combined_w - overlay.width) // 2
-        oy = (combined_h - overlay.height) // 2
-        combined.paste(overlay, (ox, oy), overlay)
-        window = combined
+        overlay_contains_parent = (
+            overlay.width >= window.width * _FULL_SCENE_OVERLAY_RATIO
+            and overlay.height >= window.height * _FULL_SCENE_OVERLAY_RATIO
+        )
+        if overlay_contains_parent:
+            window = overlay
+        else:
+            combined_w = max(window.width, overlay.width + 40)
+            combined_h = max(window.height + 20, overlay.height + 60)
+            combined = Image.new("RGBA", (combined_w, combined_h), (0, 0, 0, 0))
+            wx_off = (combined_w - window.width) // 2
+            combined.paste(window, (wx_off, 0))
+            ox = (combined_w - overlay.width) // 2
+            oy = (combined_h - overlay.height) // 2
+            combined.paste(overlay, (ox, oy), overlay)
+            window = combined
 
     # Scale window to fit canvas (upscale allowed -- raw captures are small vs HD canvases)
     max_w = int(cw * _MAX_WINDOW_W_RATIO)
