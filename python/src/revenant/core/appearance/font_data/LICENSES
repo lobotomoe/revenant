@@ -5,9 +5,10 @@ This directory contains subset fonts used for PDF signature visual
 appearances. Only the glyphs needed for signature fields are included.
 
 
-Noto Sans (NotoSans-Subset.ttf)
---------------------------------
+Noto Sans (NotoSans-Subset.ttf, NotoSans-Bold-Subset.ttf)
+---------------------------------------------------------
 Source:     NotoSans-Regular.ttf + NotoSansArmenian-Regular.ttf
+            NotoSans-Bold.ttf + NotoSansArmenian-Bold.ttf
             Google Noto Fonts (https://fonts.google.com/noto)
 Copyright:  2012 Google Inc. All Rights Reserved.
 License:    SIL Open Font License, Version 1.1 (https://openfontlicense.org)

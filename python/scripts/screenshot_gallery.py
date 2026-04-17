@@ -278,22 +278,26 @@ _STORE_SCENES: list[tuple[str, str | None, dict[str, str]]] = [
         None,
         {
             "en": "Cross-platform CoSign client",
-            "ru": "CoSign PDF Signer",
-            "hy": "CoSign PDF Signer",
+            "ru": "Кроссплатформенный CoSign-клиент",
+            "hy": "Բազմապլատֆորմ CoSign հաճախորդ",
         },
     ),
     (
         "08-main-verify.png",
         None,
-        {"en": "Verify Signatures", "ru": "Verify Signatures", "hy": "Verify Signatures"},
+        {
+            "en": "Verify Signatures",
+            "ru": "Проверка подписей",
+            "hy": "Ստորագրությունների ստուգում",
+        },
     ),
     (
         "01-main-unconfigured.png",
         "02-connect-dialog.png",
         {
             "en": "Pre-built EKENG profile",
-            "ru": "Pre-built EKENG profile",
-            "hy": "Pre-built EKENG profile",
+            "ru": "Готовый EKENG-профиль",
+            "hy": "Պատրաստի EKENG պրոֆիլ",
         },
     ),
     (
@@ -301,8 +305,8 @@ _STORE_SCENES: list[tuple[str, str | None, dict[str, str]]] = [
         "04-login-credentials.png",
         {
             "en": "Secure Authentication",
-            "ru": "Secure Authentication",
-            "hy": "Secure Authentication",
+            "ru": "Безопасная аутентификация",
+            "hy": "Անվտանգ նույնականացում",
         },
     ),
 ]

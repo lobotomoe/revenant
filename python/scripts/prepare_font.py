@@ -227,6 +227,7 @@ def _generate_metrics_module(
         ]
 
     lines = [
+        "# SPDX-License-Identifier: Apache-2.0",
         f'"""Generated {font_name} subset metrics. Do not edit manually.',
         "",
         "Created by scripts/prepare_font.py from:",
@@ -374,16 +375,19 @@ def main() -> None:
             parser.error("Merge mode requires both --latin and --armenian.")
 
         base = Path(args.output_dir)
-        ttf_path = base / _TTF_OUTPUT
-        metrics_path = base / _METRICS_OUTPUT
+        ttf_path = base / (Path(args.output_ttf) if args.output_ttf else _TTF_OUTPUT)
+        metrics_path = base / (
+            Path(args.output_metrics) if args.output_metrics else _METRICS_OUTPUT
+        )
 
         print(f"Merging {args.latin} + {args.armenian}...")
         font = _merge_fonts(args.latin, args.armenian)
         source_lines = [
-            "  - NotoSans-Regular.ttf (Google Noto Fonts, OFL 1.1)",
-            "  - NotoSansArmenian-Regular.ttf (Google Noto Fonts, OFL 1.1)",
+            f"  - {Path(args.latin).name} (Google Noto Fonts, OFL 1.1)",
+            f"  - {Path(args.armenian).name} (Google Noto Fonts, OFL 1.1)",
         ]
-        _subset_and_generate(font, ttf_path, metrics_path, "Noto Sans", source_lines)
+        display_name = args.name or "Noto Sans"
+        _subset_and_generate(font, ttf_path, metrics_path, display_name, source_lines)
 
     else:
         if not args.output_ttf or not args.output_metrics or not args.name:

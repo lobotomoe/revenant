@@ -57,46 +57,29 @@ def canvas_size() -> tuple[int, int]:
 
 # ── Font loading ─────────────────────────────────────────────────────
 
-_FONT_CANDIDATES: dict[str, list[tuple[str, int]]] = {
-    "Darwin": [
-        ("/System/Library/Fonts/Helvetica.ttc", 1),  # Helvetica Bold
-        ("/System/Library/Fonts/Supplemental/Arial Bold.ttf", 0),
-    ],
-    "Windows": [
-        (r"C:\Windows\Fonts\arialbd.ttf", 0),
-        (r"C:\Windows\Fonts\calibrib.ttf", 0),
-    ],
-    "Linux": [
-        ("/usr/share/fonts/truetype/noto/NotoSans-Bold.ttf", 0),
-        ("/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf", 0),
-        ("/usr/share/fonts/truetype/liberation/LiberationSans-Bold.ttf", 0),
-    ],
-}
-
-_BUNDLED_FONT = (
+# Bundled Bold subset covering Latin + Cyrillic + Armenian. Using a single
+# bundled font across all platforms and locales guarantees identical title
+# rendering in CI regardless of which system fonts happen to be installed.
+_BUNDLED_TITLE_FONT = (
     Path(__file__).parent.parent
-    / "src/revenant/core/appearance/font_data/noto_sans/NotoSans-Subset.ttf"
+    / "src/revenant/core/appearance/font_data/noto_sans/NotoSans-Bold-Subset.ttf"
 )
 
 
 def load_title_font(height: int) -> FreeTypeFont:
-    """Load a bold sans-serif font, sized proportionally to *height*."""
+    """Load the bundled Bold title font, sized proportionally to *height*."""
     from PIL import ImageFont
 
     size = max(int(_REF_TITLE_SIZE * height / _REF_HEIGHT), 20)
-    system = platform.system()
 
-    for path, index in _FONT_CANDIDATES.get(system, []):
-        if Path(path).exists():
-            _logger.info("Title font: %s (index %d, %dpx)", path, index, size)
-            return ImageFont.truetype(path, size, index=index)
+    if not _BUNDLED_TITLE_FONT.exists():
+        raise FileNotFoundError(
+            f"Bundled title font missing: {_BUNDLED_TITLE_FONT}. "
+            "Run scripts/prepare_font.py to regenerate."
+        )
 
-    if _BUNDLED_FONT.exists():
-        _logger.warning("Bold font not found, using bundled NotoSans-Subset")
-        return ImageFont.truetype(str(_BUNDLED_FONT), size)
-
-    _logger.warning("No font found, using Pillow default")
-    return ImageFont.load_default(size=size)  # pyright: ignore[reportReturnType]
+    _logger.info("Title font: %s (%dpx)", _BUNDLED_TITLE_FONT.name, size)
+    return ImageFont.truetype(str(_BUNDLED_TITLE_FONT), size)
 
 
 # ── Composition ──────────────────────────────────────────────────────
