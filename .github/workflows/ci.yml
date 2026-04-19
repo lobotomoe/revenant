@@ -197,10 +197,12 @@ jobs:
         run: pytest -v --junitxml=junit.xml
 
       - name: Test Summary
-        uses: test-summary/action@31493c76ec9e7aa675f1585d3ed6f1da69269a86 # v2
-        with:
-          paths: python/junit.xml
+        uses: mikepenz/action-junit-report@bccf2e31636835cf0874589931c4116687171386 # v6.4.0
         if: always()
+        with:
+          report_paths: python/junit.xml
+          detailed_summary: true
+          annotate_only: true
 
       - name: Coverage Summary
         if: matrix.python-version == '3.13' && always()
