@@ -197,10 +197,12 @@ jobs:
         run: pytest -v --junitxml=junit.xml
 
       - name: Test Summary
-        uses: test-summary/action@31493c76ec9e7aa675f1585d3ed6f1da69269a86 # v2
-        with:
-          paths: python/junit.xml
+        uses: mikepenz/action-junit-report@bccf2e31636835cf0874589931c4116687171386 # v6.4.0
         if: always()
+        with:
+          report_paths: python/junit.xml
+          detailed_summary: true
+          annotate_only: true
 
       - name: Coverage Summary
         if: matrix.python-version == '3.13' && always()
@@ -547,7 +549,7 @@ jobs:
         run: python scripts/screenshot_gallery.py ../screenshots --background ../docs/store/bg.jpg
 
       - name: Upload screenshots
-        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
           name: screenshots-${{ matrix.os }}
           path: screenshots/
