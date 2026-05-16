@@ -10,8 +10,8 @@ export {
   extractCertInfoFromX509,
 } from "./cert-info.js";
 export {
-  signData,
-  signHash,
-  signPdfDetached,
-  signPdfEmbedded,
+  signDataWithTransport,
+  signHashWithTransport,
+  signPdfDetachedWithTransport,
+  signPdfEmbeddedWithTransport,
 } from "./signing.js";

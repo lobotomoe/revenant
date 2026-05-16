@@ -1,9 +1,16 @@
 // SPDX-License-Identifier: Apache-2.0
 /**
- * Core signing functions -- detached CMS and embedded PDF signatures.
+ * Core (low-level) signing functions -- detached CMS and embedded PDF
+ * signatures with an explicit `SigningTransport`.
  *
- * All signing functions accept a SigningTransport, making them
- * transport-agnostic. Use SoapSigningTransport to create an instance.
+ * All exports here are suffixed `WithTransport` to mark them as the
+ * low-level API and to free the unsuffixed names for transport-free
+ * high-level wrappers in `api.ts`. Use these directly only when you
+ * need to inject a custom transport (mocks in tests, alternative
+ * appliance servers, etc.); production callers should prefer the
+ * `sign` / `signDetached` / `signHash` / `signData` exports from
+ * `revenant-sign` top-level, which handle profile resolution, TLS
+ * registration, and transport setup automatically.
  */
 
 import { DEFAULT_TIMEOUT_SOAP, PDF_MAGIC, SHA1_DIGEST_SIZE } from "../constants.js";
@@ -36,9 +43,11 @@ function validatePdf(pdfBytes: Uint8Array): void {
 // -- Detached signing ---------------------------------------------------------
 
 /**
- * Sign a PDF document -- returns a detached CMS/PKCS#7 signature.
+ * Sign a PDF document with an explicit transport — returns a detached
+ * CMS/PKCS#7 signature. Low-level; production callers should prefer
+ * the `signDetached` export from `revenant-sign` top-level.
  */
-export async function signPdfDetached(
+export async function signPdfDetachedWithTransport(
   pdfBytes: Uint8Array,
   transport: SigningTransport,
   username: string,
@@ -52,9 +61,11 @@ export async function signPdfDetached(
 // -- Hash signing -------------------------------------------------------------
 
 /**
- * Sign a pre-computed hash (typically 20-byte SHA-1).
+ * Sign a pre-computed 20-byte SHA-1 hash with an explicit transport.
+ * Low-level; production callers should prefer the `signHash` export
+ * from `revenant-sign` top-level.
  */
-export async function signHash(
+export async function signHashWithTransport(
   hashBytes: Uint8Array,
   transport: SigningTransport,
   username: string,
@@ -72,9 +83,11 @@ export async function signHash(
 // -- Data signing -------------------------------------------------------------
 
 /**
- * Sign arbitrary data. The server computes SHA-1 internally.
+ * Sign arbitrary data with an explicit transport. The server computes
+ * SHA-1 internally. Low-level; production callers should prefer the
+ * `signData` export from `revenant-sign` top-level.
  */
-export async function signData(
+export async function signDataWithTransport(
   dataBytes: Uint8Array,
   transport: SigningTransport,
   username: string,
@@ -90,7 +103,9 @@ export async function signData(
 // -- Embedded PDF signing -----------------------------------------------------
 
 /**
- * Sign a PDF with an embedded signature.
+ * Sign a PDF with an embedded signature, using an explicit transport.
+ * Low-level; production callers should prefer the `sign` export from
+ * `revenant-sign` top-level.
  *
  * Uses the data-then-sign workflow:
  * 1. Prepare PDF with empty signature field
@@ -99,7 +114,7 @@ export async function signData(
  * 4. Insert CMS into the PDF
  * 5. Verify the signature
  */
-export async function signPdfEmbedded(
+export async function signPdfEmbeddedWithTransport(
   pdfBytes: Uint8Array,
   transport: SigningTransport,
   username: string,
@@ -155,7 +170,7 @@ export async function signPdfEmbedded(
   brData.set(after, before.length);
 
   // Step 3: Send ByteRange data to transport for signing
-  const cmsDer = await signData(brData, transport, username, password, timeout);
+  const cmsDer = await signDataWithTransport(brData, transport, username, password, timeout);
 
   // Step 4: Insert CMS into PDF
   const signedPdf = insertCms(preparedPdf, hexStart, hexLen, cmsDer);

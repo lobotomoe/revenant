@@ -123,21 +123,28 @@ export async function signOneEmbedded(
 ): Promise<SigningResult> {
   let signedPdf: Uint8Array;
   try {
-    const { signPdfEmbedded } = await import("../core/signing.js");
+    const { signPdfEmbeddedWithTransport } = await import("../core/signing.js");
     const { SoapSigningTransport } = await import("../network/soap-transport.js");
 
     await registerActiveProfileTls();
     const transport = new SoapSigningTransport(url);
-    signedPdf = await signPdfEmbedded(pdfBytes, transport, username, password, timeout, {
-      name: options.name,
-      position: options.position ?? DEFAULT_POSITION,
-      page: options.page ?? "last",
-      reason: options.reason ?? "",
-      imagePath: options.imagePath,
-      fields: options.fields,
-      visible: options.visible ?? true,
-      font: options.font,
-    });
+    signedPdf = await signPdfEmbeddedWithTransport(
+      pdfBytes,
+      transport,
+      username,
+      password,
+      timeout,
+      {
+        name: options.name,
+        position: options.position ?? DEFAULT_POSITION,
+        page: options.page ?? "last",
+        reason: options.reason ?? "",
+        imagePath: options.imagePath,
+        fields: options.fields,
+        visible: options.visible ?? true,
+        font: options.font,
+      },
+    );
   } catch (e) {
     return classifyError(e);
   }
@@ -181,12 +188,18 @@ export async function signOneDetached(
 ): Promise<SigningResult> {
   let cmsSignature: Uint8Array;
   try {
-    const { signPdfDetached } = await import("../core/signing.js");
+    const { signPdfDetachedWithTransport } = await import("../core/signing.js");
     const { SoapSigningTransport } = await import("../network/soap-transport.js");
 
     await registerActiveProfileTls();
     const transport = new SoapSigningTransport(url);
-    cmsSignature = await signPdfDetached(pdfBytes, transport, username, password, timeout);
+    cmsSignature = await signPdfDetachedWithTransport(
+      pdfBytes,
+      transport,
+      username,
+      password,
+      timeout,
+    );
   } catch (e) {
     return classifyError(e);
   }

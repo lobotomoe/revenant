@@ -8,8 +8,10 @@ import { ConfigError } from "../src/errors.js";
 
 // Mock signing functions to avoid actual network calls
 vi.mock("../src/core/signing.js", () => ({
-  signPdfEmbedded: vi.fn().mockResolvedValue(new Uint8Array([0x25, 0x50, 0x44, 0x46])),
-  signPdfDetached: vi.fn().mockResolvedValue(new Uint8Array([0x30, 0x82])),
+  signPdfEmbeddedWithTransport: vi.fn().mockResolvedValue(new Uint8Array([0x25, 0x50, 0x44, 0x46])),
+  signPdfDetachedWithTransport: vi.fn().mockResolvedValue(new Uint8Array([0x30, 0x82])),
+  signHashWithTransport: vi.fn().mockResolvedValue(new Uint8Array([0x30, 0x82])),
+  signDataWithTransport: vi.fn().mockResolvedValue(new Uint8Array([0x30, 0x82])),
 }));
 
 // Mock the transport so it doesn't open real connections
