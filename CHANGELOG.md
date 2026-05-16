@@ -7,6 +7,46 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [2.0.0] - 2026-05-16
+
+### TypeScript SDK only — Python client is unchanged
+
+### Breaking
+
+- Low-level signing functions in `revenant-sign` are renamed with a
+  `WithTransport` suffix to free their unsuffixed names for new
+  high-level wrappers:
+  - `signPdfEmbedded` → `signPdfEmbeddedWithTransport`
+  - `signPdfDetached` → `signPdfDetachedWithTransport`
+  - `signHash` → `signHashWithTransport`
+  - `signData` → `signDataWithTransport`
+
+  The `SigningTransport` interface method names (`transport.signHash`,
+  `transport.signData`, `transport.signPdfDetached`) are unchanged.
+  Migration: rename your imports; transport-handling code is untouched.
+
+### Added
+
+- **High-level `signHash(hashBytes, username, password, options?)`** —
+  detached CMS over a precomputed 20-byte SHA-1 hash, with profile
+  resolution, transport setup, and TLS registration handled internally.
+  Production callers no longer need to construct a `SoapSigningTransport`
+  to sign a hash.
+- **High-level `signData(dataBytes, username, password, options?)`** —
+  same shape, detached CMS over arbitrary bytes (server computes the
+  hash).
+- **High-level `getCertInfo(username, password, options?)`** — returns
+  the signer's identity (`CertInfo`: CN, email, organization, DN,
+  `notBefore`, `notAfter`) by trying the `enum-certificates` SAPI
+  operation first, falling back to dummy-hash signing.
+- **High-level `verifyCredentials(username, password, options?)`** —
+  thin wrapper over `getCertInfo` that discards the result and surfaces
+  `AuthError` on bad credentials. One round-trip against the appliance's
+  5-attempt lockout counter; suitable for "test before persist"
+  credential-entry flows.
+- `CertInfo` type is re-exported from the top-level `revenant-sign`
+  entry.
+
 ## [1.2.1] - 2026-04-16
 
 ### Fixed

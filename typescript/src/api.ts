@@ -1,13 +1,12 @@
 // SPDX-License-Identifier: Apache-2.0
 /**
- * High-level convenience API for PDF signing.
+ * High-level convenience API.
  *
- * Provides sign() and signDetached() that handle profile resolution,
- * transport creation, TLS registration, and appearance defaults
- * automatically.
- *
- * For lower-level control, use signPdfEmbedded and signPdfDetached
- * directly with a SoapSigningTransport.
+ * All exports here handle profile resolution, transport creation,
+ * TLS registration, and appearance defaults automatically — callers
+ * pass credentials and (optionally) a server profile name. For
+ * lower-level control with an explicit transport, see the
+ * `*WithTransport` exports in `./core/signing.js`.
  */
 
 import {
@@ -22,8 +21,14 @@ import {
 } from "./config/index.js";
 import { DEFAULT_TIMEOUT_SOAP } from "./constants.js";
 import { extractCertFields, extractDisplayFields } from "./core/appearance/index.js";
+import { type CertInfo, discoverIdentityFromServer } from "./core/cert-info.js";
 import type { PrepareOptions } from "./core/pdf/index.js";
-import { signPdfDetached, signPdfEmbedded } from "./core/signing.js";
+import {
+  signDataWithTransport,
+  signHashWithTransport,
+  signPdfDetachedWithTransport,
+  signPdfEmbeddedWithTransport,
+} from "./core/signing.js";
 import { ConfigError } from "./errors.js";
 import { SoapSigningTransport } from "./network/soap-transport.js";
 
@@ -205,7 +210,14 @@ export async function sign(
   if (options.height != null) prepareOptions.height = options.height;
   if (options.imagePath != null) prepareOptions.imagePath = options.imagePath;
 
-  return signPdfEmbedded(pdfBytes, transport, username, password, resolvedTimeout, prepareOptions);
+  return signPdfEmbeddedWithTransport(
+    pdfBytes,
+    transport,
+    username,
+    password,
+    resolvedTimeout,
+    prepareOptions,
+  );
 }
 
 /**
@@ -227,5 +239,109 @@ export async function signDetached(
   );
   const transport = await setupTransport(resolvedUrl, profileObj);
 
-  return signPdfDetached(pdfBytes, transport, username, password, resolvedTimeout);
+  return signPdfDetachedWithTransport(pdfBytes, transport, username, password, resolvedTimeout);
+}
+
+// -- Public API: hash / data / identity ---------------------------------------
+
+/**
+ * Sign a pre-computed hash and return a detached CMS/PKCS#7 signature.
+ *
+ * High-level convenience: handles profile resolution, transport
+ * creation, and TLS registration.
+ *
+ * The EKENG CoSign appliance signs RSA with SHA-1 — `hashBytes` must
+ * be exactly 20 bytes (`SHA1_DIGEST_SIZE`); other sizes throw
+ * `RevenantError`.
+ *
+ * Server resolution is identical to `signDetached`.
+ */
+export async function signHash(
+  hashBytes: Uint8Array,
+  username: string,
+  password: string,
+  options: DetachedSignOptions = {},
+): Promise<Uint8Array> {
+  const profileObj = resolveProfile(options.profile, options.url);
+  const { url: resolvedUrl, timeout: resolvedTimeout } = resolveUrlAndTimeout(
+    profileObj,
+    options.url,
+    options.timeout,
+  );
+  const transport = await setupTransport(resolvedUrl, profileObj);
+  return signHashWithTransport(hashBytes, transport, username, password, resolvedTimeout);
+}
+
+/**
+ * Sign arbitrary data and return a detached CMS/PKCS#7 signature.
+ * The server hashes the data internally (SHA-1) and signs the digest.
+ *
+ * High-level convenience: handles profile resolution, transport
+ * creation, and TLS registration.
+ *
+ * Server resolution is identical to `signDetached`.
+ */
+export async function signData(
+  dataBytes: Uint8Array,
+  username: string,
+  password: string,
+  options: DetachedSignOptions = {},
+): Promise<Uint8Array> {
+  const profileObj = resolveProfile(options.profile, options.url);
+  const { url: resolvedUrl, timeout: resolvedTimeout } = resolveUrlAndTimeout(
+    profileObj,
+    options.url,
+    options.timeout,
+  );
+  const transport = await setupTransport(resolvedUrl, profileObj);
+  return signDataWithTransport(dataBytes, transport, username, password, resolvedTimeout);
+}
+
+/**
+ * Retrieve the signer's identity (CN, email, organization, validity
+ * dates) from the appliance.
+ *
+ * Tries the `enum-certificates` SAPI operation first; falls back to
+ * signing a dummy 20-byte SHA-1 hash and extracting the certificate
+ * from the resulting CMS if the appliance doesn't expose
+ * enum-certificates. Either way, `AuthError` is thrown on bad
+ * credentials — useful for verifying credentials before persisting
+ * them to a vault (see `verifyCredentials`).
+ *
+ * Server resolution is identical to `signDetached`.
+ */
+export async function getCertInfo(
+  username: string,
+  password: string,
+  options: DetachedSignOptions = {},
+): Promise<CertInfo> {
+  const profileObj = resolveProfile(options.profile, options.url);
+  const { url: resolvedUrl, timeout: resolvedTimeout } = resolveUrlAndTimeout(
+    profileObj,
+    options.url,
+    options.timeout,
+  );
+  const transport = await setupTransport(resolvedUrl, profileObj);
+  return discoverIdentityFromServer(transport, username, password, resolvedTimeout);
+}
+
+/**
+ * Verify that credentials are accepted by the appliance.
+ *
+ * Throws `AuthError` (or any other revenant error from the transport)
+ * if the credentials are invalid or the server is unreachable; returns
+ * normally on success. The signer's identity is fetched as a
+ * side-effect but discarded — call `getCertInfo` if you need it.
+ *
+ * Intended for credential-entry flows that want to fail fast before
+ * persisting secrets to a vault: a wrong password caught here is
+ * one failed attempt against the EKENG account lockout counter
+ * (5 attempts total), not five.
+ */
+export async function verifyCredentials(
+  username: string,
+  password: string,
+  options: DetachedSignOptions = {},
+): Promise<void> {
+  await getCertInfo(username, password, options);
 }

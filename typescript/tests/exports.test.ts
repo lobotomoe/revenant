@@ -9,6 +9,10 @@ describe("src/index.ts re-exports", () => {
     const mod = await import("../src/index.js");
     expect(typeof mod.sign).toBe("function");
     expect(typeof mod.signDetached).toBe("function");
+    expect(typeof mod.signHash).toBe("function");
+    expect(typeof mod.signData).toBe("function");
+    expect(typeof mod.getCertInfo).toBe("function");
+    expect(typeof mod.verifyCredentials).toBe("function");
   });
 
   it("exports configuration helpers", async () => {
@@ -30,12 +34,12 @@ describe("src/index.ts re-exports", () => {
     expect(typeof mod.verifyEmbeddedSignature).toBe("function");
   });
 
-  it("exports core signing functions", async () => {
+  it("exports low-level (transport-based) signing functions", async () => {
     const mod = await import("../src/index.js");
-    expect(typeof mod.signData).toBe("function");
-    expect(typeof mod.signHash).toBe("function");
-    expect(typeof mod.signPdfDetached).toBe("function");
-    expect(typeof mod.signPdfEmbedded).toBe("function");
+    expect(typeof mod.signDataWithTransport).toBe("function");
+    expect(typeof mod.signHashWithTransport).toBe("function");
+    expect(typeof mod.signPdfDetachedWithTransport).toBe("function");
+    expect(typeof mod.signPdfEmbeddedWithTransport).toBe("function");
   });
 
   it("exports error classes", async () => {
@@ -66,12 +70,12 @@ describe("src/core/index.ts re-exports", () => {
     expect(typeof mod.extractCertInfoFromX509).toBe("function");
   });
 
-  it("exports signing functions", async () => {
+  it("exports low-level signing functions", async () => {
     const mod = await import("../src/core/index.js");
-    expect(typeof mod.signData).toBe("function");
-    expect(typeof mod.signHash).toBe("function");
-    expect(typeof mod.signPdfDetached).toBe("function");
-    expect(typeof mod.signPdfEmbedded).toBe("function");
+    expect(typeof mod.signDataWithTransport).toBe("function");
+    expect(typeof mod.signHashWithTransport).toBe("function");
+    expect(typeof mod.signPdfDetachedWithTransport).toBe("function");
+    expect(typeof mod.signPdfEmbeddedWithTransport).toBe("function");
   });
 });
 
