@@ -7,6 +7,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- **Three new GUI languages: Turkish (tr), Georgian (ka), and Persian (fa).**
+  The desktop app now ships in six languages. Persian is right-to-left;
+  text in labels, messages, and input fields is right-aligned automatically
+  when a right-to-left locale is active.
+
 ## [2.0.0] - 2026-05-16
 
 ### TypeScript SDK only — Python client is unchanged

@@ -1,0 +1,591 @@
+# Revenant GUI -- Persian (Farsi) translation
+# SPDX-License-Identifier: Apache-2.0
+#
+# NOTE: msgid values are stable keys used in GUI source code.
+msgid ""
+msgstr ""
+"Content-Type: text/plain; charset=UTF-8\n"
+"Content-Transfer-Encoding: 8bit\n"
+"Language: fa\n"
+
+msgid "gui.about_revenant"
+msgstr "درباره Revenant"
+
+msgid "gui.access_denied_your_account_may_not_have_permission_to_sign"
+msgstr "دسترسی رد شد. ممکن است حساب شما اجازه امضا نداشته باشد."
+
+msgid "gui.account"
+msgstr "حساب"
+
+msgid "gui.all_count_signatures_valid"
+msgstr "همه {count} امضا معتبر هستند"
+
+msgid "gui.all_files"
+msgstr "همه فایل‌ها"
+
+msgid "gui.authentication_failed_error"
+msgstr "احراز هویت ناموفق بود: {error}"
+
+msgid "gui.authentication_rejected_check_your_username_and_password"
+msgstr "احراز هویت رد شد. نام کاربری و گذرواژه خود را بررسی کنید."
+
+msgid "gui.author_aleksandr_kraiz"
+msgstr "نویسنده: Aleksandr Kraiz"
+
+msgid "gui.back"
+msgstr "بازگشت"
+
+msgid "gui.browse_ellipsis"
+msgstr "مرور..."
+
+msgid "gui.cancel"
+msgstr "انصراف"
+
+msgid "gui.cannot_connect_to_the_server_check_your_internet_connection"
+msgstr "اتصال به سرور ممکن نیست. اتصال اینترنت خود را بررسی کنید."
+
+msgid "gui.cannot_read_file_error"
+msgstr "خواندن فایل ممکن نیست: {error}"
+
+msgid "gui.certificate_inspection"
+msgstr "بررسی گواهی"
+
+msgid "gui.certificate_status"
+msgstr "گواهی: {status}"
+
+msgid "gui.choose_server"
+msgstr "انتخاب سرور"
+
+msgid "gui.clearing_saved_credentials_ellipsis"
+msgstr "در حال پاک کردن اطلاعات ورود ذخیره‌شده..."
+
+msgid "gui.close_window"
+msgstr "بستن پنجره"
+
+msgid "gui.complete"
+msgstr "تکمیل شد"
+
+msgid "gui.connect"
+msgstr "اتصال"
+
+msgid "gui.connect_to_a_server_to_sign_documents"
+msgstr "برای امضای اسناد\nبه یک سرور متصل شوید."
+
+msgid "gui.connect_to_server"
+msgstr "اتصال به سرور"
+
+msgid "gui.connected_info"
+msgstr "متصل شد ({info})"
+
+msgid "gui.connecting_to_url_ellipsis"
+msgstr "در حال اتصال به {url}..."
+
+msgid "gui.copy"
+msgstr "کپی"
+
+msgid "gui.could_not_determine_identity_from_server"
+msgstr "تعیین هویت از سرور ممکن نشد."
+
+msgid "gui.could_not_read_password_from_system_keychain_pleas_a490f2d1"
+msgstr "خواندن گذرواژه از کلیدزنجیر سیستم ممکن نشد.\nلطفاً گذرواژه خود را دوباره وارد کنید."
+
+msgid "gui.could_not_save_password_to_system_keychain_access_04b14699"
+msgstr "ذخیره گذرواژه در کلیدزنجیر سیستم ممکن نشد\n(دسترسی رد شد یا در دسترس نبود).\n\nگذرواژه شما به جای آن در فایل پیکربندی ذخیره شد.\nبرای استفاده از ذخیره‌سازی امن، هنگام درخواست\nدسترسی به کلیدزنجیر را مجاز کنید."
+
+msgid "gui.credentials"
+msgstr "اطلاعات ورود"
+
+msgid "gui.credentials_must_contain_only_latin_characters_ple_e9a0742d"
+msgstr "اطلاعات ورود باید فقط شامل حروف لاتین باشد.\nلطفاً چیدمان صفحه‌کلید خود را بررسی کنید."
+
+msgid "gui.cross_platform_client_for_arx_cosign_electronic_signatures"
+msgstr "کلاینت چندسکویی برای امضاهای الکترونیکی\nARX CoSign."
+
+msgid "gui.custom_server"
+msgstr "سرور سفارشی"
+
+msgid "gui.cut"
+msgstr "برش"
+
+msgid "gui.detached_p7s"
+msgstr "جداگانه (.p7s)"
+
+msgid "gui.detached_signature"
+msgstr "امضای جداگانه"
+
+msgid "gui.disconnect"
+msgstr "قطع اتصال"
+
+msgid "gui.disconnect_from_name"
+msgstr "از {name} قطع شود؟"
+
+msgid "gui.disconnecting_ellipsis"
+msgstr "در حال قطع اتصال..."
+
+msgid "gui.discovering_signer_identity_ellipsis"
+msgstr "در حال یافتن هویت امضاکننده..."
+
+msgid "gui.edit"
+msgstr "ویرایش"
+
+msgid "gui.email"
+msgstr "ایمیل"
+
+msgid "gui.email_label"
+msgstr "ایمیل:"
+
+msgid "gui.embedded"
+msgstr "توکار"
+
+msgid "gui.embedded_signatures"
+msgstr "امضاهای توکار"
+
+msgid "gui.enter_a_server_url"
+msgstr "یک نشانی سرور وارد کنید."
+
+msgid "gui.enter_manually_ellipsis"
+msgstr "ورود دستی..."
+
+msgid "gui.enter_signer_identity_label"
+msgstr "هویت امضاکننده را وارد کنید:"
+
+msgid "gui.error_error"
+msgstr "خطا: {error}"
+
+msgid "gui.failed"
+msgstr "ناموفق"
+
+msgid "gui.failed_info"
+msgstr "ناموفق: {info}"
+
+msgid "gui.failed_of_total_signature_s_failed"
+msgstr "{failed} از {total} امضا ناموفق بود"
+
+msgid "gui.failed_upper"
+msgstr "ناموفق"
+
+msgid "gui.file"
+msgstr "فایل"
+
+msgid "gui.file_already_exists_filename_overwrite"
+msgstr "فایل از قبل وجود دارد:\n{filename}\n\nبازنویسی شود؟"
+
+msgid "gui.file_not_found_path"
+msgstr "فایل یافت نشد:\n{path}"
+
+msgid "gui.font_label"
+msgstr "قلم:"
+
+msgid "gui.github"
+msgstr "GitHub"
+
+msgid "gui.image_opt_label"
+msgstr "تصویر (اختیاری):"
+
+msgid "gui.images"
+msgstr "تصاویر"
+
+msgid "gui.inspecting_signature_ellipsis"
+msgstr "در حال بررسی امضا..."
+
+msgid "gui.invisible_signature"
+msgstr "امضای نامرئی"
+
+msgid "gui.reason_label"
+msgstr "دلیل:"
+
+msgid "gui.invalid_page_specification"
+msgstr "مشخصات صفحه نامعتبر است"
+
+msgid "gui.language_label"
+msgstr "زبان:"
+
+msgid "gui.license_apache_2_0"
+msgstr "پروانه: Apache 2.0"
+
+msgid "gui.loading_credentials_ellipsis"
+msgstr "در حال بارگذاری اطلاعات ورود..."
+
+msgid "gui.loading_saved_credentials_ellipsis"
+msgstr "در حال بارگذاری اطلاعات ورود ذخیره‌شده..."
+
+msgid "gui.log_in"
+msgstr "ورود"
+
+msgid "gui.log_out"
+msgstr "خروج"
+
+msgid "gui.log_out_server_connection_will_be_preserved"
+msgstr "خروج از حساب؟\nاتصال سرور حفظ خواهد شد."
+
+msgid "gui.logging_out_ellipsis"
+msgstr "در حال خروج..."
+
+msgid "gui.login"
+msgstr "ورود"
+
+msgid "gui.name"
+msgstr "نام"
+
+msgid "gui.name_is_required"
+msgstr "نام الزامی است."
+
+msgid "gui.name_required_label"
+msgstr "نام (الزامی):"
+
+msgid "gui.next"
+msgstr "بعدی"
+
+msgid "gui.no_server_configured"
+msgstr "هیچ سروری پیکربندی نشده است"
+
+msgid "gui.no_server_configured_click_setup_to_configure"
+msgstr "هیچ سروری پیکربندی نشده است.\nبرای پیکربندی روی «راه‌اندازی...» کلیک کنید."
+
+msgid "gui.no_signer"
+msgstr "(بدون امضاکننده)"
+
+msgid "gui.note_cryptographic_verification_requires_the_origi_d0fbbcbb"
+msgstr "  توجه: راستی‌آزمایی رمزنگاشتی به PDF اصلی نیاز دارد.\n  برای بررسی یکپارچگی امضا، PDF را اضافه کنید."
+
+msgid "gui.ok_upper"
+msgstr "تأیید"
+
+msgid "gui.org"
+msgstr "سازمان"
+
+msgid "gui.organization"
+msgstr "سازمان"
+
+msgid "gui.organization_label"
+msgstr "سازمان:"
+
+msgid "gui.output_opt_label"
+msgstr "خروجی (اختیاری):"
+
+msgid "gui.output_path_must_be_absolute_use_browse_to_select_a_location"
+msgstr "مسیر خروجی باید مطلق باشد.\nبرای انتخاب محل از «مرور...» استفاده کنید."
+
+msgid "gui.page_label"
+msgstr "صفحه:"
+
+msgid "gui.password_label"
+msgstr "گذرواژه:"
+
+msgid "gui.paste"
+msgstr "چسباندن"
+
+msgid "gui.pdf_file_label"
+msgstr "فایل PDF:"
+
+msgid "gui.pdf_files"
+msgstr "فایل‌های PDF"
+
+msgid "gui.permission_denied_path_try_saving_to_a_different_l_51ac0570"
+msgstr "دسترسی رد شد:\n{path}\n\nبا «مرور...» سعی کنید در محل دیگری\nذخیره کنید."
+
+msgid "gui.permission_denied_path_try_selecting_the_file_agai_de400967"
+msgstr "دسترسی رد شد:\n{path}\n\nبا «مرور...» دوباره فایل را انتخاب کنید."
+
+msgid "gui.pkcs_7_signature"
+msgstr "امضای PKCS#7"
+
+msgid "gui.pkcs_7_signatures"
+msgstr "امضاهای PKCS#7"
+
+msgid "gui.please_select_a_file_to_verify"
+msgstr "لطفاً فایلی برای راستی‌آزمایی انتخاب کنید."
+
+msgid "gui.please_select_a_pdf_file"
+msgstr "لطفاً یک فایل PDF انتخاب کنید."
+
+msgid "gui.position_label"
+msgstr "موقعیت:"
+
+msgid "gui.ready"
+msgstr "آماده"
+
+msgid "gui.report_a_bug"
+msgstr "گزارش اشکال"
+
+msgid "gui.request_rejected_by_server_contact_your_system_administrator"
+msgstr "درخواست توسط سرور رد شد. با مدیر سیستم خود تماس بگیرید."
+
+msgid "gui.restart_the_app_to_apply_the_new_language"
+msgstr "برنامه برای اعمال زبان جدید راه‌اندازی مجدد شود؟"
+
+msgid "gui.retry"
+msgstr "تلاش مجدد"
+
+msgid "gui.save"
+msgstr "ذخیره"
+
+msgid "gui.save_credentials"
+msgstr "ذخیره اطلاعات ورود"
+
+msgid "gui.save_credentials_username_password"
+msgstr "ذخیره اطلاعات ورود (نام کاربری/گذرواژه)"
+
+msgid "gui.save_signature_as"
+msgstr "ذخیره امضا با نام"
+
+msgid "gui.save_signed_pdf_as"
+msgstr "ذخیره PDF امضاشده با نام"
+
+msgid "gui.saving_credentials_ellipsis"
+msgstr "در حال ذخیره اطلاعات ورود..."
+
+msgid "gui.secure_connection_failed_contact_your_system_administrator"
+msgstr "اتصال امن ناموفق بود. با مدیر سیستم خود تماس بگیرید."
+
+msgid "gui.select_a_cosign_server_label"
+msgstr "یک سرور CoSign انتخاب کنید:"
+
+msgid "gui.select_a_pdf_file_and_click_verify_to_check_signat_8fbc47f0"
+msgstr "یک فایل PDF انتخاب کرده و برای بررسی امضاها روی راستی‌آزمایی کلیک کنید.\n\nحالت‌ها:\n  فقط PDF -- راستی‌آزمایی امضاهای توکار\n  PDF + .p7s -- راستی‌آزمایی امضای جداگانه\n  فقط .p7s -- بررسی گواهی (بدون راستی‌آزمایی رمزنگاشتی)"
+
+msgid "gui.select_a_server"
+msgstr "یک سرور انتخاب کنید."
+
+msgid "gui.select_all"
+msgstr "انتخاب همه"
+
+msgid "gui.select_pdf"
+msgstr "انتخاب PDF"
+
+msgid "gui.select_pdf_to_verify"
+msgstr "انتخاب PDF برای راستی‌آزمایی"
+
+msgid "gui.select_signature_file"
+msgstr "انتخاب فایل امضا"
+
+msgid "gui.select_signature_image"
+msgstr "انتخاب تصویر امضا"
+
+msgid "gui.server_address_not_found_check_the_server_url"
+msgstr "نشانی سرور یافت نشد. نشانی سرور را بررسی کنید."
+
+msgid "gui.server_connected_log_in_to_sign_documents"
+msgstr "سرور متصل شد.\nبرای امضای اسناد وارد شوید."
+
+msgid "gui.server_error_error"
+msgstr "خطای سرور: {error}"
+
+msgid "gui.server_error_the_signing_service_may_be_temporaril_d8163695"
+msgstr "خطای سرور. ممکن است سرویس امضا به‌طور موقت در دسترس نباشد."
+
+msgid "gui.server_is_not_available_it_may_be_down_for_maintenance"
+msgstr "سرور در دسترس نیست. ممکن است برای نگهداری خاموش باشد."
+
+msgid "gui.server_is_not_responding_check_your_internet_conne_cd87621d"
+msgstr "سرور پاسخ نمی‌دهد. اتصال اینترنت خود را بررسی کرده و دوباره تلاش کنید."
+
+msgid "gui.server_verification"
+msgstr "راستی‌آزمایی سرور"
+
+msgid "gui.settings"
+msgstr "تنظیمات"
+
+msgid "gui.setup_complete_summary_label"
+msgstr "راه‌اندازی تکمیل شد! خلاصه:"
+
+msgid "gui.sign"
+msgstr "امضا"
+
+msgid "gui.sign_detached"
+msgstr "امضا (جداگانه)"
+
+msgid "gui.sign_pdf"
+msgstr "امضای PDF"
+
+msgid "gui.signature"
+msgstr "امضا"
+
+msgid "gui.signature_current_total_signer"
+msgstr "امضای {current}/{total} ({signer})"
+
+msgid "gui.signature_failed"
+msgstr "امضا ناموفق بود"
+
+msgid "gui.signature_p7s_label"
+msgstr "امضا (.p7s):"
+
+msgid "gui.signature_valid"
+msgstr "امضا معتبر است"
+
+msgid "gui.signed_filename_size"
+msgstr "امضا شد! -> {filename} ({size})"
+
+msgid "gui.signed_time"
+msgstr "امضا شده: {time}"
+
+msgid "gui.signer_identity"
+msgstr "هویت امضاکننده"
+
+msgid "gui.signer_identity_found_label"
+msgstr "هویت امضاکننده یافت شد:"
+
+msgid "gui.signer_identity_is_required_click_enter_manually_t_397d205e"
+msgstr "هویت امضاکننده الزامی است. برای ارائه آن روی «ورود دستی...» کلیک کنید."
+
+msgid "gui.signer_identity_is_required_retry_the_connection_o_6eb0ccec"
+msgstr "هویت امضاکننده الزامی است. اتصال را دوباره امتحان کنید یا برای اصلاح اطلاعات ورود بازگردید."
+
+msgid "gui.signer_name"
+msgstr "امضاکننده: {name}"
+
+msgid "gui.signing_ellipsis"
+msgstr "در حال امضا..."
+
+msgid "gui.step_current_of_total"
+msgstr "گام {current} از {total}"
+
+msgid "gui.storage_storage"
+msgstr "ذخیره‌سازی: {storage}"
+
+msgid "gui.system"
+msgstr "سیستم"
+
+msgid "gui.telegram"
+msgstr "Telegram"
+
+msgid "gui.this_pdf_is_size_mb_mb_files_over_30_mb_may_take_a_64b3d55a"
+msgstr "این PDF {size_mb} MB است.\n\nفایل‌های بزرگ‌تر از ۳۰ MB ممکن است زمان زیادی برای امضا ببرند\nیا روی سرور ناموفق شوند.\n\nادامه می‌دهید؟"
+
+msgid "gui.this_will_also_remove_your_credentials_and_signer_identity"
+msgstr "این کار اطلاعات ورود\nو هویت امضاکننده شما را نیز حذف می‌کند."
+
+msgid "gui.unavailable_error"
+msgstr "در دسترس نیست: {error}"
+
+msgid "gui.undo"
+msgstr "واگرد"
+
+msgid "gui.unexpected_error_error"
+msgstr "خطای غیرمنتظره: {error}"
+
+msgid "gui.url_label_upper"
+msgstr "URL:"
+
+msgid "gui.username_and_password_are_required"
+msgstr "نام کاربری و گذرواژه الزامی است."
+
+msgid "gui.username_label"
+msgstr "نام کاربری:"
+
+msgid "gui.username_username"
+msgstr "نام کاربری: {username}"
+
+msgid "gui.valid_upper"
+msgstr "معتبر"
+
+msgid "gui.verify"
+msgstr "راستی‌آزمایی"
+
+msgid "gui.verify_signature"
+msgstr "راستی‌آزمایی امضا"
+
+msgid "gui.verify_details_header"
+msgstr "جزئیات:"
+
+msgid "gui.verify_integrity_failed"
+msgstr "بررسی یکپارچگی ناموفق"
+
+msgid "gui.verify_integrity_ok"
+msgstr "موفق"
+
+msgid "gui.verify_org_label"
+msgstr "سازمان:"
+
+msgid "gui.verify_signature_label"
+msgstr "امضا:"
+
+msgid "gui.verify_signer_label"
+msgstr "امضاکننده:"
+
+msgid "gui.verify_trust_label"
+msgstr "اعتماد:"
+
+msgid "gui.verify_trust_not_checked"
+msgstr "بررسی نشده"
+
+msgid "gui.verify_trust_not_trusted"
+msgstr "به‌طور عمومی مورد اعتماد نیست"
+
+msgid "gui.verify_trust_partial"
+msgstr "مطابقت یافت ({anchor})، به‌طور کامل راستی‌آزمایی نشد"
+
+msgid "gui.verify_trust_trusted"
+msgstr "مورد اعتماد ({anchor})"
+
+msgid "gui.verifying_detached_signature_ellipsis"
+msgstr "در حال راستی‌آزمایی امضای جداگانه..."
+
+msgid "gui.verifying_ellipsis"
+msgstr "در حال راستی‌آزمایی..."
+
+msgid "gui.verifying_embedded_signatures_ellipsis"
+msgstr "در حال راستی‌آزمایی امضاهای توکار..."
+
+msgid "gui.version_version"
+msgstr "نسخه {version}"
+
+msgid "gui.warning_account_locks_after_max_attempts_failed_attempts"
+msgstr "هشدار: حساب پس از {max_attempts} تلاش ناموفق قفل می‌شود!"
+
+msgid "gui.remove"
+msgstr "حذف"
+
+msgid "gui.sign_n_pdfs"
+msgstr "امضای {n} PDF"
+
+msgid "gui.batch_signing"
+msgstr "امضای دسته‌ای"
+
+msgid "gui.preparing_ellipsis"
+msgstr "در حال آماده‌سازی..."
+
+msgid "gui.signing_n_of_total_filename"
+msgstr "در حال امضای {n}/{total}: {filename}..."
+
+msgid "gui.batch_complete_succeeded_failed"
+msgstr "امضای دسته‌ای کامل شد: {succeeded} امضا شد، {failed} ناموفق بود."
+
+msgid "gui.cancelling_ellipsis"
+msgstr "در حال لغو..."
+
+msgid "gui.show_password"
+msgstr "نمایش گذرواژه"
+
+msgid "gui.cert_validity_unknown"
+msgstr "اعتبار گواهی نامشخص است"
+
+msgid "gui.cert_valid_range"
+msgstr "{start} - {end} ({days} روز باقی‌مانده)"
+
+msgid "gui.cert_expiring_soon_range"
+msgstr "{start} - {end} ({days} روز باقی‌مانده!)"
+
+msgid "gui.cert_expired_range"
+msgstr "منقضی شده: {start} - {end} ({days} روز پیش)"
+
+msgid "gui.pos_bottom_center"
+msgstr "پایین وسط"
+
+msgid "gui.pos_bottom_left"
+msgstr "پایین چپ"
+
+msgid "gui.pos_bottom_right"
+msgstr "پایین راست"
+
+msgid "gui.pos_top_left"
+msgstr "بالا چپ"
+
+msgid "gui.pos_top_right"
+msgstr "بالا راست"
+
+msgid "gui.page_last"
+msgstr "آخر"
+
+msgid "gui.page_first"
+msgstr "اول"

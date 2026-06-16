@@ -382,6 +382,12 @@ def main() -> None:
             style.theme_use(preferred)
             break
 
+    # Right-align text for RTL locales (e.g. Persian). Must run before any
+    # widgets are created, since the option database is read at build time.
+    from .direction import apply_layout_direction
+
+    apply_layout_direction(root)
+
     # All keychain access is deferred to first use (LoginDialog pre-fill or signing)
     # to avoid triggering a macOS Keychain prompt before the UI appears.
     _logger.info("GUI startup: config=%s", get_server_config())

@@ -86,7 +86,7 @@ npm install revenant-sign
 - **Embedded and detached PDF signing** with customizable visual appearance
 - **Signature verification** -- hash integrity, CMS structure, certificate chain
 - **PKI chain validation** against ETSI Trust Service Lists (TSL)
-- **Localization** -- English, Russian, Armenian
+- **Localization** -- English, Russian, Armenian, Turkish, Georgian, Persian (RTL)
 - **Batch signing** -- sign multiple files in one session
 - **Cross-platform GUI** (tkinter) and CLI
 - **macOS universal binaries** (arm64 + x86_64)
