@@ -88,7 +88,7 @@ export function extractCertFields(
     if (field.regex) {
       try {
         const match = raw.match(new RegExp(field.regex));
-        if (!match || !match[1]) continue;
+        if (!match?.[1]) continue;
         result[field.id] = match[1];
       } catch {}
     } else {

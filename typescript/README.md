@@ -16,7 +16,7 @@ npm install revenant-sign
 pnpm add revenant-sign
 ```
 
-Requires Node.js >= 18.0.0.
+Requires Node.js >= 22.12.0.
 
 ## CLI quick start
 

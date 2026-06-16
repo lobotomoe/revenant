@@ -14,13 +14,15 @@ vi.mock("../src/core/signing.js", () => ({
   signDataWithTransport: vi.fn().mockResolvedValue(new Uint8Array([0x30, 0x82])),
 }));
 
-// Mock the transport so it doesn't open real connections
+// Mock the transport so it doesn't open real connections.
+// Use a class so it stays constructible under vitest 4, where a `vi.fn()` arrow
+// implementation is invoked as a constructor and throws "not a constructor".
 vi.mock("../src/network/soap-transport.js", () => ({
-  SoapSigningTransport: vi.fn().mockImplementation((url: string) => ({
-    url,
-    signData: vi.fn(),
-    signHash: vi.fn(),
-  })),
+  SoapSigningTransport: class {
+    signData = vi.fn();
+    signHash = vi.fn();
+    constructor(public url: string) {}
+  },
 }));
 
 // Mock config module to control profile/URL resolution without reading disk config
