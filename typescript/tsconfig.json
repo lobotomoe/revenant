@@ -20,7 +20,11 @@
     "noFallthroughCasesInSwitch": true,
     "exactOptionalPropertyTypes": false,
     "noUncheckedIndexedAccess": true,
-    "isolatedModules": true
+    "isolatedModules": true,
+    // tsup's DTS pipeline (rollup.js) unconditionally injects the now-deprecated
+    // `baseUrl` option, which TS 6.0 rejects unless this transition flag is set.
+    // Remove once tsup stops emitting baseUrl. See https://aka.ms/ts6
+    "ignoreDeprecations": "6.0"
   },
   "include": ["src"],
   "exclude": ["node_modules", "dist", "tests"]
