@@ -9,7 +9,7 @@
 [![npm](https://img.shields.io/npm/v/revenant-sign.svg)](https://www.npmjs.com/package/revenant-sign)
 [![Snap Store](https://snapcraft.io/revenant/badge.svg)](https://snapcraft.io/revenant)
 [![Python 3.10+](https://img.shields.io/badge/python-3.10%2B-blue.svg)](https://www.python.org/downloads/)
-[![Node.js 22+](https://img.shields.io/badge/node-22%2B-green.svg)](https://nodejs.org/)
+[![Node.js 22.12+](https://img.shields.io/badge/node-22.12%2B-green.svg)](https://nodejs.org/)
 [![TypeScript: strict](https://img.shields.io/badge/TypeScript-strict-blue)](https://www.typescriptlang.org/)
 [![License: Apache 2.0](https://img.shields.io/badge/license-Apache%202.0-blue.svg)](LICENSE)
 [![OpenSSF Scorecard](https://api.scorecard.dev/projects/github.com/lobotomoe/revenant/badge)](https://scorecard.dev/viewer/?uri=github.com/lobotomoe/revenant)
