@@ -1,0 +1,591 @@
+# Revenant GUI -- Georgian translation
+# SPDX-License-Identifier: Apache-2.0
+#
+# NOTE: msgid values are stable keys used in GUI source code.
+msgid ""
+msgstr ""
+"Content-Type: text/plain; charset=UTF-8\n"
+"Content-Transfer-Encoding: 8bit\n"
+"Language: ka\n"
+
+msgid "gui.about_revenant"
+msgstr "Revenant-ის შესახებ"
+
+msgid "gui.access_denied_your_account_may_not_have_permission_to_sign"
+msgstr "წვდომა აკრძალულია. შესაძლოა თქვენს ანგარიშს ხელმოწერის უფლება არ ჰქონდეს."
+
+msgid "gui.account"
+msgstr "ანგარიში"
+
+msgid "gui.all_count_signatures_valid"
+msgstr "ყველა {count} ხელმოწერა ვალიდურია"
+
+msgid "gui.all_files"
+msgstr "ყველა ფაილი"
+
+msgid "gui.authentication_failed_error"
+msgstr "ავთენტიფიკაცია ვერ მოხერხდა: {error}"
+
+msgid "gui.authentication_rejected_check_your_username_and_password"
+msgstr "ავთენტიფიკაცია უარყოფილია. შეამოწმეთ მომხმარებლის სახელი და პაროლი."
+
+msgid "gui.author_aleksandr_kraiz"
+msgstr "ავტორი: Aleksandr Kraiz"
+
+msgid "gui.back"
+msgstr "უკან"
+
+msgid "gui.browse_ellipsis"
+msgstr "არჩევა..."
+
+msgid "gui.cancel"
+msgstr "გაუქმება"
+
+msgid "gui.cannot_connect_to_the_server_check_your_internet_connection"
+msgstr "სერვერთან დაკავშირება ვერ ხერხდება. შეამოწმეთ ინტერნეტთან კავშირი."
+
+msgid "gui.cannot_read_file_error"
+msgstr "ფაილის წაკითხვა ვერ ხერხდება: {error}"
+
+msgid "gui.certificate_inspection"
+msgstr "სერტიფიკატის შემოწმება"
+
+msgid "gui.certificate_status"
+msgstr "სერტიფიკატი: {status}"
+
+msgid "gui.choose_server"
+msgstr "სერვერის არჩევა"
+
+msgid "gui.clearing_saved_credentials_ellipsis"
+msgstr "შენახული ავტორიზაციის მონაცემები იწმინდება..."
+
+msgid "gui.close_window"
+msgstr "ფანჯრის დახურვა"
+
+msgid "gui.complete"
+msgstr "დასრულდა"
+
+msgid "gui.connect"
+msgstr "დაკავშირება"
+
+msgid "gui.connect_to_a_server_to_sign_documents"
+msgstr "დაუკავშირდით სერვერს\nდოკუმენტების ხელმოსაწერად."
+
+msgid "gui.connect_to_server"
+msgstr "სერვერთან დაკავშირება"
+
+msgid "gui.connected_info"
+msgstr "დაკავშირებულია ({info})"
+
+msgid "gui.connecting_to_url_ellipsis"
+msgstr "მიმდინარეობს დაკავშირება {url}-თან..."
+
+msgid "gui.copy"
+msgstr "კოპირება"
+
+msgid "gui.could_not_determine_identity_from_server"
+msgstr "სერვერიდან ვინაობის დადგენა ვერ მოხერხდა."
+
+msgid "gui.could_not_read_password_from_system_keychain_pleas_a490f2d1"
+msgstr "სისტემური გასაღებების საცავიდან პაროლის წაკითხვა ვერ მოხერხდა.\nგთხოვთ, ხელახლა შეიყვანოთ პაროლი."
+
+msgid "gui.could_not_save_password_to_system_keychain_access_04b14699"
+msgstr "სისტემური გასაღებების საცავში პაროლის შენახვა ვერ მოხერხდა\n(წვდომა აკრძალულია ან მიუწვდომელია).\n\nამის ნაცვლად თქვენი პაროლი კონფიგურაციის ფაილში შეინახა.\nუსაფრთხო საცავის გამოსაყენებლად, მოთხოვნისას\nგასაღებების საცავზე წვდომა დაუშვით."
+
+msgid "gui.credentials"
+msgstr "ავტორიზაციის მონაცემები"
+
+msgid "gui.credentials_must_contain_only_latin_characters_ple_e9a0742d"
+msgstr "ავტორიზაციის მონაცემები მხოლოდ ლათინურ სიმბოლოებს უნდა შეიცავდეს.\nგთხოვთ, შეამოწმოთ კლავიატურის განლაგება."
+
+msgid "gui.cross_platform_client_for_arx_cosign_electronic_signatures"
+msgstr "კროს-პლატფორმული კლიენტი ARX CoSign\nელექტრონული ხელმოწერებისთვის."
+
+msgid "gui.custom_server"
+msgstr "მორგებული სერვერი"
+
+msgid "gui.cut"
+msgstr "ამოჭრა"
+
+msgid "gui.detached_p7s"
+msgstr "განცალკევებული (.p7s)"
+
+msgid "gui.detached_signature"
+msgstr "განცალკევებული ხელმოწერა"
+
+msgid "gui.disconnect"
+msgstr "კავშირის გაწყვეტა"
+
+msgid "gui.disconnect_from_name"
+msgstr "გაწყვიტოთ კავშირი {name}-თან?"
+
+msgid "gui.disconnecting_ellipsis"
+msgstr "კავშირის გაწყვეტა..."
+
+msgid "gui.discovering_signer_identity_ellipsis"
+msgstr "ხელმომწერის ვინაობა დგინდება..."
+
+msgid "gui.edit"
+msgstr "რედაქტირება"
+
+msgid "gui.email"
+msgstr "ელფოსტა"
+
+msgid "gui.email_label"
+msgstr "ელფოსტა:"
+
+msgid "gui.embedded"
+msgstr "ჩაშენებული"
+
+msgid "gui.embedded_signatures"
+msgstr "ჩაშენებული ხელმოწერები"
+
+msgid "gui.enter_a_server_url"
+msgstr "შეიყვანეთ სერვერის URL."
+
+msgid "gui.enter_manually_ellipsis"
+msgstr "ხელით შეყვანა..."
+
+msgid "gui.enter_signer_identity_label"
+msgstr "შეიყვანეთ ხელმომწერის ვინაობა:"
+
+msgid "gui.error_error"
+msgstr "შეცდომა: {error}"
+
+msgid "gui.failed"
+msgstr "ვერ მოხერხდა"
+
+msgid "gui.failed_info"
+msgstr "ვერ მოხერხდა: {info}"
+
+msgid "gui.failed_of_total_signature_s_failed"
+msgstr "{failed} / {total} ხელმოწერა ვერ დადასტურდა"
+
+msgid "gui.failed_upper"
+msgstr "ვერ დადასტურდა"
+
+msgid "gui.file"
+msgstr "ფაილი"
+
+msgid "gui.file_already_exists_filename_overwrite"
+msgstr "ფაილი უკვე არსებობს:\n{filename}\n\nგადაეწეროს?"
+
+msgid "gui.file_not_found_path"
+msgstr "ფაილი ვერ მოიძებნა:\n{path}"
+
+msgid "gui.font_label"
+msgstr "შრიფტი:"
+
+msgid "gui.github"
+msgstr "GitHub"
+
+msgid "gui.image_opt_label"
+msgstr "სურათი (არასავალდ.):"
+
+msgid "gui.images"
+msgstr "სურათები"
+
+msgid "gui.inspecting_signature_ellipsis"
+msgstr "ხელმოწერის შემოწმება..."
+
+msgid "gui.invisible_signature"
+msgstr "უხილავი ხელმოწერა"
+
+msgid "gui.reason_label"
+msgstr "მიზეზი:"
+
+msgid "gui.invalid_page_specification"
+msgstr "გვერდის არასწორი მითითება"
+
+msgid "gui.language_label"
+msgstr "ენა:"
+
+msgid "gui.license_apache_2_0"
+msgstr "ლიცენზია: Apache 2.0"
+
+msgid "gui.loading_credentials_ellipsis"
+msgstr "ავტორიზაციის მონაცემები იტვირთება..."
+
+msgid "gui.loading_saved_credentials_ellipsis"
+msgstr "შენახული ავტორიზაციის მონაცემები იტვირთება..."
+
+msgid "gui.log_in"
+msgstr "შესვლა"
+
+msgid "gui.log_out"
+msgstr "გასვლა"
+
+msgid "gui.log_out_server_connection_will_be_preserved"
+msgstr "გავიდეთ?\nსერვერთან კავშირი შენარჩუნდება."
+
+msgid "gui.logging_out_ellipsis"
+msgstr "გასვლა..."
+
+msgid "gui.login"
+msgstr "შესვლა"
+
+msgid "gui.name"
+msgstr "სახელი"
+
+msgid "gui.name_is_required"
+msgstr "სახელის მითითება სავალდებულოა."
+
+msgid "gui.name_required_label"
+msgstr "სახელი (სავალდებულო):"
+
+msgid "gui.next"
+msgstr "შემდეგი"
+
+msgid "gui.no_server_configured"
+msgstr "სერვერი არ არის კონფიგურირებული"
+
+msgid "gui.no_server_configured_click_setup_to_configure"
+msgstr "სერვერი არ არის კონფიგურირებული.\nკონფიგურაციისთვის დააწკაპუნეთ 'დაყენება...'."
+
+msgid "gui.no_signer"
+msgstr "(ხელმომწერი არ არის)"
+
+msgid "gui.note_cryptographic_verification_requires_the_origi_d0fbbcbb"
+msgstr "  შენიშვნა: კრიპტოგრაფიული შემოწმებისთვის საჭიროა ორიგინალი PDF.\n  ხელმოწერის მთლიანობის შესამოწმებლად დაამატეთ PDF."
+
+msgid "gui.ok_upper"
+msgstr "OK"
+
+msgid "gui.org"
+msgstr "ორგ."
+
+msgid "gui.organization"
+msgstr "ორგანიზაცია"
+
+msgid "gui.organization_label"
+msgstr "ორგანიზაცია:"
+
+msgid "gui.output_opt_label"
+msgstr "გამომავალი ფაილი (არასავალდ.):"
+
+msgid "gui.output_path_must_be_absolute_use_browse_to_select_a_location"
+msgstr "გამომავალი ფაილის გზა აბსოლუტური უნდა იყოს.\nადგილმდებარეობის ასარჩევად გამოიყენეთ 'არჩევა...'."
+
+msgid "gui.page_label"
+msgstr "გვერდი:"
+
+msgid "gui.password_label"
+msgstr "პაროლი:"
+
+msgid "gui.paste"
+msgstr "ჩასმა"
+
+msgid "gui.pdf_file_label"
+msgstr "PDF ფაილი:"
+
+msgid "gui.pdf_files"
+msgstr "PDF ფაილები"
+
+msgid "gui.permission_denied_path_try_saving_to_a_different_l_51ac0570"
+msgstr "წვდომა აკრძალულია:\n{path}\n\nსცადეთ სხვა ადგილას შენახვა\n'არჩევა...'-ის გამოყენებით."
+
+msgid "gui.permission_denied_path_try_selecting_the_file_agai_de400967"
+msgstr "წვდომა აკრძალულია:\n{path}\n\nსცადეთ ფაილის ხელახლა არჩევა 'არჩევა...'-ით."
+
+msgid "gui.pkcs_7_signature"
+msgstr "PKCS#7 ხელმოწერა"
+
+msgid "gui.pkcs_7_signatures"
+msgstr "PKCS#7 ხელმოწერები"
+
+msgid "gui.please_select_a_file_to_verify"
+msgstr "გთხოვთ, აირჩიოთ შესამოწმებელი ფაილი."
+
+msgid "gui.please_select_a_pdf_file"
+msgstr "გთხოვთ, აირჩიოთ PDF ფაილი."
+
+msgid "gui.position_label"
+msgstr "მდებარეობა:"
+
+msgid "gui.ready"
+msgstr "მზადაა"
+
+msgid "gui.report_a_bug"
+msgstr "ხარვეზის შეტყობინება"
+
+msgid "gui.request_rejected_by_server_contact_your_system_administrator"
+msgstr "მოთხოვნა უარყოფილია სერვერის მიერ. დაუკავშირდით სისტემურ ადმინისტრატორს."
+
+msgid "gui.restart_the_app_to_apply_the_new_language"
+msgstr "გადატვირთოთ აპლიკაცია ახალი ენის გასააქტიურებლად?"
+
+msgid "gui.retry"
+msgstr "ხელახლა ცდა"
+
+msgid "gui.save"
+msgstr "შენახვა"
+
+msgid "gui.save_credentials"
+msgstr "ავტორიზაციის მონაცემების შენახვა"
+
+msgid "gui.save_credentials_username_password"
+msgstr "ავტორიზაციის მონაცემების შენახვა (მომხმარებლის სახელი/პაროლი)"
+
+msgid "gui.save_signature_as"
+msgstr "ხელმოწერის შენახვა როგორც"
+
+msgid "gui.save_signed_pdf_as"
+msgstr "ხელმოწერილი PDF-ის შენახვა როგორც"
+
+msgid "gui.saving_credentials_ellipsis"
+msgstr "ავტორიზაციის მონაცემები ინახება..."
+
+msgid "gui.secure_connection_failed_contact_your_system_administrator"
+msgstr "უსაფრთხო კავშირი ვერ დამყარდა. დაუკავშირდით სისტემურ ადმინისტრატორს."
+
+msgid "gui.select_a_cosign_server_label"
+msgstr "აირჩიეთ CoSign სერვერი:"
+
+msgid "gui.select_a_pdf_file_and_click_verify_to_check_signat_8fbc47f0"
+msgstr "აირჩიეთ PDF ფაილი და ხელმოწერების შესამოწმებლად დააწკაპუნეთ 'შემოწმება'.\n\nრეჟიმები:\n  მხოლოდ PDF -- ჩაშენებული ხელმოწერების შემოწმება\n  PDF + .p7s -- განცალკევებული ხელმოწერის შემოწმება\n  მხოლოდ .p7s -- სერტიფიკატის შემოწმება (კრიპტოგრაფიული შემოწმების გარეშე)"
+
+msgid "gui.select_a_server"
+msgstr "აირჩიეთ სერვერი."
+
+msgid "gui.select_all"
+msgstr "ყველას მონიშვნა"
+
+msgid "gui.select_pdf"
+msgstr "PDF-ის არჩევა"
+
+msgid "gui.select_pdf_to_verify"
+msgstr "აირჩიეთ შესამოწმებელი PDF"
+
+msgid "gui.select_signature_file"
+msgstr "აირჩიეთ ხელმოწერის ფაილი"
+
+msgid "gui.select_signature_image"
+msgstr "აირჩიეთ ხელმოწერის სურათი"
+
+msgid "gui.server_address_not_found_check_the_server_url"
+msgstr "სერვერის მისამართი ვერ მოიძებნა. შეამოწმეთ სერვერის URL."
+
+msgid "gui.server_connected_log_in_to_sign_documents"
+msgstr "სერვერთან კავშირი დამყარდა.\nშედით დოკუმენტების ხელმოსაწერად."
+
+msgid "gui.server_error_error"
+msgstr "სერვერის შეცდომა: {error}"
+
+msgid "gui.server_error_the_signing_service_may_be_temporaril_d8163695"
+msgstr "სერვერის შეცდომა. ხელმოწერის სერვისი შესაძლოა დროებით მიუწვდომელია."
+
+msgid "gui.server_is_not_available_it_may_be_down_for_maintenance"
+msgstr "სერვერი მიუწვდომელია. შესაძლოა ტექნიკური მომსახურება მიმდინარეობს."
+
+msgid "gui.server_is_not_responding_check_your_internet_conne_cd87621d"
+msgstr "სერვერი არ პასუხობს. შეამოწმეთ ინტერნეტთან კავშირი და სცადეთ ხელახლა."
+
+msgid "gui.server_verification"
+msgstr "სერვერის შემოწმება"
+
+msgid "gui.settings"
+msgstr "პარამეტრები"
+
+msgid "gui.setup_complete_summary_label"
+msgstr "კონფიგურაცია დასრულდა! შეჯამება:"
+
+msgid "gui.sign"
+msgstr "ხელმოწერა"
+
+msgid "gui.sign_detached"
+msgstr "ხელმოწერა (განცალკევებული)"
+
+msgid "gui.sign_pdf"
+msgstr "PDF-ის ხელმოწერა"
+
+msgid "gui.signature"
+msgstr "ხელმოწერა"
+
+msgid "gui.signature_current_total_signer"
+msgstr "ხელმოწერა {current}/{total} ({signer})"
+
+msgid "gui.signature_failed"
+msgstr "ხელმოწერა ვერ დადასტურდა"
+
+msgid "gui.signature_p7s_label"
+msgstr "ხელმოწერა (.p7s):"
+
+msgid "gui.signature_valid"
+msgstr "ხელმოწერა ვალიდურია"
+
+msgid "gui.signed_filename_size"
+msgstr "ხელმოწერილია! -> {filename} ({size})"
+
+msgid "gui.signed_time"
+msgstr "ხელმოწერილია: {time}"
+
+msgid "gui.signer_identity"
+msgstr "ხელმომწერის ვინაობა"
+
+msgid "gui.signer_identity_found_label"
+msgstr "ხელმომწერის ვინაობა მოიძებნა:"
+
+msgid "gui.signer_identity_is_required_click_enter_manually_t_397d205e"
+msgstr "ხელმომწერის ვინაობა სავალდებულოა. მის შესაყვანად დააწკაპუნეთ 'ხელით შეყვანა...'."
+
+msgid "gui.signer_identity_is_required_retry_the_connection_o_6eb0ccec"
+msgstr "ხელმომწერის ვინაობა სავალდებულოა. სცადეთ დაკავშირება ხელახლა ან დაბრუნდით ავტორიზაციის მონაცემების შესასწორებლად."
+
+msgid "gui.signer_name"
+msgstr "ხელმომწერი: {name}"
+
+msgid "gui.signing_ellipsis"
+msgstr "მიმდინარეობს ხელმოწერა..."
+
+msgid "gui.step_current_of_total"
+msgstr "ნაბიჯი {current} / {total}"
+
+msgid "gui.storage_storage"
+msgstr "საცავი: {storage}"
+
+msgid "gui.system"
+msgstr "სისტემა"
+
+msgid "gui.telegram"
+msgstr "Telegram"
+
+msgid "gui.this_pdf_is_size_mb_mb_files_over_30_mb_may_take_a_64b3d55a"
+msgstr "ეს PDF არის {size_mb} MB.\n\n30 MB-ზე დიდი ფაილების ხელმოწერას შესაძლოა დიდი დრო დასჭირდეს\nან სერვერზე ჩაიშალოს.\n\nგავაგრძელოთ?"
+
+msgid "gui.this_will_also_remove_your_credentials_and_signer_identity"
+msgstr "ეს ასევე წაშლის თქვენს ავტორიზაციის მონაცემებსა\nდა ხელმომწერის ვინაობას."
+
+msgid "gui.unavailable_error"
+msgstr "მიუწვდომელია: {error}"
+
+msgid "gui.undo"
+msgstr "უკუქცევა"
+
+msgid "gui.unexpected_error_error"
+msgstr "მოულოდნელი შეცდომა: {error}"
+
+msgid "gui.url_label_upper"
+msgstr "URL:"
+
+msgid "gui.username_and_password_are_required"
+msgstr "მომხმარებლის სახელისა და პაროლის მითითება სავალდებულოა."
+
+msgid "gui.username_label"
+msgstr "მომხმარებლის სახელი:"
+
+msgid "gui.username_username"
+msgstr "მომხმარებლის სახელი: {username}"
+
+msgid "gui.valid_upper"
+msgstr "ვალიდური"
+
+msgid "gui.verify"
+msgstr "შემოწმება"
+
+msgid "gui.verify_signature"
+msgstr "ხელმოწერის შემოწმება"
+
+msgid "gui.verify_details_header"
+msgstr "დეტალები:"
+
+msgid "gui.verify_integrity_failed"
+msgstr "მთლიანობის შემოწმება ვერ გაიარა"
+
+msgid "gui.verify_integrity_ok"
+msgstr "OK"
+
+msgid "gui.verify_org_label"
+msgstr "ორგანიზაცია:"
+
+msgid "gui.verify_signature_label"
+msgstr "ხელმოწერა:"
+
+msgid "gui.verify_signer_label"
+msgstr "ხელმომწერი:"
+
+msgid "gui.verify_trust_label"
+msgstr "ნდობა:"
+
+msgid "gui.verify_trust_not_checked"
+msgstr "არ შემოწმებულა"
+
+msgid "gui.verify_trust_not_trusted"
+msgstr "არ არის საჯაროდ სანდო"
+
+msgid "gui.verify_trust_partial"
+msgstr "დაემთხვა ({anchor}), სრულად არ გადამოწმებულა"
+
+msgid "gui.verify_trust_trusted"
+msgstr "სანდო ({anchor})"
+
+msgid "gui.verifying_detached_signature_ellipsis"
+msgstr "განცალკევებული ხელმოწერის შემოწმება..."
+
+msgid "gui.verifying_ellipsis"
+msgstr "შემოწმება..."
+
+msgid "gui.verifying_embedded_signatures_ellipsis"
+msgstr "ჩაშენებული ხელმოწერების შემოწმება..."
+
+msgid "gui.version_version"
+msgstr "ვერსია {version}"
+
+msgid "gui.warning_account_locks_after_max_attempts_failed_attempts"
+msgstr "გაფრთხილება: ანგარიში დაიბლოკება {max_attempts} წარუმატებელი მცდელობის შემდეგ!"
+
+msgid "gui.remove"
+msgstr "წაშლა"
+
+msgid "gui.sign_n_pdfs"
+msgstr "{n} PDF-ის ხელმოწერა"
+
+msgid "gui.batch_signing"
+msgstr "ჯგუფური ხელმოწერა"
+
+msgid "gui.preparing_ellipsis"
+msgstr "მზადება..."
+
+msgid "gui.signing_n_of_total_filename"
+msgstr "მიმდინარეობს ხელმოწერა {n}/{total}: {filename}..."
+
+msgid "gui.batch_complete_succeeded_failed"
+msgstr "ჯგუფური ოპერაცია დასრულდა: {succeeded} ხელმოწერილია, {failed} ვერ შესრულდა."
+
+msgid "gui.cancelling_ellipsis"
+msgstr "მიმდინარეობს გაუქმება..."
+
+msgid "gui.show_password"
+msgstr "პაროლის ჩვენება"
+
+msgid "gui.cert_validity_unknown"
+msgstr "სერტიფიკატის მოქმედების ვადა უცნობია"
+
+msgid "gui.cert_valid_range"
+msgstr "{start} - {end} (დარჩა {days} დღე)"
+
+msgid "gui.cert_expiring_soon_range"
+msgstr "{start} - {end} (დარჩა {days} დღე!)"
+
+msgid "gui.cert_expired_range"
+msgstr "ვადაგასულია: {start} - {end} ({days} დღის წინ)"
+
+msgid "gui.pos_bottom_center"
+msgstr "ქვემოთ შუაში"
+
+msgid "gui.pos_bottom_left"
+msgstr "ქვემოთ მარცხნივ"
+
+msgid "gui.pos_bottom_right"
+msgstr "ქვემოთ მარჯვნივ"
+
+msgid "gui.pos_top_left"
+msgstr "ზემოთ მარცხნივ"
+
+msgid "gui.pos_top_right"
+msgstr "ზემოთ მარჯვნივ"
+
+msgid "gui.page_last"
+msgstr "ბოლო"
+
+msgid "gui.page_first"
+msgstr "პირველი"
