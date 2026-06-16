@@ -20,4 +20,8 @@ extend-exclude = [
     "docs/",
     # Font metrics are auto-generated hex data
     "python/src/revenant/core/appearance/font_data/",
+    # Translation catalogs: non-English UI strings and truncated msgid keys.
+    # typos has no per-language dictionary, so Turkish/etc. words collide with
+    # the English typo corpus (e.g. "sistem" -> "system"). Not English to check.
+    "python/src/revenant/ui/gui/i18n/locales/",
 ]

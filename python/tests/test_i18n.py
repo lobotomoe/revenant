@@ -97,7 +97,7 @@ def test_supported_locales_complete():
 
 def test_rtl_locales_are_supported():
     """Every RTL locale must also be a supported locale."""
-    assert RTL_LOCALES.issubset(SUPPORTED_LOCALES)
+    assert RTL_LOCALES.issubset(SUPPORTED_LOCALES.keys())
     assert "fa" in RTL_LOCALES
 
 
