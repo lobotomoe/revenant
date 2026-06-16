@@ -6,10 +6,12 @@ from __future__ import annotations
 from unittest.mock import patch
 
 from revenant.ui.gui.i18n import (
+    RTL_LOCALES,
     SUPPORTED_LOCALES,
     _detect_system_locale,
     get_current_locale,
     init_locale,
+    is_rtl,
 )
 
 
@@ -89,6 +91,21 @@ def test_translation_function():
 
 def test_supported_locales_complete():
     """All declared locales should be present."""
-    assert "en" in SUPPORTED_LOCALES
-    assert "ru" in SUPPORTED_LOCALES
-    assert "hy" in SUPPORTED_LOCALES
+    for code in ("en", "ru", "hy", "tr", "ka", "fa"):
+        assert code in SUPPORTED_LOCALES
+
+
+def test_rtl_locales_are_supported():
+    """Every RTL locale must also be a supported locale."""
+    assert RTL_LOCALES.issubset(SUPPORTED_LOCALES.keys())
+    assert "fa" in RTL_LOCALES
+
+
+def test_is_rtl_respects_active_locale():
+    """is_rtl() reflects the active locale and explicit overrides."""
+    init_locale("fa")
+    assert is_rtl() is True
+    assert is_rtl("en") is False
+    init_locale("en")
+    assert is_rtl() is False
+    assert is_rtl("fa") is True

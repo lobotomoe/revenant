@@ -39,7 +39,10 @@ if TYPE_CHECKING:
 
     from revenant.ui.gui.app import RevenantGUI
 
-_LOCALES = ("en", "ru", "hy")
+# fa (RTL) must come last: apply_layout_direction sets option-database defaults
+# on the shared root that cannot be reverted, so it would otherwise leak into
+# subsequent LTR locales.
+_LOCALES = ("en", "ru", "hy", "tr", "ka", "fa")
 
 _MOCK_IDENTITY: dict[str, str | None] = {
     "name": "John Smith 12345",
@@ -256,9 +259,12 @@ def run(output_dir: Path, *, dry_run: bool = False) -> None:
                     style.theme_use(preferred)
                     break
 
+            from revenant.ui.gui.direction import apply_layout_direction
+
             for locale_code in _LOCALES:
                 _logger.info("Locale: %s", locale_code)
                 init_locale(locale_code)
+                apply_layout_direction(root)
                 locale_dir = output_dir / locale_code
                 _capture_locale(root, config_dir, locale_dir, dry_run=dry_run)
 

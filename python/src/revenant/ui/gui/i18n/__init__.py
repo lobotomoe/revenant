@@ -30,7 +30,13 @@ SUPPORTED_LOCALES: dict[str, str] = {
     "en": "English",
     "ru": "\u0420\u0443\u0441\u0441\u043a\u0438\u0439",
     "hy": "\u0540\u0561\u0575\u0565\u0580\u0565\u0576",
+    "tr": "T\u00fcrk\u00e7e",
+    "ka": "\u10e5\u10d0\u10e0\u10d7\u10e3\u10da\u10d8",
+    "fa": "\u0641\u0627\u0631\u0633\u06cc",
 }
+
+# Locales whose script is written right-to-left.
+RTL_LOCALES: frozenset[str] = frozenset({"fa"})
 
 SYSTEM_LOCALE = "system"
 
@@ -45,6 +51,12 @@ _translator: gettext.GNUTranslations | gettext.NullTranslations = gettext.NullTr
 def get_current_locale() -> str:
     """Return the active locale code (e.g. 'en', 'ru', 'hy')."""
     return _current_locale
+
+
+def is_rtl(locale_code: str | None = None) -> bool:
+    """Return True if the locale (or the active one) is written right-to-left."""
+    code = locale_code if locale_code is not None else _current_locale
+    return code in RTL_LOCALES
 
 
 def _detect_system_locale() -> str:

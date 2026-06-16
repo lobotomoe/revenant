@@ -1,23 +1,63 @@
+# Single source of truth for typos config.
+# (Replaces the former .typos.toml, which was shadowed by this file's
+# precedence and therefore inert; its word list is merged in below.)
+
 [default.extend-identifiers]
 PNGs = "PNGs"
 
 [default.extend-words]
-# Truncated msgid keys -- not real typos
-agai = "agai"
+# ARX CoSign server error messages (actual responses, not our typos)
+occured = "occured"
+suported = "suported"
+
+# ARX CoSign protocol terms
+cosign = "cosign"
+SAPI = "SAPI"
+SAPIWS = "SAPIWS"
+
+# Cryptography
+CMS = "CMS"
+OID = "OID"
+DN = "DN"
+RDN = "RDN"
+
+# PDF structure
+xref = "xref"
+startxref = "startxref"
+endstream = "endstream"
+AcroForm = "AcroForm"
+Flate = "Flate"
+
+# Font / OpenType terms
+GHEA = "GHEA"
+grapalat = "grapalat"
+Grapalat = "Grapalat"
+mariam = "mariam"
+Mariam = "Mariam"
+OT = "OT"
+
+# PyInstaller spec keyword
+datas = "datas"
+
 # Apple App Store error code prefix
 ITMS = "ITMS"
-# PDF spec: /FlateDecode is the standard filter name
-Flate = "Flate"
-# PyInstaller API uses "datas" as a parameter name
-datas = "datas"
-# Server response text quoted verbatim in tests/docs
-occured = "occured"
-# OpenType features abbreviation
-OT = "OT"
+
+# Truncated msgid key fragment referenced in GUI source
+agai = "agai"
+
+# Misc
+PN = "PN"
+
+# Products / organizations
+EKENG = "EKENG"
 
 [files]
 extend-exclude = [
     "docs/",
-    # Font metrics are auto-generated hex data
+    # Font data is auto-generated (hex metrics)
     "python/src/revenant/core/appearance/font_data/",
+    # Translation catalogs: non-English UI strings and truncated msgid keys.
+    # typos has no per-language dictionary, so Turkish/etc. words collide with
+    # the English typo corpus (e.g. "sistem" -> "system"). Not English to check.
+    "python/src/revenant/ui/gui/i18n/locales/",
 ]
