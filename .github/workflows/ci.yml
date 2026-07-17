@@ -98,11 +98,12 @@ jobs:
       - name: Run pip-audit
         run: |
           # CVE-2024-23342: timing attack in ecdsa (dep of tlslite-ng).
-          # No fix available as of 2026-02 -- ecdsa maintainers consider side-channel
-          # attacks out of scope for pure-Python implementation.
+          # No fix available -- ecdsa maintainers consider side-channel attacks
+          # out of scope for the pure-Python implementation. 0.19.2 (latest) still
+          # ships the vulnerable code.
           # Tracking: https://github.com/tlsfuzzer/python-ecdsa/issues/339
-          # Re-evaluate: when ecdsa > 0.19.1 is released or tlslite-ng drops ecdsa dep.
-          # Last checked: 2026-02-12
+          # Re-evaluate: when a side-channel-hardened ecdsa lands or tlslite-ng drops the dep.
+          # Last checked: 2026-07-17
           pip-audit --skip-editable --ignore-vuln CVE-2024-23342
 
   dependency-review:
