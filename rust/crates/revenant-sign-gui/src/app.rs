@@ -25,8 +25,8 @@ use crate::jobs;
 use crate::reveal;
 use crate::theme;
 use crate::views::{
-    self, ConnectAction, ConnectState, LoginAction, LoginState, SettingsAction, SignAction,
-    SignForm, VerifyAction, VerifyState,
+    self, AccountAction, ConnectAction, ConnectState, LoginAction, LoginState, SettingsAction,
+    SignAction, SignForm, VerifyAction, VerifyState,
 };
 use crate::worker::{IdentityOutcome, SignedOutcome, VerifyOutcome, Worker, WorkerMsg};
 
@@ -503,6 +503,7 @@ impl RevenantApp {
         // blocking file dialog never runs mid-layout with a form borrowed.
         let mut sign_action = SignAction::None;
         let mut verify_action = VerifyAction::None;
+        let mut account_action = AccountAction::None;
         egui::CentralPanel::default().show(ctx, |ui| {
             ui.with_layout(egui::Layout::top_down(align), |ui| {
                 ui.horizontal(|ui| {
@@ -510,17 +511,28 @@ impl RevenantApp {
                     ui.selectable_value(&mut self.tab, Tab::Verify, self.l10n.t("gui.verify"));
                 });
                 ui.separator();
-                match self.tab {
-                    Tab::Sign => {
-                        let layer = self.store.config_layer();
-                        sign_action = views::sign::show(ui, &self.l10n, layer, &mut self.sign_form);
-                    }
-                    Tab::Verify => {
-                        verify_action = views::verify::show(ui, &self.l10n, &mut self.verify);
-                    }
-                }
+                // Scroll when content (account panel + form, or long verify
+                // results) exceeds the window, so nothing clips on small sizes.
+                egui::ScrollArea::vertical()
+                    .auto_shrink([false, false])
+                    .show(ui, |ui| match self.tab {
+                        Tab::Sign => {
+                            let layer = self.store.config_layer();
+                            // The account panel only exists once a signer is set up.
+                            if layer == ConfigLayer::FullyConfigured {
+                                account_action = views::account::show(ui, &self.l10n, &self.store);
+                                ui.separator();
+                            }
+                            sign_action =
+                                views::sign::show(ui, &self.l10n, layer, &mut self.sign_form);
+                        }
+                        Tab::Verify => {
+                            verify_action = views::verify::show(ui, &self.l10n, &mut self.verify);
+                        }
+                    });
             });
         });
+        self.apply_account_action(&account_action);
         self.apply_sign_action(&sign_action);
         self.apply_verify_action(&verify_action);
     }
@@ -541,6 +553,17 @@ impl RevenantApp {
                 }
             }
             SignAction::CancelBatch => self.batch_cancel.store(true, Ordering::Relaxed),
+        }
+    }
+
+    fn apply_account_action(&mut self, action: &AccountAction) {
+        match action {
+            AccountAction::None => {}
+            AccountAction::LogOut => {
+                if let Err(err) = self.store.logout() {
+                    log::error!("failed to log out: {err}");
+                }
+            }
         }
     }
 
