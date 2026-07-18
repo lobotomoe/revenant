@@ -130,9 +130,11 @@ jobs:
             WTFPL, BlueOak-1.0.0, Unicode-3.0, CDLA-Permissive-2.0
           # These crates declare dual Apache-2.0/MIT with the old `/` separator,
           # which is not valid SPDX, so the scanner tags the license as "bad".
-          # dbus/libdbus-sys are the Linux keyring backend; all three are fine.
+          # dbus/libdbus-sys are the Linux keyring backend; unicode-properties and
+          # stringprep come in via lopdf's PDF-encryption (SASLprep) path; all fine.
           allow-dependencies-licenses: >-
-            pkg:cargo/dbus, pkg:cargo/libdbus-sys, pkg:cargo/rangemap
+            pkg:cargo/dbus, pkg:cargo/libdbus-sys, pkg:cargo/rangemap,
+            pkg:cargo/unicode-properties, pkg:cargo/stringprep
 
   typecheck:
     name: Type Check

@@ -58,16 +58,18 @@ x509-verify = { version = "0.4.8", features = ["x509", "std", "sha1"] }
 # is used only for the signature-appearance date string, which needs the
 # machine's *local* wall-clock offset: `time::OffsetDateTime::now_local()`
 # returns Err in a multi-threaded process (the real CLI), silently degrading to
-# UTC, whereas `chrono::Local` reads the zone reliably. chrono is already in the
-# tree via lopdf, so this adds no new compilation.
+# UTC, whereas `chrono::Local` reads the zone reliably.
 time = { version = "0.3", features = ["parsing", "formatting", "macros"] }
 chrono = { version = "0.4", default-features = false, features = ["clock", "std"] }
 
 # -- PDF (read-side structure parsing only; writes are raw bytes) ------------
 # 0.44+ is required: it transparently decrypts empty-user-password documents on
 # load and exposes `Document::was_encrypted()`, which the encryption guard in
-# `pdf::reader` relies on to reject such inputs (see `is_encrypted`).
-lopdf = "0.44"
+# `pdf::reader` relies on to reject such inputs (see `is_encrypted`). Its
+# encryption support is not feature-gated, so `default-features = false` keeps it
+# while dropping the date (chrono/jiff/time) and rayon deps we never use -- we
+# only read PDF structure and detect encryption.
+lopdf = { version = "0.44", default-features = false }
 
 # -- Signature image loading (optional visual element) -----------------------
 # Trimmed to exactly the formats the Python client accepts via Pillow. Pulls in
