@@ -60,7 +60,24 @@ pub(crate) enum WorkerMsg {
     Signed(SignedOutcome),
     /// A verification job finished.
     Verified(VerifyOutcome),
+    /// A batch job is about to sign file `current` of `total`.
+    BatchProgress {
+        current: usize,
+        total: usize,
+        filename: String,
+    },
+    /// A batch job finished. `aborted` carries the reason when a fatal error
+    /// (bad credentials, TLS failure) stopped the whole batch early.
+    BatchDone {
+        succeeded: usize,
+        failed: usize,
+        aborted: Option<String>,
+    },
 }
+
+/// A sink a streaming (batch) job uses to push progress messages to the UI
+/// thread, waking it with a repaint after each one.
+pub(crate) type Emit<'a> = dyn Fn(WorkerMsg) + 'a;
 
 /// Owns the channel between background jobs and the UI thread.
 pub(crate) struct Worker {
@@ -89,6 +106,23 @@ impl Worker {
             // so there is nothing to recover.
             let _ = tx.send(msg);
             ctx.request_repaint();
+        });
+    }
+
+    /// Run a streaming `job` on a background thread. The job is handed an
+    /// [`Emit`] sink to push progress messages; each send wakes the UI thread.
+    pub(crate) fn spawn_batch<F>(&self, job: F)
+    where
+        F: FnOnce(&Emit<'_>) + Send + 'static,
+    {
+        let tx = self.tx.clone();
+        let ctx = self.ctx.clone();
+        thread::spawn(move || {
+            let emit = |msg: WorkerMsg| {
+                let _ = tx.send(msg);
+                ctx.request_repaint();
+            };
+            job(&emit);
         });
     }
 
