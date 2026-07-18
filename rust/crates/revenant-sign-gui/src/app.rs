@@ -15,10 +15,12 @@ use revenant_sign_core::api::{self, ServerChoice};
 use revenant_sign_core::appearance::DEFAULT_FONT;
 use revenant_sign_core::config::{
     register_active_profile_tls, register_profile_tls_mode, ConfigLayer, ConfigStore,
-    ServerProfile, SignerInfo,
+    ResolvedServerConfig, ServerProfile, SignerInfo, TrustAnchors,
 };
-use revenant_sign_core::net::{ping_server, PingOutcome, SoapSigningTransport, Transport};
-use revenant_sign_core::pki::{discover_identity_from_server, CertInfo};
+use revenant_sign_core::net::{
+    ping_server, verify_pdf_server, PingOutcome, SoapSigningTransport, Transport,
+};
+use revenant_sign_core::pki::{discover_identity_from_server, CertInfo, TrustStoreCache};
 use revenant_sign_core::signing::EmbeddedSignatureOptions;
 use revenant_sign_core::RevenantError;
 
@@ -27,9 +29,9 @@ use crate::reveal;
 use crate::theme;
 use crate::views::{
     self, ConnectAction, ConnectState, LoginAction, LoginState, SettingsAction, SignAction,
-    SignForm,
+    SignForm, VerifyAction, VerifyState,
 };
-use crate::worker::{IdentityOutcome, SignedOutcome, Worker, WorkerMsg};
+use crate::worker::{IdentityOutcome, SignedOutcome, VerifyOutcome, Worker, WorkerMsg};
 
 /// PDF extension accepted by the file picker and drag-and-drop.
 const PDF_EXTENSION: &str = "pdf";
@@ -62,6 +64,7 @@ pub(crate) struct RevenantApp {
     /// Present only while the login wizard is open (needs the active profile).
     login: Option<LoginState>,
     sign_form: SignForm,
+    verify: VerifyState,
 }
 
 impl RevenantApp {
@@ -88,6 +91,7 @@ impl RevenantApp {
             connect: ConnectState::new(),
             login: None,
             sign_form: SignForm::new(default_font),
+            verify: VerifyState::new(),
         }
     }
 
@@ -106,6 +110,7 @@ impl RevenantApp {
                 WorkerMsg::Ping { ok, detail } => self.on_ping_result(ok, &detail),
                 WorkerMsg::Identity(outcome) => self.on_identity_result(outcome),
                 WorkerMsg::Signed(outcome) => self.on_signed(outcome),
+                WorkerMsg::Verified(outcome) => self.on_verified(outcome),
             }
         }
     }
@@ -269,8 +274,8 @@ impl RevenantApp {
     }
 
     /// Accept a PDF dropped anywhere on the window (the drag-and-drop entry
-    /// point the Python client lacks). The first dropped PDF wins; batch drops
-    /// arrive in a later phase.
+    /// point the Python client lacks). The file loads into the active tab's
+    /// input. The first dropped PDF wins; batch drops arrive in a later phase.
     fn handle_dropped_files(&mut self, ctx: &egui::Context) {
         let dropped = ctx.input(|i| {
             i.raw
@@ -280,8 +285,10 @@ impl RevenantApp {
                 .find(|path| is_pdf(path))
         });
         if let Some(path) = dropped {
-            self.sign_form.set_pdf(&path);
-            self.tab = Tab::Sign;
+            match self.tab {
+                Tab::Sign => self.sign_form.set_pdf(&path),
+                Tab::Verify => self.verify.set_pdf(&path),
+            }
         }
     }
 
@@ -330,6 +337,45 @@ impl RevenantApp {
                 reveal::in_file_manager(&path);
             }
             SignedOutcome::Failed(detail) => self.sign_form.on_signed_failed(detail),
+        }
+    }
+
+    fn browse_verify_pdf(&mut self) {
+        if let Some(path) = rfd::FileDialog::new()
+            .add_filter(self.l10n.t("gui.pdf_files"), &[PDF_EXTENSION])
+            .pick_file()
+        {
+            self.verify.set_pdf(&path);
+        }
+    }
+
+    /// Verify the selected PDF offline, plus server-side when configured.
+    fn start_verify(&mut self) {
+        if self.verify.pdf_path().is_empty() {
+            let message = self.l10n.t("gui.please_select_a_pdf_file").to_owned();
+            self.verify.on_failed(message);
+            return;
+        }
+        let pdf_path = PathBuf::from(self.verify.pdf_path());
+        // Register the profile TLS mode so the (optional) server verify connects.
+        register_active_profile_tls(&self.transport, &self.store);
+        let trust = self
+            .store
+            .active_profile()
+            .map_or(TrustAnchors::None, |profile| profile.trust);
+        let server = self.store.server_config();
+        let transport = Arc::clone(&self.transport);
+        self.verify.begin();
+        self.worker.spawn(move || {
+            let outcome = verify_job(&transport, &pdf_path, &trust, server.as_ref());
+            WorkerMsg::Verified(outcome)
+        });
+    }
+
+    fn on_verified(&mut self, outcome: VerifyOutcome) {
+        match outcome {
+            VerifyOutcome::ReadError(message) => self.verify.on_failed(message),
+            VerifyOutcome::Done { local, server } => self.verify.on_done(local, server),
         }
     }
 
@@ -386,9 +432,10 @@ impl RevenantApp {
         } else {
             egui::Align::Min
         };
-        // Collect the sign-tab intent and act on it after the panel closes, so a
-        // blocking file dialog never runs mid-layout with the form borrowed.
-        let mut action = SignAction::None;
+        // Collect the tab intent and act on it after the panel closes, so a
+        // blocking file dialog never runs mid-layout with a form borrowed.
+        let mut sign_action = SignAction::None;
+        let mut verify_action = VerifyAction::None;
         egui::CentralPanel::default().show(ctx, |ui| {
             ui.with_layout(egui::Layout::top_down(align), |ui| {
                 ui.horizontal(|ui| {
@@ -399,13 +446,16 @@ impl RevenantApp {
                 match self.tab {
                     Tab::Sign => {
                         let layer = self.store.config_layer();
-                        action = views::sign::show(ui, &self.l10n, layer, &mut self.sign_form);
+                        sign_action = views::sign::show(ui, &self.l10n, layer, &mut self.sign_form);
                     }
-                    Tab::Verify => views::verify::show(ui, &self.l10n),
+                    Tab::Verify => {
+                        verify_action = views::verify::show(ui, &self.l10n, &mut self.verify);
+                    }
                 }
             });
         });
-        self.apply_sign_action(&action);
+        self.apply_sign_action(&sign_action);
+        self.apply_verify_action(&verify_action);
     }
 
     fn apply_sign_action(&mut self, action: &SignAction) {
@@ -417,6 +467,14 @@ impl RevenantApp {
             SignAction::BrowseImage => self.browse_image(),
             SignAction::BrowseOutput => self.browse_output(),
             SignAction::Sign => self.start_sign(),
+        }
+    }
+
+    fn apply_verify_action(&mut self, action: &VerifyAction) {
+        match action {
+            VerifyAction::None => {}
+            VerifyAction::BrowsePdf => self.browse_verify_pdf(),
+            VerifyAction::Verify => self.start_verify(),
         }
     }
 
@@ -550,6 +608,25 @@ fn sign_job(
         }
         Err(err) => SignedOutcome::Failed(err.to_string()),
     }
+}
+
+/// Verify `pdf_path` offline (per signature) and, when `server` is set, against
+/// the appliance. Runs on the background worker.
+fn verify_job(
+    transport: &Transport,
+    pdf_path: &Path,
+    trust: &TrustAnchors,
+    server: Option<&ResolvedServerConfig>,
+) -> VerifyOutcome {
+    let pdf = match std::fs::read(pdf_path) {
+        Ok(bytes) => bytes,
+        Err(err) => return VerifyOutcome::ReadError(err.to_string()),
+    };
+    let cache = TrustStoreCache::new();
+    let local = api::verify_pdf_all(transport, &cache, &pdf, trust).map_err(|err| err.to_string());
+    let server =
+        server.map(|cfg| verify_pdf_server(transport, &cfg.url, &pdf, cfg.timeout_duration()));
+    VerifyOutcome::Done { local, server }
 }
 
 /// Human-readable byte size (integer math to avoid lossy float casts).

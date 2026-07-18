@@ -13,3 +13,4 @@ pub(crate) use connect::{ConnectAction, ConnectState};
 pub(crate) use login::{LoginAction, LoginState};
 pub(crate) use settings::SettingsAction;
 pub(crate) use sign::{SignAction, SignForm};
+pub(crate) use verify::{VerifyAction, VerifyState};
