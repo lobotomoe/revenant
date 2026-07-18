@@ -11,7 +11,7 @@ rendered PDF stay identical to the source of truth.
 
 Run from the repo root:
     python/.venv/bin/python \\
-        rust/crates/revenant-core/src/appearance/font_data/generate_font_metrics.py
+        rust/crates/revenant-sign-core/src/appearance/font_data/generate_font_metrics.py
 """
 
 from __future__ import annotations

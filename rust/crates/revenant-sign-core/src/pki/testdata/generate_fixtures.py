@@ -11,7 +11,7 @@ expire and cause spurious test failures.
 
 Regenerate with:
     python/.venv/bin/python \\
-        crates/revenant-core/src/pki/testdata/generate_fixtures.py
+        crates/revenant-sign-core/src/pki/testdata/generate_fixtures.py
 """
 
 from __future__ import annotations

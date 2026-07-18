@@ -11,7 +11,7 @@ incremental-update assembly:
 
 Run from the repo root:
     python/.venv/bin/python \\
-        rust/crates/revenant-core/src/pdf/testdata/generate_pdfs.py
+        rust/crates/revenant-sign-core/src/pdf/testdata/generate_pdfs.py
 """
 
 from __future__ import annotations
