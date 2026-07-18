@@ -213,6 +213,21 @@ pub(crate) fn signer_info_from_cert(info: &CertInfo) -> SignerInfo {
     }
 }
 
+/// The inverse of [`signer_info_from_cert`]: view the saved signer record as a
+/// [`CertInfo`] so the appearance field extractor can read from it. The core's
+/// own converter is private to its signing path, so the GUI keeps both
+/// directions of this identical-shape mapping here.
+pub(crate) fn cert_info_from_signer(info: &SignerInfo) -> CertInfo {
+    CertInfo {
+        name: info.name.clone(),
+        email: info.email.clone(),
+        organization: info.organization.clone(),
+        dn: info.dn.clone(),
+        not_before: info.not_before.clone(),
+        not_after: info.not_after.clone(),
+    }
+}
+
 /// Human-readable byte size (integer math to avoid lossy float casts).
 pub(crate) fn format_bytes(bytes: u64) -> String {
     const KB: u64 = 1024;
