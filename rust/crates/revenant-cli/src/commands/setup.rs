@@ -223,7 +223,7 @@ fn try_identity_from_server(
         }
     };
 
-    if info.name.as_deref().filter(|n| !n.is_empty()).is_none() {
+    if info.name.as_deref().is_none_or(str::is_empty) {
         println!("no signer name found");
         return None;
     }
