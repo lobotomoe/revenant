@@ -11,12 +11,12 @@ the same surface as the [TypeScript port](../typescript): a library plus a
 rust/
 ├── Cargo.toml                    # workspace: shared dep catalog + strict lints
 └── crates/
-    ├── revenant-legacy-tls/      # from-scratch TLS 1.0 + RC4-MD5 client
-    ├── revenant-core/            # library: config, PKI, CMS, PDF, SOAP, signing
-    └── revenant-cli/             # `revenant` binary (clap)
+    ├── revenant-sign-tls/      # from-scratch TLS 1.0 + RC4-MD5 client
+    ├── revenant-sign-core/            # library: config, PKI, CMS, PDF, SOAP, signing
+    └── revenant-sign/             # `revenant` binary (clap)
 ```
 
-### `revenant-legacy-tls`
+### `revenant-sign-tls`
 
 Some CoSign appliances -- notably EKENG's `ca.gov.am` -- only accept TLS 1.0
 with RC4, a cipher suite removed from OpenSSL 3.x and unsupported by rustls,
@@ -50,7 +50,7 @@ RFC 2202, the TLS 1.0 PRF). A full handshake is verified end-to-end against
 RC4:
 
 ```bash
-cargo run -p revenant-legacy-tls --example roundtrip -- https://127.0.0.1:18443/
+cargo run -p revenant-sign-tls --example roundtrip -- https://127.0.0.1:18443/
 ```
 
 against a `tlslite-ng` server configured with `cipherNames=["rc4"]`,
@@ -59,7 +59,7 @@ and `TLS_RSA_WITH_RC4_128_SHA` are exercised.
 
 ### SOAP-over-legacy-TLS interop check
 
-`revenant-core` layers the CoSign DSS SOAP client (envelope builders, XML
+`revenant-sign-core` layers the CoSign DSS SOAP client (envelope builders, XML
 parsers, the auto-detecting HTTP transport, and `SoapSigningTransport`) on top
 of the legacy-TLS crate. The full stack -- envelope -> transport -> TLS 1.0 +
 RC4 -> HTTP -> XML parse -- is verified against a SOAP variant of the same
@@ -67,7 +67,7 @@ harness, which answers with a canned `DssSign` *Success* envelope:
 
 ```bash
 python/.venv/bin/python scratchpad/tlsharness/soap_server.py 18444 &
-cargo run -p revenant-core --example soap_roundtrip -- \
+cargo run -p revenant-sign-core --example soap_roundtrip -- \
     https://127.0.0.1:18444/SAPIWS/DSS.asmx
 ```
 
@@ -78,7 +78,7 @@ retry and error-classification logic, and the HTTPS-only guard.
 
 ## Configuration, credentials, and profiles
 
-`revenant-core::config` persists signer identity, the active server profile, and
+`revenant-sign-core::config` persists signer identity, the active server profile, and
 preferences under `~/.revenant/config.json` (written atomically, `0600`). It is a
 port of the Python `revenant.config` package: the same two-tier config model
 (unknown keys preserved on rewrite, known keys validated on read), the same
@@ -99,12 +99,12 @@ configured backend is a real keychain (not the crate's no-features in-memory
 mock) is proven by an ignored end-to-end test:
 
 ```bash
-cargo test -p revenant-core --lib keyring_store_roundtrips -- --ignored
+cargo test -p revenant-sign-core --lib keyring_store_roundtrips -- --ignored
 ```
 
 ## CMS signatures: extraction and inspection
 
-`revenant-core::cms` is the read side of signing -- the ASN.1/CMS layer the
+`revenant-sign-core::cms` is the read side of signing -- the ASN.1/CMS layer the
 Python client keeps in its `asn1`, `cms_extraction`, `cms_info`, and `ltv`
 modules. Given a signed PDF (or a bare `.p7s`) it finds the signature, extracts
 the exact CMS DER, and reports the digest algorithm, signer identity, and LTV
@@ -133,7 +133,7 @@ status. It is entirely read-only and best-effort: inspection helpers return
 
 ## PDF signatures: preparing, embedding, and verifying
 
-`revenant-core::pdf` and `revenant-core::appearance` port the Python client's
+`revenant-sign-core::pdf` and `revenant-sign-core::appearance` port the Python client's
 `pdf` and `appearance` packages: reserve an empty signature field, hash the
 ByteRange to send to the appliance, splice the returned CMS into the reserved
 `/Contents`, and verify the result. The whole flow is hash-then-sign around a
@@ -177,19 +177,19 @@ Python-prepared PDF verifies under Rust's `verify_embedded_signature` -- also
 byte-identical. Two runnable examples exercise the flow:
 
 ```bash
-cargo run -p revenant-core --example prepare_signature -- in.pdf out.pdf
-cargo run -p revenant-core --example verify_signature  -- out.pdf <hex-sha1>
+cargo run -p revenant-sign-core --example prepare_signature -- in.pdf out.pdf
+cargo run -p revenant-sign-core --example verify_signature  -- out.pdf <hex-sha1>
 ```
 
 ## Signing: the end-to-end flow and the high-level API
 
-`revenant-core::signing` and `revenant-core::api` port the Python client's
+`revenant-sign-core::signing` and `revenant-sign-core::api` port the Python client's
 `core.signing` and `api` modules -- the orchestration that turns a raw PDF and a
 set of credentials into a signed document.
 
 - **`signing` is transport-agnostic.** `sign_hash`, `sign_data`,
   `sign_pdf_detached`, and `sign_pdf_embedded` take any
-  [`SigningTransport`](crates/revenant-core/src/net/protocol.rs); the appliance
+  [`SigningTransport`](crates/revenant-sign-core/src/net/protocol.rs); the appliance
   holds the private key and returns the CMS, so nothing is constructed
   client-side. `sign_pdf_embedded` runs the full hash-then-sign cycle -- prepare
   an empty field, hash the ByteRange, send it, splice the returned CMS in, and
@@ -221,7 +221,7 @@ embedded signing, detached signing, and the high-level `api::sign`:
 
 ```sh
 REVENANT_USER=... REVENANT_PASS=... \
-    cargo test -p revenant-core --test ekeng_integration -- --ignored --nocapture
+    cargo test -p revenant-sign-core --test ekeng_integration -- --ignored --nocapture
 ```
 
 Credentials are read from the environment only; none are hard-coded. Each test
@@ -229,7 +229,7 @@ soft-skips when the variables are unset.
 
 ## Command-line interface (`revenant`)
 
-`revenant-cli` is the `revenant` binary -- a thin front-end over the library that
+`revenant-sign` is the `revenant` binary -- a thin front-end over the library that
 mirrors the Python client's subcommands, flags, and output. A single
 `ConfigStore` and one shared `Transport` are threaded through an `App` context,
 and every command returns a typed result that maps to the process exit code.
@@ -254,7 +254,7 @@ end to end against the real EKENG appliance (`cert` / `sign` / `check` / `info`)
 
 ## Certificates, TSL, and chain validation
 
-`revenant-core::pki` ports the certificate / Trust Service List / chain modules
+`revenant-sign-core::pki` ports the certificate / Trust Service List / chain modules
 of the Python `revenant.core` package. It parses X.509 certificates and CMS
 signatures with the RustCrypto `x509-cert` / `cms` crates, extracts signer
 identity (`CertInfo`), computes expiry, parses ETSI TSL documents into trust

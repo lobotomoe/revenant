@@ -1,9 +1,9 @@
 [workspace]
 resolver = "2"
 members = [
-    "crates/revenant-legacy-tls",
-    "crates/revenant-core",
-    "crates/revenant-cli",
+    "crates/revenant-sign-tls",
+    "crates/revenant-sign-core",
+    "crates/revenant-sign",
 ]
 
 [workspace.package]

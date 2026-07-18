@@ -60,7 +60,7 @@ extend-exclude = [
     # Font data is auto-generated (hex metrics)
     "python/src/revenant/core/appearance/font_data/",
     # Rust port: same auto-generated hex font metrics.
-    "rust/crates/revenant-core/src/appearance/font_data/",
+    "rust/crates/revenant-sign-core/src/appearance/font_data/",
     # Translation catalogs: non-English UI strings and truncated msgid keys.
     # typos has no per-language dictionary, so Turkish/etc. words collide with
     # the English typo corpus (e.g. "sistem" -> "system"). Not English to check.

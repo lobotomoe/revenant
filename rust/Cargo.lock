@@ -2006,13 +2006,13 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "d6f6ff9a378485b298a5286656da665ba74413d36db0979633275d2e708145d4"
 
 [[package]]
-name = "revenant-cli"
+name = "revenant-sign"
 version = "0.1.0"
 dependencies = [
  "clap",
  "env_logger",
  "log",
- "revenant-core",
+ "revenant-sign-core",
  "rpassword",
  "tempfile",
  "url",
@@ -2020,7 +2020,7 @@ dependencies = [
 ]
 
 [[package]]
-name = "revenant-core"
+name = "revenant-sign-core"
 version = "0.1.0"
 dependencies = [
  "base64",
@@ -2036,7 +2036,7 @@ dependencies = [
  "lopdf",
  "quick-xml",
  "regex",
- "revenant-legacy-tls",
+ "revenant-sign-tls",
  "serde_json",
  "sha1",
  "sha2 0.10.9",
@@ -2051,7 +2051,7 @@ dependencies = [
 ]
 
 [[package]]
-name = "revenant-legacy-tls"
+name = "revenant-sign-tls"
 version = "0.1.0"
 dependencies = [
  "const-oid 0.9.6",
