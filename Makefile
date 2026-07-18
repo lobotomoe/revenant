@@ -39,23 +39,43 @@ ts-test: ## Run TypeScript tests (Vitest)
 ts-build: ## Build TypeScript package (tsup)
 	cd typescript && pnpm build
 
+# -- Rust ---------------------------------------------------------------------
+
+.PHONY: rs-lint rs-format rs-typecheck rs-test rs-build
+
+rs-lint: ## Lint Rust (clippy, warnings as errors)
+	cd rust && cargo clippy --workspace --all-targets -- -D warnings
+
+rs-format: ## Check Rust formatting (rustfmt)
+	cd rust && cargo fmt --all --check
+
+rs-typecheck: ## Type-check Rust (cargo check)
+	cd rust && cargo check --workspace --all-targets
+
+rs-test: ## Run Rust tests (cargo test)
+	cd rust && cargo test --workspace
+
+rs-build: ## Build Rust workspace (release)
+	cd rust && cargo build --workspace --release
+
 # -- Combined ----------------------------------------------------------------
 
 .PHONY: lint typecheck test build check clean
 
-lint: py-lint py-format ts-lint ## Lint both Python and TypeScript
+lint: py-lint py-format ts-lint rs-lint rs-format ## Lint Python, TypeScript, and Rust
 
-typecheck: py-typecheck ts-typecheck ## Type-check both
+typecheck: py-typecheck ts-typecheck rs-typecheck ## Type-check all
 
-test: py-test ts-test ## Test both
+test: py-test ts-test rs-test ## Test all
 
-build: py-build ts-build ## Build both
+build: py-build ts-build rs-build ## Build all
 
 check: lint typecheck test ## Run all checks (lint + typecheck + test)
 
 clean: ## Remove build artifacts
 	rm -rf python/dist python/build python/*.egg-info
 	cd typescript && pnpm clean
+	cd rust && cargo clean
 
 # -- Help ---------------------------------------------------------------------
 
