@@ -25,17 +25,10 @@ const POSITIONS: [Position; 5] = [
     Position::TopRight,
 ];
 
-/// Page presets: last, first, then the first five explicit pages (1-based in the
-/// UI, 0-based in [`PageSpec::Index`]). Arbitrary higher pages are a later step.
-const PAGES: [PageSpec; 7] = [
-    PageSpec::Last,
-    PageSpec::First,
-    PageSpec::Index(0),
-    PageSpec::Index(1),
-    PageSpec::Index(2),
-    PageSpec::Index(3),
-    PageSpec::Index(4),
-];
+/// Bounds for the explicit page-number spinner (1-based in the UI, 0-based in
+/// [`PageSpec::Index`]). The upper bound is a sanity cap, not a real PDF limit.
+const MIN_PAGE: usize = 1;
+const MAX_PAGE: usize = 9999;
 
 /// What the app should do after rendering the tab.
 pub(crate) enum SignAction {
@@ -301,10 +294,19 @@ impl SignForm {
             });
         });
 
-        ui.add_enabled_ui(appearance_enabled, |ui| {
-            self.position_combo(ui, l10n);
-            self.page_combo(ui, l10n);
-            self.font_combo(ui, l10n);
+        // Appearance controls on the left, a live placement preview on the
+        // right. The preview stays outside the enabled-gate so it can show the
+        // "no visible signature" state when detached or invisible.
+        ui.horizontal(|ui| {
+            ui.vertical(|ui| {
+                ui.add_enabled_ui(appearance_enabled, |ui| {
+                    self.position_combo(ui, l10n);
+                    self.page_selector(ui, l10n);
+                    self.font_combo(ui, l10n);
+                });
+            });
+            ui.add_space(12.0);
+            super::preview::signature_preview(ui, l10n, self.position, appearance_enabled);
         });
 
         ui.add_enabled_ui(!detached, |ui| {
@@ -391,16 +393,38 @@ impl SignForm {
         });
     }
 
-    fn page_combo(&mut self, ui: &mut egui::Ui, l10n: &Localizer) {
+    /// Page selection: `Last`/`First` presets plus a numeric spinner for any
+    /// explicit page. Editing the spinner switches to explicit mode, so a signer
+    /// can target a page well beyond the old fixed list.
+    fn page_selector(&mut self, ui: &mut egui::Ui, l10n: &Localizer) {
         ui.horizontal(|ui| {
             ui.label(l10n.t("gui.page_label"));
-            egui::ComboBox::from_id_salt("sign_page")
-                .selected_text(page_label(l10n, self.page))
-                .show_ui(ui, |ui| {
-                    for page in PAGES {
-                        ui.selectable_value(&mut self.page, page, page_label(l10n, page));
-                    }
-                });
+            if ui
+                .selectable_label(self.page == PageSpec::Last, l10n.t("gui.page_last"))
+                .clicked()
+            {
+                self.page = PageSpec::Last;
+            }
+            if ui
+                .selectable_label(self.page == PageSpec::First, l10n.t("gui.page_first"))
+                .clicked()
+            {
+                self.page = PageSpec::First;
+            }
+            let is_index = matches!(self.page, PageSpec::Index(_));
+            // Display is 1-based; `PageSpec::Index` is 0-based.
+            let mut page_number = match self.page {
+                PageSpec::Index(index) => index + 1,
+                _ => MIN_PAGE,
+            };
+            let spinner = ui.add(
+                egui::DragValue::new(&mut page_number)
+                    .range(MIN_PAGE..=MAX_PAGE)
+                    .speed(0.1),
+            );
+            if spinner.changed() || (spinner.gained_focus() && !is_index) {
+                self.page = PageSpec::Index(page_number.saturating_sub(1));
+            }
         });
     }
 
@@ -491,14 +515,6 @@ fn position_label(l10n: &Localizer, position: Position) -> &str {
         Position::BottomCenter => l10n.t("gui.pos_bottom_center"),
         Position::TopLeft => l10n.t("gui.pos_top_left"),
         Position::TopRight => l10n.t("gui.pos_top_right"),
-    }
-}
-
-fn page_label(l10n: &Localizer, page: PageSpec) -> String {
-    match page {
-        PageSpec::Last => l10n.t("gui.page_last").to_owned(),
-        PageSpec::First => l10n.t("gui.page_first").to_owned(),
-        PageSpec::Index(index) => (index + 1).to_string(),
     }
 }
 
@@ -601,6 +617,15 @@ mod tests {
             form.resolved_output(),
             Some(PathBuf::from("/custom/out.pdf"))
         );
+    }
+
+    #[test]
+    fn embedded_options_carry_high_page_index() {
+        use revenant_sign_core::pdf::PageSpec;
+        let mut form = SignForm::new("noto-sans".to_owned());
+        // A page well past the old fixed cap of 5 (0-based index 41 == page 42).
+        form.page = PageSpec::Index(41);
+        assert_eq!(form.embedded_options().page, PageSpec::Index(41));
     }
 
     #[test]

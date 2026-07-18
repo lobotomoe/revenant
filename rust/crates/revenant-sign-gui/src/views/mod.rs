@@ -5,6 +5,7 @@
 pub(crate) mod about;
 pub(crate) mod connect;
 pub(crate) mod login;
+pub(crate) mod preview;
 pub(crate) mod settings;
 pub(crate) mod sign;
 pub(crate) mod verify;
