@@ -84,9 +84,17 @@ impl PdfReader {
     /// Signing one regardless yields a structurally inconsistent file whose
     /// original content is unreadable, so the embedded-signing path rejects it
     /// up front (fail-loud) rather than emitting a corrupt "signed" document.
+    ///
+    /// Two lopdf signals are combined because either alone is insufficient:
+    /// `is_encrypted()` reports a trailer that still carries `/Encrypt` (a
+    /// document lopdf did not decrypt -- e.g. a non-empty user password);
+    /// `was_encrypted()` reports one lopdf transparently decrypted on load (the
+    /// common empty-user-password case), which strips `/Encrypt` from the
+    /// in-memory trailer. A trailer check alone would wrongly pass the latter and
+    /// append plaintext objects onto still-encrypted original bytes.
     #[must_use]
     pub fn is_encrypted(&self) -> bool {
-        self.doc.trailer.get(b"Encrypt").is_ok()
+        self.doc.is_encrypted() || self.doc.was_encrypted()
     }
 
     /// The `/Size` value from the trailer (highest object number + 1).
@@ -406,15 +414,30 @@ mod tests {
     const TWO_PAGE_A4: &[u8] = include_bytes!("testdata/two_page_a4.pdf");
     const XREF_STREAM: &[u8] = include_bytes!("testdata/blank_letter_xref_stream.pdf");
     const ENCRYPTED: &[u8] = include_bytes!("testdata/encrypted.pdf");
+    // AES-256 with an empty user password: lopdf decrypts it transparently on
+    // load and strips /Encrypt from the in-memory trailer, so a trailer-only
+    // check would miss it. `was_encrypted()` is what catches this case.
+    const ENCRYPTED_EMPTY_PW: &[u8] = include_bytes!("testdata/encrypted_empty_password.pdf");
 
     #[test]
     fn detects_encryption() {
-        // An encrypted PDF that lopdf can still parse must be flagged: signing
-        // it would silently corrupt the document.
+        // An encrypted PDF whose trailer still carries /Encrypt must be flagged:
+        // signing it would silently corrupt the document.
         let r = PdfReader::open(ENCRYPTED).unwrap();
         assert!(r.is_encrypted());
         // A plain PDF is not flagged.
         assert!(!PdfReader::open(BLANK_LETTER).unwrap().is_encrypted());
+    }
+
+    #[test]
+    fn detects_empty_password_encryption() {
+        // Regression: an empty-user-password document is decrypted on load, which
+        // clears /Encrypt from the in-memory trailer. A trailer-only guard would
+        // wrongly pass it and the signer would append plaintext objects onto
+        // still-encrypted bytes, producing a file no reader can open. The guard
+        // must still reject it (via was_encrypted()).
+        let r = PdfReader::open(ENCRYPTED_EMPTY_PW).unwrap();
+        assert!(r.is_encrypted());
     }
 
     #[test]

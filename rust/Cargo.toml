@@ -64,7 +64,10 @@ time = { version = "0.3", features = ["parsing", "formatting", "macros"] }
 chrono = { version = "0.4", default-features = false, features = ["clock", "std"] }
 
 # -- PDF (read-side structure parsing only; writes are raw bytes) ------------
-lopdf = "0.34"
+# 0.44+ is required: it transparently decrypts empty-user-password documents on
+# load and exposes `Document::was_encrypted()`, which the encryption guard in
+# `pdf::reader` relies on to reject such inputs (see `is_encrypted`).
+lopdf = "0.44"
 
 # -- Signature image loading (optional visual element) -----------------------
 # Trimmed to exactly the formats the Python client accepts via Pillow. Pulls in
