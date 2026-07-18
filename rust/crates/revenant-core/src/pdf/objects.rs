@@ -76,6 +76,29 @@ pub fn pdf_string(text: &str) -> String {
     result
 }
 
+/// Encode `text` as a complete PDF text-string token, delimiters included.
+///
+/// Pure-ASCII text uses the readable literal `(...)` form. Any text containing a
+/// non-ASCII character is emitted as a UTF-16BE hex string `<FEFF...>` with a
+/// byte-order mark (PDF 32000-1 section 7.9.2.2). This is what lets Armenian (and
+/// any other non-Latin-1) signer names and reasons survive in the signature
+/// dictionary instead of being flattened to `?` by [`pdf_string`].
+#[must_use]
+pub(super) fn pdf_text_string(text: &str) -> String {
+    use std::fmt::Write as _;
+
+    if text.is_ascii() {
+        return format!("({})", pdf_string(text));
+    }
+    // UTF-16BE with a leading U+FEFF BOM, hex-encoded. `{:04X}` renders each
+    // code unit big-endian; a hex string needs no character escaping.
+    let mut hex = String::from("FEFF");
+    for unit in text.encode_utf16() {
+        let _ = write!(hex, "{unit:04X}");
+    }
+    format!("<{hex}>")
+}
+
 // ── Object-number allocation ────────────────────────────────────────────
 
 /// Object numbers for the embedded Type0/CIDFontType2 font chain.
@@ -270,10 +293,30 @@ mod tests {
 
     #[test]
     fn pdf_string_replaces_non_latin1() {
-        // Armenian letter is > 0xFF -> replaced with '?'.
+        // The low-level literal escaper still degrades non-Latin-1 to '?'; the
+        // high-level pdf_text_string is what callers use to avoid that.
         assert_eq!(pdf_string("Ա"), "?");
-        // Latin-1 accented char is preserved.
         assert_eq!(pdf_string("é"), "é");
+    }
+
+    #[test]
+    fn pdf_text_string_ascii_uses_literal_form() {
+        assert_eq!(pdf_text_string("John Doe"), "(John Doe)");
+        // Delimiters inside ASCII text are still escaped.
+        assert_eq!(pdf_text_string("a(b)\\c"), "(a\\(b\\)\\\\c)");
+    }
+
+    #[test]
+    fn pdf_text_string_non_ascii_uses_utf16be_with_bom() {
+        // U+0531 -> BOM (FEFF) + big-endian code unit 0531, no data loss.
+        assert_eq!(pdf_text_string("Ա"), "<FEFF0531>");
+        // Latin-1 'é' (U+00E9) is non-ASCII, so it also uses UTF-16BE (never the
+        // old UTF-8 mojibake).
+        assert_eq!(pdf_text_string("é"), "<FEFF00E9>");
+        // A full Armenian word round-trips through UTF-16BE.
+        let out = pdf_text_string("Բարեւ");
+        assert!(out.starts_with("<FEFF") && out.ends_with('>'), "{out}");
+        assert_eq!(out.len(), 1 + 4 + "Բարեւ".chars().count() * 4 + 1);
     }
 
     #[test]

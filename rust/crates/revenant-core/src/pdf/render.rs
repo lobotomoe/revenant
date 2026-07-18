@@ -6,7 +6,7 @@
 //! widget, and the optional image + soft-mask XObjects. Each is emitted as raw
 //! bytes for the incremental update.
 
-use super::objects::pdf_string;
+use super::objects::pdf_text_string;
 use super::objects::{
     deflate, FontObjNums, RawObject, VisibleObjNums, ANNOT_FLAGS_SIG_WIDGET, BYTERANGE_PLACEHOLDER,
     CMS_HEX_SIZE,
@@ -29,19 +29,19 @@ pub(crate) fn build_sig_dict(sig_num: u32, reason: &str, name: Option<&str>) -> 
     let pdf_date = now.format("D:%Y%m%d%H%M%S+00'00'").to_string();
     let contents_zeros = "0".repeat(CMS_HEX_SIZE);
     let name_entry = match name {
-        Some(n) if !n.is_empty() => format!("  /Name ({})\n", pdf_string(n)),
+        Some(n) if !n.is_empty() => format!("  /Name {}\n", pdf_text_string(n)),
         _ => String::new(),
     };
     let prop_build = format!(
         "  /Prop_Build << /App << /Name /Revenant /REx ({VERSION}) >> \
          /Filter << /Name /Adobe.PPKLite >> >>\n"
     );
-    let reason_escaped = pdf_string(reason);
+    let reason_value = pdf_text_string(reason);
     format!(
         "{sig_num} 0 obj\n<<\n  /Type /Sig\n  /Filter /Adobe.PPKLite\n  \
          /SubFilter /adbe.pkcs7.detached\n  {BYTERANGE_PLACEHOLDER}\n  \
          /Contents <{contents_zeros}>\n  /M ({pdf_date})\n  \
-         /Reason ({reason_escaped})\n{name_entry}{prop_build}>>\nendobj\n"
+         /Reason {reason_value}\n{name_entry}{prop_build}>>\nendobj\n"
     )
     .into_bytes()
 }
@@ -342,6 +342,15 @@ mod tests {
     fn sig_dict_omits_name_when_absent() {
         let s = String::from_utf8(build_sig_dict(5, "", None)).unwrap();
         assert!(!s.contains("/Name ("), "{s}");
+    }
+
+    #[test]
+    fn sig_dict_encodes_armenian_name_and_reason_as_utf16() {
+        // Non-ASCII must be UTF-16BE hex strings, never flattened to '?'.
+        let s = String::from_utf8(build_sig_dict(5, "Հաստատված", Some("Բարեւ Ձեզ"))).unwrap();
+        assert!(s.contains("/Name <FEFF"), "{s}");
+        assert!(s.contains("/Reason <FEFF"), "{s}");
+        assert!(!s.contains('?'), "{s}");
     }
 
     #[test]

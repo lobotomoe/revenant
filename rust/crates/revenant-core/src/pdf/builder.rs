@@ -86,6 +86,13 @@ pub fn prepare_pdf_with_sig_field(
     // Read-only analysis of the original PDF.
     let root = find_root_obj_num(pdf_bytes)?;
     let reader = PdfReader::open(pdf_bytes)?;
+    if reader.is_encrypted() {
+        return Err(RevenantError::Pdf(
+            "PDF is encrypted; encrypted documents cannot be signed with an \
+             embedded signature. Remove the password/encryption and try again."
+                .to_owned(),
+        ));
+    }
     let page_index = resolve_page_index(opts.page, reader.page_count())?;
     let page_info = reader.page_info(page_index)?;
     let prev_xref = find_startxref_offset(pdf_bytes)?;
@@ -124,7 +131,17 @@ fn prepare_visible(
 
     let (w, h) = opts.size;
     let rect = match opts.manual_xy {
-        Some((x, y)) => SigRect { x, y, w, h },
+        Some((x, y)) => {
+            // The preset branch validates geometry inside compute_sig_rect; the
+            // manual branch must do the same or a non-finite/non-positive size
+            // would emit NaN/inf tokens into the appearance stream.
+            if !(w > 0.0 && h > 0.0 && [x, y, w, h].iter().all(|v| v.is_finite())) {
+                return Err(RevenantError::Pdf(format!(
+                    "Invalid manual signature geometry: x={x}, y={y}, w={w}, h={h}"
+                )));
+            }
+            SigRect { x, y, w, h }
+        }
         None => compute_sig_rect(
             page_info.width,
             page_info.height,
@@ -259,8 +276,13 @@ pub fn compute_byterange_hash(
     hex_start: usize,
     hex_len: usize,
 ) -> Result<[u8; SHA1_LEN]> {
-    let end = hex_start + hex_len;
-    if hex_start == 0 || end + 1 > pdf_bytes.len() {
+    let Some(end) = hex_start.checked_add(hex_len) else {
+        return Err(RevenantError::Pdf(format!(
+            "Invalid hex range: start={hex_start}, len={hex_len} overflows pdf_size={}",
+            pdf_bytes.len()
+        )));
+    };
+    if hex_start == 0 || end >= pdf_bytes.len() {
         return Err(RevenantError::Pdf(format!(
             "Invalid hex range: start={hex_start}, len={hex_len}, pdf_size={}",
             pdf_bytes.len()
@@ -303,9 +325,12 @@ pub fn insert_cms(
         )));
     }
 
+    let end = hex_start
+        .checked_add(hex_len)
+        .ok_or_else(|| RevenantError::Pdf("Contents region offset overflows.".to_owned()))?;
     let mut out = pdf_bytes.to_vec();
     let region = out
-        .get_mut(hex_start..hex_start + hex_len)
+        .get_mut(hex_start..end)
         .ok_or_else(|| RevenantError::Pdf("Contents region is out of range.".to_owned()))?;
     let (filled, padding) = region.split_at_mut(cms_hex.len());
     filled.copy_from_slice(cms_hex.as_bytes());
@@ -321,6 +346,16 @@ mod tests {
     const BLANK_LETTER: &[u8] = include_bytes!("testdata/blank_letter.pdf");
     const TWO_PAGE_A4: &[u8] = include_bytes!("testdata/two_page_a4.pdf");
     const XREF_STREAM: &[u8] = include_bytes!("testdata/blank_letter_xref_stream.pdf");
+    const ENCRYPTED: &[u8] = include_bytes!("testdata/encrypted.pdf");
+
+    #[test]
+    fn rejects_encrypted_pdf() {
+        // Encrypted input must fail loud, not silently produce a corrupt signed
+        // document (its original content would become unreadable).
+        let err = prepare_pdf_with_sig_field(ENCRYPTED, &PrepareOptions::default()).unwrap_err();
+        assert!(matches!(err, RevenantError::Pdf(_)));
+        assert!(err.to_string().contains("encrypted"));
+    }
 
     /// A well-formed DER SEQUENCE standing in for a CMS blob (203 bytes,
     /// declared length matches actual, above MIN_CMS_SIZE).

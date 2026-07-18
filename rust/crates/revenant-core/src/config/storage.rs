@@ -83,6 +83,18 @@ pub(crate) struct Storage {
     file: PathBuf,
 }
 
+/// The distinguishable outcomes of reading the config file, so the read and
+/// write paths can react differently to each (see [`Storage::load_raw`] vs.
+/// [`Storage::load_raw_for_update`]).
+enum ReadError {
+    /// The file does not exist -- the normal unconfigured state.
+    Missing,
+    /// The file exists but could not be read (permissions, I/O error).
+    Unreadable(String),
+    /// The file was read but is not a valid JSON object.
+    Corrupt(String),
+}
+
 impl Storage {
     /// Create a store rooted at `dir`, with `config.json` inside it.
     pub(crate) fn new(dir: PathBuf) -> Self {
@@ -102,28 +114,69 @@ impl Storage {
         &self.file
     }
 
-    /// Load the raw config object, preserving every key.
+    /// Load the raw config object for a *read* (lenient), preserving every key.
     ///
     /// Returns an empty map when the file is missing, unreadable, corrupt, or
-    /// holds valid JSON that is not an object. Only genuinely unexpected states
-    /// (unreadable-but-present, corrupt JSON) are logged; a missing file is the
-    /// normal unconfigured state and stays silent.
+    /// holds valid JSON that is not an object. Reads are non-destructive, so
+    /// degrading an unreadable file to "unconfigured" is acceptable here. The
+    /// read-modify-*write* path must instead fail loud -- see
+    /// [`Storage::load_raw_for_update`] -- so a transient read failure never
+    /// makes a save silently overwrite the whole config with a near-empty object.
     pub(crate) fn load_raw(&self) -> Map<String, Value> {
-        let text = match fs::read_to_string(&self.file) {
-            Ok(text) => text,
-            Err(e) if e.kind() == ErrorKind::NotFound => return Map::new(),
-            Err(e) => {
+        match self.read_object() {
+            Ok(map) => map,
+            Err(ReadError::Missing) => Map::new(),
+            Err(ReadError::Unreadable(e)) => {
                 log::warn!("Cannot read config file {}: {e}", self.file.display());
-                return Map::new();
+                Map::new()
             }
-        };
-        match serde_json::from_str::<Value>(&text) {
-            Ok(Value::Object(map)) => map,
-            Ok(_) => Map::new(), // valid JSON but not an object -> treat as empty
-            Err(e) => {
+            Err(ReadError::Corrupt(e)) => {
                 log::warn!("Config file corrupted, ignoring: {e}");
                 Map::new()
             }
+        }
+    }
+
+    /// Load the raw config object for a read-modify-write, failing loud.
+    ///
+    /// Only a genuinely missing file yields an empty map (the normal "first
+    /// save" case). An unreadable or corrupt file is an error, so the caller
+    /// refuses to overwrite it: otherwise one transient read failure would
+    /// silently destroy the server profile, signer identity, and the
+    /// username -> keychain binding on the very next save.
+    ///
+    /// # Errors
+    /// [`RevenantError::Config`] if the file exists but cannot be read or parsed.
+    pub(crate) fn load_raw_for_update(&self) -> Result<Map<String, Value>, RevenantError> {
+        self.read_object().or_else(|err| match err {
+            ReadError::Missing => Ok(Map::new()),
+            ReadError::Unreadable(e) => Err(RevenantError::Config(format!(
+                "Cannot read config file {} to update it: {e}. \
+                 Refusing to overwrite it; fix or remove the file and retry.",
+                self.file.display()
+            ))),
+            ReadError::Corrupt(e) => Err(RevenantError::Config(format!(
+                "Config file {} is corrupt ({e}). \
+                 Refusing to overwrite it; fix or remove the file and retry.",
+                self.file.display()
+            ))),
+        })
+    }
+
+    /// Read and JSON-parse the config file into its three distinguishable
+    /// outcomes: a present object, a missing file, or an unreadable/corrupt one.
+    fn read_object(&self) -> Result<Map<String, Value>, ReadError> {
+        let text = match fs::read_to_string(&self.file) {
+            Ok(text) => text,
+            Err(e) if e.kind() == ErrorKind::NotFound => return Err(ReadError::Missing),
+            Err(e) => return Err(ReadError::Unreadable(e.to_string())),
+        };
+        match serde_json::from_str::<Value>(&text) {
+            Ok(Value::Object(map)) => Ok(map),
+            Ok(_) => Err(ReadError::Corrupt(
+                "top-level JSON is not an object".to_owned(),
+            )),
+            Err(e) => Err(ReadError::Corrupt(e.to_string())),
         }
     }
 
@@ -308,6 +361,26 @@ mod tests {
         fs::create_dir_all(storage.dir()).unwrap();
         fs::write(storage.file(), b"[1, 2, 3]").unwrap();
         assert!(storage.load_raw().is_empty());
+    }
+
+    #[test]
+    fn update_load_missing_file_is_empty_ok() {
+        let (_guard, storage) = temp_storage();
+        assert!(storage.load_raw_for_update().unwrap().is_empty());
+    }
+
+    #[test]
+    fn update_load_refuses_corrupt_file() {
+        let (_guard, storage) = temp_storage();
+        fs::create_dir_all(storage.dir()).unwrap();
+        fs::write(storage.file(), b"{ broken json").unwrap();
+        // The lenient read still degrades to empty (non-destructive)...
+        assert!(storage.load_raw().is_empty());
+        // ...but the update path fails loud so a save cannot overwrite it.
+        assert!(storage.load_raw_for_update().is_err());
+        // A non-object is likewise refused for update.
+        fs::write(storage.file(), b"[1,2,3]").unwrap();
+        assert!(storage.load_raw_for_update().is_err());
     }
 
     #[test]

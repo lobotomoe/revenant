@@ -24,7 +24,8 @@ use time::OffsetDateTime;
 use x509_cert::attr::AttributeTypeAndValue;
 use x509_cert::ext::pkix::name::GeneralName;
 use x509_cert::ext::pkix::{
-    AuthorityInfoAccessSyntax, AuthorityKeyIdentifier, SubjectKeyIdentifier,
+    AuthorityInfoAccessSyntax, AuthorityKeyIdentifier, BasicConstraints, KeyUsage,
+    SubjectKeyIdentifier,
 };
 use x509_cert::name::RdnSequence;
 use x509_cert::time::Time;
@@ -197,6 +198,29 @@ pub(crate) fn is_currently_valid(cert: &Certificate) -> bool {
 /// here: its only role is to stop chain building at a root.
 pub(crate) fn is_self_signed(cert: &Certificate) -> bool {
     cert.tbs_certificate.issuer == cert.tbs_certificate.subject
+}
+
+/// Whether a certificate is authorized to issue other certificates.
+///
+/// Per RFC 5280 an issuing CA must carry BasicConstraints with `cA=TRUE`
+/// (section 4.2.1.9), and when KeyUsage is present it must assert `keyCertSign`
+/// (section 4.2.1.3). A certificate lacking BasicConstraints, or with `cA=FALSE`,
+/// is not a CA -- so a wrongly issued end-entity certificate cannot be used as
+/// an intermediate.
+pub(crate) fn is_ca_cert(cert: &Certificate) -> bool {
+    let Some(bc) = find_extension::<BasicConstraints>(cert) else {
+        return false;
+    };
+    if !bc.ca {
+        return false;
+    }
+    find_extension::<KeyUsage>(cert).is_none_or(|ku| ku.key_cert_sign())
+}
+
+/// The CA's `pathLenConstraint` -- the maximum number of intermediate CA
+/// certificates permitted below it in a path -- when a CA sets one.
+pub(crate) fn ca_path_len(cert: &Certificate) -> Option<u8> {
+    find_extension::<BasicConstraints>(cert).and_then(|bc| bc.path_len_constraint)
 }
 
 // ── internals ────────────────────────────────────────────────────────

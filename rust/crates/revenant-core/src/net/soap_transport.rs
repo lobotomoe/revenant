@@ -10,7 +10,7 @@ use std::time::Duration;
 
 use base64::Engine as _;
 
-use crate::constants::{PDF_MAGIC, SHA1_DIGEST_SIZE};
+use crate::constants::{DEFAULT_MAX_RETRIES, PDF_MAGIC, SHA1_DIGEST_SIZE};
 use crate::net::protocol::SigningTransport;
 use crate::net::soap::send_soap;
 use crate::net::soap_envelope::{
@@ -51,12 +51,15 @@ impl SoapSigningTransport {
     }
 
     fn send_and_parse(&self, envelope: &str, timeout: Duration) -> Result<Vec<u8>> {
+        // Signing is not idempotent: never auto-retry (max_retries = 0), or a
+        // lost response could make the appliance sign the document twice.
         let response = send_soap(
             self.transport.as_ref(),
             &self.url,
             envelope,
             ACTION_SIGN,
             timeout,
+            0,
         )?;
         let cms = parse_sign_response(&response)?;
         log::info!("Received CMS signature: {} bytes", cms.len());
@@ -148,7 +151,14 @@ pub fn verify_pdf_server(
 ) -> ServerVerifyResult {
     log::info!("Server-side verify: {} bytes, url={url}", pdf.len());
     let envelope = build_verify_envelope(&to_base64(pdf), SIGNATURE_TYPE_FIELD_VERIFY);
-    match send_soap(transport, url, &envelope, ACTION_VERIFY, timeout) {
+    match send_soap(
+        transport,
+        url,
+        &envelope,
+        ACTION_VERIFY,
+        timeout,
+        DEFAULT_MAX_RETRIES,
+    ) {
         Ok(response) => parse_verify_response(&response),
         Err(e) => {
             log::warn!("Server verify failed: {e}");
@@ -173,7 +183,15 @@ pub fn enum_certificates(
 ) -> Result<Vec<Vec<u8>>> {
     log::info!("Enumerating certificates: url={url}");
     let envelope = build_enum_certificates_envelope(username, password);
-    let response = send_soap(transport, url, &envelope, ACTION_SIGN, timeout)?;
+    // Enumeration is idempotent -- safe to retry, unlike signing.
+    let response = send_soap(
+        transport,
+        url,
+        &envelope,
+        ACTION_SIGN,
+        timeout,
+        DEFAULT_MAX_RETRIES,
+    )?;
     parse_enum_certificates_response(&response)
 }
 

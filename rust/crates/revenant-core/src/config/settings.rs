@@ -149,7 +149,7 @@ impl ConfigStore {
     /// # Errors
     /// [`RevenantError::Config`] if the config file cannot be written.
     pub fn save_server_config(&self, profile: &ServerProfile) -> Result<(), RevenantError> {
-        let mut raw = self.storage.load_raw();
+        let mut raw = self.storage.load_raw_for_update()?;
         raw.insert(KEY_PROFILE.to_owned(), Value::String(profile.name.clone()));
         raw.insert(KEY_URL.to_owned(), Value::String(profile.url.clone()));
         raw.insert(KEY_TIMEOUT.to_owned(), Value::from(profile.timeout));
@@ -192,7 +192,7 @@ impl ConfigStore {
             ));
         };
 
-        let mut raw = self.storage.load_raw();
+        let mut raw = self.storage.load_raw_for_update()?;
         raw.insert(KEY_NAME.to_owned(), Value::String(name.to_owned()));
 
         let optional = [
@@ -224,7 +224,7 @@ impl ConfigStore {
         self.clear_credentials()?;
         self.clear_session_credentials();
 
-        let raw = self.storage.load_raw();
+        let raw = self.storage.load_raw_for_update()?;
         let mut preserved = Map::new();
         if let Some(language) = raw.get(KEY_LANGUAGE) {
             preserved.insert(KEY_LANGUAGE.to_owned(), language.clone());
@@ -240,7 +240,7 @@ impl ConfigStore {
         self.clear_credentials()?;
         self.clear_session_credentials();
 
-        let mut raw = self.storage.load_raw();
+        let mut raw = self.storage.load_raw_for_update()?;
         let mut changed = false;
         for key in IDENTITY_KEYS {
             if raw.remove(key).is_some() {
@@ -267,7 +267,7 @@ impl ConfigStore {
     /// # Errors
     /// [`RevenantError::Config`] if the config file cannot be written.
     pub fn save_language(&self, language: &str) -> Result<(), RevenantError> {
-        let mut raw = self.storage.load_raw();
+        let mut raw = self.storage.load_raw_for_update()?;
         if language == SYSTEM_LANGUAGE {
             raw.remove(KEY_LANGUAGE);
         } else {
@@ -469,6 +469,22 @@ mod tests {
         assert_eq!(store.config_layer(), ConfigLayer::Unconfigured);
         // Language preference is preserved.
         assert_eq!(store.language(), "hy");
+    }
+
+    #[test]
+    fn save_on_corrupt_config_fails_loud_without_destroying_it() {
+        let (dir, store) = test_store();
+        let path = dir.path().join("config.json");
+        std::fs::create_dir_all(dir.path()).unwrap();
+        std::fs::write(&path, b"{ this is corrupt").unwrap();
+
+        // A write must fail loud instead of silently replacing the file.
+        let err = store.save_language("ru").unwrap_err();
+        assert!(matches!(err, RevenantError::Config(_)));
+
+        // The corrupt file is left intact, not overwritten with {"language":"ru"}.
+        let text = std::fs::read_to_string(&path).unwrap();
+        assert_eq!(text, "{ this is corrupt");
     }
 
     #[test]

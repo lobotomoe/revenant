@@ -139,6 +139,29 @@ pub(super) fn verify_chain_crypto(
         }
     }
 
+    // Every certificate above the leaf issues the one below it, so each must be a
+    // CA authorized to sign certificates (RFC 5280), and its pathLenConstraint
+    // must permit the number of intermediates beneath it. This stops a
+    // wrongly issued end-entity certificate from being accepted as an intermediate.
+    for (index, issuer) in chain.iter().enumerate().skip(1) {
+        if !cert::is_ca_cert(issuer) {
+            return Err(format!(
+                "chain certificate is not a valid CA: {}",
+                cert::subject_dn(issuer)
+            ));
+        }
+        if let Some(max_intermediates) = cert::ca_path_len(issuer) {
+            // Certs strictly between this issuer and the leaf (indices 1..index).
+            let intermediates_below = index - 1;
+            if intermediates_below > usize::from(max_intermediates) {
+                return Err(format!(
+                    "pathLenConstraint violated at {}: {intermediates_below} intermediate(s) below a limit of {max_intermediates}",
+                    cert::subject_dn(issuer)
+                ));
+            }
+        }
+    }
+
     for pair in chain.windows(2) {
         // pair = [subject, issuer]: the issuer's key must verify the subject.
         verify_signed_by(&pair[1], &pair[0])?;
@@ -278,5 +301,17 @@ mod tests {
     #[test]
     fn crypto_rejects_wrong_anchor() {
         assert!(verify_chain_crypto(&[cert(LEAF_DIRECT_DER)], &[cert(ROOT2_DER)]).is_err());
+    }
+
+    #[test]
+    fn ca_role_is_enforced() {
+        // Real CAs qualify; an end-entity leaf does not.
+        assert!(cert::is_ca_cert(&cert(ROOT_DER)));
+        assert!(cert::is_ca_cert(&cert(INTER_DER)));
+        assert!(!cert::is_ca_cert(&cert(LEAF_DER)));
+        // A chain whose "issuer" is actually a non-CA leaf is rejected even
+        // before signature math (here the leaf cannot issue itself).
+        let err = verify_chain_crypto(&[cert(LEAF_DER), cert(LEAF_DER)], &[cert(ROOT_DER)]);
+        assert!(err.is_err());
     }
 }

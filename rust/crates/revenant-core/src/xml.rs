@@ -33,21 +33,27 @@ impl Node {
         }
     }
 
-    fn from_start(e: &BytesStart<'_>) -> Self {
+    fn from_start(e: &BytesStart<'_>) -> Result<Self, String> {
         let name = local_name(e.local_name().as_ref());
         let mut attrs = Vec::new();
-        for attr in e.attributes().flatten() {
+        // Fail loud on a malformed or unescapable attribute rather than dropping
+        // it: this DOM feeds both SOAP-response and TSL trust-list parsing, where
+        // a silently missing attribute (a signer name, a CA datum) would surface
+        // as a wrong result instead of a surfaced error.
+        for attr in e.attributes() {
+            let attr = attr.map_err(|err| format!("malformed attribute in <{name}>: {err}"))?;
             let key = local_name(attr.key.local_name().as_ref());
-            if let Ok(value) = attr.unescape_value() {
-                attrs.push((key, value.into_owned()));
-            }
+            let value = attr
+                .unescape_value()
+                .map_err(|err| format!("cannot unescape attribute '{key}' in <{name}>: {err}"))?;
+            attrs.push((key, value.into_owned()));
         }
-        Self {
+        Ok(Self {
             name,
             attrs,
             children: Vec::new(),
             text: String::new(),
-        }
+        })
     }
 
     pub(crate) fn attr(&self, name: &str) -> Option<&str> {
@@ -78,14 +84,17 @@ fn local_name(raw: &[u8]) -> String {
 /// partial tree.
 pub(crate) fn parse_dom(xml: &str) -> Result<Node, String> {
     let mut reader = Reader::from_str(xml);
+    // Reject mismatched end tags explicitly, rather than relying on the library
+    // default: a `<a><b></a>` must be an error, not a partial tree.
+    reader.config_mut().check_end_names = true;
     // Index 0 is the synthetic root; deeper entries are open elements.
     let mut stack: Vec<Node> = vec![Node::root()];
 
     loop {
         match reader.read_event().map_err(|e| e.to_string())? {
-            Event::Start(e) => stack.push(Node::from_start(&e)),
+            Event::Start(e) => stack.push(Node::from_start(&e)?),
             Event::Empty(e) => {
-                let node = Node::from_start(&e);
+                let node = Node::from_start(&e)?;
                 if let Some(top) = stack.last_mut() {
                     top.children.push(node);
                 }
@@ -234,6 +243,23 @@ mod tests {
     #[test]
     fn unclosed_tag_is_rejected() {
         assert!(parse_dom("<r><child></r>").is_err());
+    }
+
+    #[test]
+    fn mismatched_tags_are_rejected() {
+        assert!(parse_dom("<a><b></a></b>").is_err());
+    }
+
+    #[test]
+    fn unescapable_attribute_is_rejected_not_dropped() {
+        // An unknown entity in an attribute value must fail loud, matching the
+        // text-node path -- never be silently discarded.
+        assert!(parse_dom("<r><e k='&nope;'/></r>").is_err());
+        // A well-formed attribute still parses.
+        assert_eq!(
+            find_attribute(&parse_dom("<r><e k='v&amp;w'/></r>").unwrap(), "e", "k").as_deref(),
+            Some("v&w")
+        );
     }
 
     #[test]

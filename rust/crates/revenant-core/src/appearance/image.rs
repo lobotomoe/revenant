@@ -54,13 +54,14 @@ pub fn load_signature_image(image_path: &str) -> Result<SignatureImageData> {
         .map_err(|_| RevenantError::Pdf(format!("Signature image not found: {image_path}")))?;
     let file_size = meta.len();
     if file_size > MAX_FILE_SIZE {
-        // One-decimal MB via integer tenths (no float cast).
-        let tenths = file_size * 10 / (1024 * 1024);
+        // One-decimal MB via integer math (no float cast). Divide before
+        // multiplying so a huge (e.g. sparse) file size cannot overflow u64.
+        const MB: u64 = 1024 * 1024;
+        let whole = file_size / MB;
+        let tenth = (file_size % MB) * 10 / MB;
         return Err(RevenantError::Pdf(format!(
-            "Signature image too large: {}.{} MB (max {} MB)",
-            tenths / 10,
-            tenths % 10,
-            MAX_FILE_SIZE / 1024 / 1024
+            "Signature image too large: {whole}.{tenth} MB (max {} MB)",
+            MAX_FILE_SIZE / MB
         )));
     }
     if file_size == 0 {
@@ -90,6 +91,11 @@ pub fn load_signature_image(image_path: &str) -> Result<SignatureImageData> {
     let (w, h) = probe
         .into_dimensions()
         .map_err(|e| RevenantError::Pdf(format!("Cannot read image dimensions: {e}")))?;
+    if w == 0 || h == 0 {
+        return Err(RevenantError::Pdf(format!(
+            "Signature image has a zero dimension: {w}x{h}"
+        )));
+    }
     let pixels = u64::from(w) * u64::from(h);
     if pixels > MAX_IMAGE_PIXELS {
         return Err(RevenantError::Pdf(format!(

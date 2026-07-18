@@ -287,11 +287,41 @@ impl ConfigStore {
     /// # Errors
     /// [`RevenantError::Config`] if the config file cannot be written.
     pub fn save_credentials(&self, username: &str, password: &str) -> Result<bool, RevenantError> {
-        let mut raw = self.storage.load_raw();
+        let mut raw = self.storage.load_raw_for_update()?;
         let old_username = raw
             .get(KEY_USERNAME)
             .and_then(Value::as_str)
             .map(str::to_owned);
+        raw.insert(KEY_USERNAME.to_owned(), Value::String(username.to_owned()));
+
+        // Decide where the password lives, then persist the durable config store
+        // *before* any destructive keychain change. If the write fails, the old
+        // keychain entry is still intact and the config still names the old user,
+        // so credentials never end up orphaned across the two stores.
+        let stored_in_keychain = if self.secrets.is_secure() {
+            match self.secrets.set(username, password) {
+                Ok(()) => {
+                    raw.remove(KEY_PASSWORD);
+                    true
+                }
+                Err(e) => {
+                    log::warn!("Keyring save failed, using config file: {e}");
+                    raw.insert(KEY_PASSWORD.to_owned(), Value::String(password.to_owned()));
+                    false
+                }
+            }
+        } else {
+            log::warn!(
+                "Keyring unavailable. Password will be saved in plaintext ({}).",
+                self.storage.file().display()
+            );
+            raw.insert(KEY_PASSWORD.to_owned(), Value::String(password.to_owned()));
+            false
+        };
+
+        self.storage.save(&raw)?;
+
+        // Config is now durable; only now retire the stale keychain entry.
         if let Some(old) = &old_username {
             if old != username {
                 if let Err(e) = self.secrets.delete(old) {
@@ -299,27 +329,7 @@ impl ConfigStore {
                 }
             }
         }
-        raw.insert(KEY_USERNAME.to_owned(), Value::String(username.to_owned()));
-
-        if self.secrets.is_secure() {
-            match self.secrets.set(username, password) {
-                Ok(()) => {
-                    raw.remove(KEY_PASSWORD);
-                    self.storage.save(&raw)?;
-                    return Ok(true);
-                }
-                Err(e) => log::warn!("Keyring save failed, using config file: {e}"),
-            }
-        } else {
-            log::warn!(
-                "Keyring unavailable. Password will be saved in plaintext ({}).",
-                self.storage.file().display()
-            );
-        }
-
-        raw.insert(KEY_PASSWORD.to_owned(), Value::String(password.to_owned()));
-        self.storage.save(&raw)?;
-        Ok(false)
+        Ok(stored_in_keychain)
     }
 
     /// Remove saved credentials from every backend.
@@ -327,7 +337,7 @@ impl ConfigStore {
     /// # Errors
     /// [`RevenantError::Config`] if the config file cannot be written.
     pub fn clear_credentials(&self) -> Result<(), RevenantError> {
-        let mut raw = self.storage.load_raw();
+        let mut raw = self.storage.load_raw_for_update()?;
         let username = raw
             .get(KEY_USERNAME)
             .and_then(Value::as_str)

@@ -75,6 +75,11 @@ pub const DEFAULT_POSITION: &str = "bottom-right";
 
 /// Trust Service List cache time-to-live (24 hours).
 pub const TSL_CACHE_TTL: Duration = Duration::from_secs(86400);
+/// Maximum age of a cached TSL that may still be used as a fallback when a fresh
+/// fetch fails (7 days). Beyond this the stale list is discarded and trust
+/// degrades to indeterminate, so a blocked TSL endpoint cannot pin clients to an
+/// arbitrarily old trust list indefinitely.
+pub const TSL_MAX_STALE: Duration = Duration::from_secs(7 * 86400);
 /// TSL fetch timeout.
 pub const TSL_FETCH_TIMEOUT: Duration = Duration::from_secs(30);
 /// Maximum AIA intermediate certificate fetches per chain.

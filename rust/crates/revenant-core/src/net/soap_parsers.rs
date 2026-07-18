@@ -12,6 +12,18 @@ use crate::{Result, RevenantError};
 
 /// Minor-result suffix that marks an authentication failure.
 const AUTH_MINOR_SUFFIX: &str = ":AuthenticationError";
+/// Best-effort message fragments used only when the server omits the precise
+/// `:AuthenticationError` minor code. Kept specific so an unrelated failure that
+/// merely mentions "password" (e.g. "password store unavailable") is not
+/// misreported as bad credentials, prompting a pointless re-login.
+const AUTH_MESSAGE_HINTS: [&str; 6] = [
+    "invalid password",
+    "wrong password",
+    "incorrect password",
+    "invalid user name",
+    "user name or password",
+    "authentication failed",
+];
 /// How many characters of a malformed response to keep for the error preview,
 /// before redaction and final truncation.
 const RAW_PREVIEW_CHARS: usize = 500;
@@ -29,7 +41,7 @@ fn is_auth_error(result_minor: Option<&str>, msg: &str) -> bool {
         return true;
     }
     let lower = msg.to_lowercase();
-    lower.contains("password") || lower.contains("user name")
+    AUTH_MESSAGE_HINTS.iter().any(|hint| lower.contains(hint))
 }
 
 /// Redact credential-bearing elements and truncate a malformed response for
@@ -116,7 +128,9 @@ pub fn parse_sign_response(xml: &str) -> Result<Vec<u8>> {
     let result_minor = find_value(&root, "ResultMinor");
     let result_message = find_value(&root, "ResultMessage");
 
-    let cms_b64 = ["Base64Data", "Base64Signature"]
+    // Prefer the signature-specific element; `Base64Data` is only a fallback, so
+    // an echoed input document never gets mistaken for the signature.
+    let cms_b64 = ["Base64Signature", "Base64Data"]
         .into_iter()
         .find_map(|tag| find_value(&root, tag).filter(|v| v.len() > MIN_SIGNATURE_B64_LEN));
 
@@ -160,7 +174,7 @@ pub fn parse_enum_certificates_response(xml: &str) -> Result<Vec<Vec<u8>>> {
         for b64 in b64s {
             match decode_b64(&b64) {
                 Ok(der) => certs.push(der),
-                Err(_) => log::warn!("Skipping malformed certificate Base64"),
+                Err(e) => log::warn!("Skipping malformed certificate Base64: {e}"),
             }
         }
         return Ok(certs);
@@ -265,6 +279,24 @@ mod tests {
         </Result></Env>";
         let err = parse_sign_response(xml).unwrap_err();
         assert!(matches!(err, RevenantError::Auth(_)), "got {err:?}");
+    }
+
+    #[test]
+    fn auth_heuristic_is_specific() {
+        // Message-only auth hint (no minor code) is detected...
+        assert!(is_auth_error(None, "Invalid password for user"));
+        assert!(is_auth_error(None, "Authentication failed"));
+        // ...but an unrelated failure that merely mentions "password" is not.
+        assert!(!is_auth_error(
+            None,
+            "Signing key password store unavailable"
+        ));
+        assert!(!is_auth_error(None, "Internal appliance failure"));
+        // The precise minor code always wins.
+        assert!(is_auth_error(
+            Some("urn:com:arx:AuthenticationError"),
+            "anything"
+        ));
     }
 
     #[test]

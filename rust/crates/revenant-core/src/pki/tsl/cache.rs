@@ -5,7 +5,7 @@ use std::sync::{Mutex, MutexGuard, PoisonError};
 use std::time::Duration;
 
 use super::{parse_tsl, TrustStore};
-use crate::constants::{DEFAULT_MAX_RETRIES, TSL_FETCH_TIMEOUT};
+use crate::constants::{DEFAULT_MAX_RETRIES, TSL_FETCH_TIMEOUT, TSL_MAX_STALE};
 use crate::net::Transport;
 use crate::Result;
 
@@ -49,7 +49,7 @@ impl TrustStoreCache {
         tsl_url: &str,
         ttl: Duration,
     ) -> Option<TrustStore> {
-        self.get_or_fetch_with(tsl_url, ttl, || {
+        self.get_or_fetch_with(tsl_url, ttl, TSL_MAX_STALE, || {
             fetch_trust_store(transport, tsl_url, TSL_FETCH_TIMEOUT)
         })
     }
@@ -59,12 +59,13 @@ impl TrustStoreCache {
         self.lock().clear();
     }
 
-    /// Core cache logic with an injectable fetch, so every path is unit-tested
-    /// without a live transport.
+    /// Core cache logic with an injectable fetch and staleness bound, so every
+    /// path is unit-tested without a live transport.
     fn get_or_fetch_with(
         &self,
         tsl_url: &str,
         ttl: Duration,
+        max_stale: Duration,
         fetch: impl FnOnce() -> Result<TrustStore>,
     ) -> Option<TrustStore> {
         if let Some(fresh) = self.fresh_cached(tsl_url, ttl) {
@@ -77,7 +78,19 @@ impl TrustStoreCache {
             }
             Err(err) => {
                 log::warn!("Failed to fetch TSL from {tsl_url}: {err}");
-                self.lock().get(tsl_url).cloned() // stale, if present
+                // Fall back to a cached entry only within a bounded staleness
+                // window, so a blocked endpoint cannot pin trust to an old list.
+                let cache = self.lock();
+                let cached = cache.get(tsl_url)?;
+                if cached.fetched_at.elapsed() < max_stale {
+                    Some(cached.clone())
+                } else {
+                    log::warn!(
+                        "Cached TSL for {tsl_url} is older than the maximum staleness \
+                         window; discarding -- trust degrades to indeterminate"
+                    );
+                    None
+                }
             }
         }
     }
@@ -116,15 +129,16 @@ mod tests {
     fn returns_fresh_entry_without_fetching() {
         let cache = TrustStoreCache::new();
         cache.lock().insert("url".to_owned(), make_store("Cached"));
-        let result =
-            cache.get_or_fetch_with("url", HOUR, || panic!("must not fetch on a fresh hit"));
+        let result = cache.get_or_fetch_with("url", HOUR, HOUR, || {
+            panic!("must not fetch on a fresh hit")
+        });
         assert_eq!(result.unwrap().scheme_operator, "Cached");
     }
 
     #[test]
     fn stores_fetched_result() {
         let cache = TrustStoreCache::new();
-        let result = cache.get_or_fetch_with("url", HOUR, || Ok(make_store("Fresh")));
+        let result = cache.get_or_fetch_with("url", HOUR, HOUR, || Ok(make_store("Fresh")));
         assert_eq!(result.unwrap().scheme_operator, "Fresh");
         assert!(cache.fresh_cached("url", HOUR).is_some());
     }
@@ -132,21 +146,36 @@ mod tests {
     #[test]
     fn returns_none_on_fetch_failure_with_no_entry() {
         let cache = TrustStoreCache::new();
-        let result = cache.get_or_fetch_with("url", HOUR, || {
+        let result = cache.get_or_fetch_with("url", HOUR, HOUR, || {
             Err(RevenantError::Other("network".to_owned()))
         });
         assert!(result.is_none());
     }
 
     #[test]
-    fn returns_stale_on_fetch_failure() {
+    fn returns_stale_within_window_on_fetch_failure() {
         let cache = TrustStoreCache::new();
         cache.lock().insert("url".to_owned(), make_store("Stale"));
-        // ttl = 0 forces the entry to be treated as stale.
-        let result = cache.get_or_fetch_with("url", Duration::ZERO, || {
+        // ttl = 0 forces the entry past freshness, but it is still within the
+        // staleness window, so it is used as a fallback.
+        let result = cache.get_or_fetch_with("url", Duration::ZERO, HOUR, || {
             Err(RevenantError::Other("down".to_owned()))
         });
         assert_eq!(result.unwrap().scheme_operator, "Stale");
+    }
+
+    #[test]
+    fn discards_cache_beyond_max_stale_window() {
+        let cache = TrustStoreCache::new();
+        cache.lock().insert("url".to_owned(), make_store("TooOld"));
+        // max_stale = 0 makes even a just-inserted entry "too old" -> discarded.
+        let result = cache.get_or_fetch_with("url", Duration::ZERO, Duration::ZERO, || {
+            Err(RevenantError::Other("down".to_owned()))
+        });
+        assert!(
+            result.is_none(),
+            "a TSL past the max-stale window must not be used"
+        );
     }
 
     #[test]

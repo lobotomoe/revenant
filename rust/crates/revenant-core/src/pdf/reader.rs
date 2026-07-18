@@ -76,6 +76,19 @@ impl PdfReader {
         self.doc.get_pages().len()
     }
 
+    /// Whether the PDF declares document encryption (`/Encrypt` in the trailer).
+    ///
+    /// An encrypted source cannot receive a correct incremental-update
+    /// signature: the appended objects would have to be encrypted with the
+    /// document key and the `/Encrypt` reference carried into the new trailer.
+    /// Signing one regardless yields a structurally inconsistent file whose
+    /// original content is unreadable, so the embedded-signing path rejects it
+    /// up front (fail-loud) rather than emitting a corrupt "signed" document.
+    #[must_use]
+    pub fn is_encrypted(&self) -> bool {
+        self.doc.trailer.get(b"Encrypt").is_ok()
+    }
+
     /// The `/Size` value from the trailer (highest object number + 1).
     ///
     /// Uses `lopdf`, which resolves cross-reference streams, incremental
@@ -392,6 +405,17 @@ mod tests {
     const BLANK_LETTER: &[u8] = include_bytes!("testdata/blank_letter.pdf");
     const TWO_PAGE_A4: &[u8] = include_bytes!("testdata/two_page_a4.pdf");
     const XREF_STREAM: &[u8] = include_bytes!("testdata/blank_letter_xref_stream.pdf");
+    const ENCRYPTED: &[u8] = include_bytes!("testdata/encrypted.pdf");
+
+    #[test]
+    fn detects_encryption() {
+        // An encrypted PDF that lopdf can still parse must be flagged: signing
+        // it would silently corrupt the document.
+        let r = PdfReader::open(ENCRYPTED).unwrap();
+        assert!(r.is_encrypted());
+        // A plain PDF is not flagged.
+        assert!(!PdfReader::open(BLANK_LETTER).unwrap().is_encrypted());
+    }
 
     #[test]
     fn reads_single_letter_page() {
