@@ -8,6 +8,7 @@
 mod app;
 mod fonts;
 mod i18n;
+mod jobs;
 mod reveal;
 mod theme;
 mod views;

@@ -12,27 +12,23 @@ use std::sync::Arc;
 use std::time::Duration;
 
 use eframe::egui;
-use revenant_sign_core::api::{self, ServerChoice};
 use revenant_sign_core::appearance::DEFAULT_FONT;
 use revenant_sign_core::config::{
     register_active_profile_tls, register_profile_tls_mode, ConfigLayer, ConfigStore,
-    ResolvedServerConfig, ServerProfile, SignerInfo, TrustAnchors,
+    ServerProfile, TrustAnchors,
 };
-use revenant_sign_core::net::{
-    ping_server, verify_pdf_server, PingOutcome, SoapSigningTransport, Transport,
-};
-use revenant_sign_core::pki::{discover_identity_from_server, CertInfo, TrustStoreCache};
-use revenant_sign_core::signing::EmbeddedSignatureOptions;
-use revenant_sign_core::RevenantError;
+use revenant_sign_core::net::{ping_server, PingOutcome, SoapSigningTransport, Transport};
+use revenant_sign_core::pki::discover_identity_from_server;
 
 use crate::i18n::Localizer;
+use crate::jobs;
 use crate::reveal;
 use crate::theme;
 use crate::views::{
     self, ConnectAction, ConnectState, LoginAction, LoginState, SettingsAction, SignAction,
     SignForm, VerifyAction, VerifyState,
 };
-use crate::worker::{Emit, IdentityOutcome, SignedOutcome, VerifyOutcome, Worker, WorkerMsg};
+use crate::worker::{IdentityOutcome, SignedOutcome, VerifyOutcome, Worker, WorkerMsg};
 
 /// PDF extension accepted by the file picker and drag-and-drop.
 const PDF_EXTENSION: &str = "pdf";
@@ -192,7 +188,7 @@ impl RevenantApp {
             let outcome = match discover_identity_from_server(&soap, &username, &password, timeout)
             {
                 Ok(info) => IdentityOutcome::Ok(Box::new(info)),
-                Err(err) => categorize_identity_error(&err),
+                Err(err) => jobs::categorize_identity_error(&err),
             };
             WorkerMsg::Identity(outcome)
         });
@@ -232,7 +228,7 @@ impl RevenantApp {
         self.dialog = None;
 
         if let Some(info) = login.identity() {
-            let signer = signer_info_from_cert(info);
+            let signer = jobs::signer_info_from_cert(info);
             if let Err(err) = self.store.save_signer_info(&signer) {
                 log::error!("failed to save signer info: {err}");
             }
@@ -336,7 +332,7 @@ impl RevenantApp {
         let transport = Arc::clone(&self.transport);
         self.sign_form.begin_signing();
         self.worker.spawn(move || {
-            let outcome = sign_job(
+            let outcome = jobs::sign(
                 &store, &transport, &pdf_path, &output, detached, options, no_creds,
             );
             WorkerMsg::Signed(outcome)
@@ -350,7 +346,7 @@ impl RevenantApp {
                     .file_name()
                     .map(|name| name.to_string_lossy().into_owned())
                     .unwrap_or_default();
-                let human = format_bytes(size);
+                let human = jobs::format_bytes(size);
                 let message = self.l10n.tf(
                     "gui.signed_filename_size",
                     &[("filename", &filename), ("size", &human)],
@@ -380,14 +376,14 @@ impl RevenantApp {
         let cancel = Arc::clone(&self.batch_cancel);
         self.sign_form.begin_batch();
         self.worker.spawn_batch(move |emit| {
-            let ctx = BatchContext {
+            let ctx = jobs::BatchContext {
                 store: &store,
                 transport: &transport,
                 detached,
                 options: &options,
                 no_credentials_message: &no_creds,
             };
-            batch_sign_job(emit, &ctx, &files, &cancel);
+            jobs::batch_sign(emit, &ctx, &files, &cancel);
         });
     }
 
@@ -435,7 +431,7 @@ impl RevenantApp {
         let transport = Arc::clone(&self.transport);
         self.verify.begin();
         self.worker.spawn(move || {
-            let outcome = verify_job(&transport, &pdf_path, &trust, server.as_ref());
+            let outcome = jobs::verify(&transport, &pdf_path, &trust, server.as_ref());
             WorkerMsg::Verified(outcome)
         });
     }
@@ -628,205 +624,4 @@ fn draw_drop_hint(ctx: &egui::Context) {
 fn is_pdf(path: &Path) -> bool {
     path.extension()
         .is_some_and(|ext| ext.eq_ignore_ascii_case(PDF_EXTENSION))
-}
-
-/// Sign `pdf_path` and write the result to `output`, resolving credentials from
-/// the store. Runs on the background worker; returns a routable outcome.
-fn sign_job(
-    store: &ConfigStore,
-    transport: &Arc<Transport>,
-    pdf_path: &Path,
-    output: &Path,
-    detached: bool,
-    options: EmbeddedSignatureOptions,
-    no_credentials_message: String,
-) -> SignedOutcome {
-    let creds = store.resolve_credentials();
-    let (Some(username), Some(password)) = (creds.username, creds.password) else {
-        return SignedOutcome::Failed(no_credentials_message);
-    };
-    let pdf = match std::fs::read(pdf_path) {
-        Ok(bytes) => bytes,
-        Err(err) => return SignedOutcome::Failed(err.to_string()),
-    };
-    let server = ServerChoice::default();
-    let result = if detached {
-        api::sign_detached(
-            store,
-            transport,
-            &pdf,
-            &username,
-            password.expose(),
-            &server,
-        )
-    } else {
-        api::sign(
-            store,
-            transport,
-            &pdf,
-            &username,
-            password.expose(),
-            &server,
-            options,
-        )
-    };
-    match result {
-        Ok(bytes) => {
-            if let Err(err) = std::fs::write(output, &bytes) {
-                return SignedOutcome::Failed(err.to_string());
-            }
-            let size = u64::try_from(bytes.len()).unwrap_or(u64::MAX);
-            SignedOutcome::Ok {
-                path: output.to_path_buf(),
-                size,
-            }
-        }
-        Err(err) => SignedOutcome::Failed(err.to_string()),
-    }
-}
-
-/// The signing configuration shared across a batch's files.
-struct BatchContext<'a> {
-    store: &'a ConfigStore,
-    transport: &'a Arc<Transport>,
-    detached: bool,
-    options: &'a EmbeddedSignatureOptions,
-    /// Localized message for the "no saved credentials" case.
-    no_credentials_message: &'a str,
-}
-
-/// Sign every file in `files` sequentially, emitting progress before each and a
-/// final tally. A fatal error (bad credentials, TLS failure) aborts the whole
-/// batch; per-file read/write errors are counted and the run continues.
-/// Cancellation is honored between files. Runs on the background worker.
-fn batch_sign_job(emit: &Emit<'_>, ctx: &BatchContext<'_>, files: &[PathBuf], cancel: &AtomicBool) {
-    let creds = ctx.store.resolve_credentials();
-    let (Some(username), Some(password)) = (creds.username, creds.password) else {
-        emit(WorkerMsg::BatchDone {
-            succeeded: 0,
-            failed: 0,
-            aborted: Some(ctx.no_credentials_message.to_owned()),
-        });
-        return;
-    };
-    let total = files.len();
-    let server = ServerChoice::default();
-    let mut succeeded = 0;
-    let mut failed = 0;
-    for (index, path) in files.iter().enumerate() {
-        if cancel.load(Ordering::Relaxed) {
-            break;
-        }
-        let filename = path
-            .file_name()
-            .map_or_else(String::new, |name| name.to_string_lossy().into_owned());
-        emit(WorkerMsg::BatchProgress {
-            current: index + 1,
-            total,
-            filename,
-        });
-        let Ok(pdf) = std::fs::read(path) else {
-            failed += 1;
-            continue;
-        };
-        let output = views::sign::default_output(path, ctx.detached);
-        let result = if ctx.detached {
-            api::sign_detached(
-                ctx.store,
-                ctx.transport,
-                &pdf,
-                &username,
-                password.expose(),
-                &server,
-            )
-        } else {
-            api::sign(
-                ctx.store,
-                ctx.transport,
-                &pdf,
-                &username,
-                password.expose(),
-                &server,
-                ctx.options.clone(),
-            )
-        };
-        match result {
-            Err(err) if is_fatal_batch_error(&err) => {
-                emit(WorkerMsg::BatchDone {
-                    succeeded,
-                    failed,
-                    aborted: Some(err.to_string()),
-                });
-                return;
-            }
-            Ok(bytes) if std::fs::write(&output, &bytes).is_ok() => succeeded += 1,
-            // A non-fatal signing error or a failed write: count it and continue.
-            _ => failed += 1,
-        }
-    }
-    emit(WorkerMsg::BatchDone {
-        succeeded,
-        failed,
-        aborted: None,
-    });
-}
-
-/// Whether an error should abort the whole batch rather than just fail one file.
-fn is_fatal_batch_error(err: &RevenantError) -> bool {
-    matches!(err, RevenantError::Auth(_) | RevenantError::Tls { .. })
-}
-
-/// Verify `pdf_path` offline (per signature) and, when `server` is set, against
-/// the appliance. Runs on the background worker.
-fn verify_job(
-    transport: &Transport,
-    pdf_path: &Path,
-    trust: &TrustAnchors,
-    server: Option<&ResolvedServerConfig>,
-) -> VerifyOutcome {
-    let pdf = match std::fs::read(pdf_path) {
-        Ok(bytes) => bytes,
-        Err(err) => return VerifyOutcome::ReadError(err.to_string()),
-    };
-    let cache = TrustStoreCache::new();
-    let local = api::verify_pdf_all(transport, &cache, &pdf, trust).map_err(|err| err.to_string());
-    let server =
-        server.map(|cfg| verify_pdf_server(transport, &cfg.url, &pdf, cfg.timeout_duration()));
-    VerifyOutcome::Done { local, server }
-}
-
-/// Human-readable byte size (integer math to avoid lossy float casts).
-fn format_bytes(bytes: u64) -> String {
-    const KB: u64 = 1024;
-    const MB: u64 = KB * 1024;
-    if bytes >= MB {
-        format!("{}.{} MB", bytes / MB, (bytes % MB) * 10 / MB)
-    } else if bytes >= KB {
-        format!("{}.{} KB", bytes / KB, (bytes % KB) * 10 / KB)
-    } else {
-        format!("{bytes} B")
-    }
-}
-
-/// Classify a discovery error so the UI thread can pick the localized message.
-fn categorize_identity_error(err: &RevenantError) -> IdentityOutcome {
-    let detail = err.to_string();
-    match err {
-        RevenantError::Auth(_) => IdentityOutcome::AuthFailed(detail),
-        RevenantError::Tls { .. } => IdentityOutcome::ServerError(detail),
-        _ => IdentityOutcome::OtherError(detail),
-    }
-}
-
-/// Adapt a discovered certificate into the config store's signer record. Both
-/// carry the same fields; the store owns the persisted view.
-fn signer_info_from_cert(info: &CertInfo) -> SignerInfo {
-    SignerInfo {
-        name: info.name.clone(),
-        email: info.email.clone(),
-        organization: info.organization.clone(),
-        dn: info.dn.clone(),
-        not_before: info.not_before.clone(),
-        not_after: info.not_after.clone(),
-    }
 }
