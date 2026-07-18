@@ -1,0 +1,34 @@
+[package]
+name = "revenant-sign-gui"
+description = "Cross-platform desktop GUI for ARX CoSign / DocuSign Signature Appliance electronic signatures"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+authors.workspace = true
+repository.workspace = true
+homepage.workspace = true
+# A desktop application distributed via the app stores (Mac App Store, Microsoft
+# Store, Snap, AppImage), not a library -- kept out of the crates.io publish set.
+publish = false
+
+[[bin]]
+name = "revenant-gui"
+path = "src/main.rs"
+
+# GUI-only dependencies are pinned locally rather than in the workspace catalog:
+# unlike the crypto/formats stack (which must stay version-aligned across crates)
+# nothing else in the workspace depends on egui, so central pinning would only
+# add noise. egui is used through `eframe::egui` to keep the two in lockstep.
+[dependencies]
+revenant-sign-core = { path = "../revenant-sign-core", version = "0.1.0" }
+log.workspace = true
+env_logger.workspace = true
+eframe = "0.32.3"
+sys-locale = "0.3.2"
+
+[lints]
+workspace = true
+
+[dev-dependencies]
+ab_glyph = "0.2.32"

@@ -4,6 +4,7 @@ members = [
     "crates/revenant-sign-tls",
     "crates/revenant-sign-core",
     "crates/revenant-sign",
+    "crates/revenant-sign-gui",
 ]
 
 [workspace.package]

@@ -65,4 +65,8 @@ extend-exclude = [
     # typos has no per-language dictionary, so Turkish/etc. words collide with
     # the English typo corpus (e.g. "sistem" -> "system"). Not English to check.
     "python/src/revenant/ui/gui/i18n/locales/",
+    # Rust GUI: same non-English translation catalogs, carried over verbatim.
+    "rust/crates/revenant-sign-gui/src/i18n/locales/",
+    # Bundled Noto font assets and their SIL OFL license (proper nouns).
+    "rust/crates/revenant-sign-gui/src/fonts/",
 ]
