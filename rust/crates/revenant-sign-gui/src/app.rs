@@ -354,7 +354,10 @@ impl RevenantApp {
                 self.sign_form.on_signed_ok(message);
                 reveal::in_file_manager(&path);
             }
-            SignedOutcome::Failed(detail) => self.sign_form.on_signed_failed(detail),
+            SignedOutcome::Failed(detail) => {
+                let message = crate::friendly::friendly(&self.l10n, &detail);
+                self.sign_form.on_signed_failed(message);
+            }
         }
     }
 
@@ -389,7 +392,7 @@ impl RevenantApp {
 
     fn on_batch_done(&mut self, succeeded: usize, failed: usize, aborted: Option<String>) {
         let (message, ok) = match aborted {
-            Some(reason) => (reason, false),
+            Some(reason) => (crate::friendly::friendly(&self.l10n, &reason), false),
             None => (
                 self.l10n.tf(
                     "gui.batch_complete_succeeded_failed",

@@ -7,6 +7,7 @@
 
 mod app;
 mod fonts;
+mod friendly;
 mod i18n;
 mod jobs;
 mod reveal;
