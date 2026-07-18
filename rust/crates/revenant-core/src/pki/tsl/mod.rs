@@ -50,6 +50,42 @@ pub struct TrustStore {
     pub fetched_at: Instant,
 }
 
+impl TrustStore {
+    /// Build a trust store from a pinned, bundled set of CA certificates (DER),
+    /// with no network access.
+    ///
+    /// This is the offline, out-of-band way to establish trust for a deployment
+    /// whose issuing CAs are not published in a usable Trust Service List -- the
+    /// caller vouches for the certificates by bundling them. Certificates that
+    /// fail to parse are skipped (a bundled anchor should always parse; this only
+    /// guards against a malformed embed). Chain validation treats these anchors
+    /// exactly like TSL-derived ones.
+    #[must_use]
+    pub fn from_pinned_cas(certs: &[Vec<u8>]) -> Self {
+        let ca_anchors: Vec<TrustAnchor> = certs
+            .iter()
+            .filter_map(|der| {
+                let cert = super::cert::parse_der(der).ok()?;
+                let subject = super::cert::subject_dn(&cert);
+                Some(TrustAnchor {
+                    subject_name: subject.clone(),
+                    service_name: subject,
+                    service_type: "pinned".to_owned(),
+                    status: "pinned".to_owned(),
+                    cert_der: der.clone(),
+                })
+            })
+            .collect();
+        TrustStore {
+            anchors: ca_anchors.clone(),
+            ca_anchors,
+            scheme_operator: "pinned trust anchors".to_owned(),
+            tsl_url: String::new(),
+            fetched_at: Instant::now(),
+        }
+    }
+}
+
 /// Parse an ETSI TSL XML document into a [`TrustStore`]. Pure -- no I/O.
 ///
 /// # Errors

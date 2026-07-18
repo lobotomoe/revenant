@@ -118,6 +118,27 @@ pub enum IdentityMethod {
     Manual,
 }
 
+/// Where a server profile's certificate-chain trust anchors come from.
+///
+/// A deployment establishes trust in exactly one way, so this is a sum type
+/// rather than overlapping optional fields. It is plain data (DER bytes / a URL)
+/// so profiles carry no PKI dependency; the verification layer interprets it.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum TrustAnchors {
+    /// No configured anchors -- chain validation is left indeterminate ("trust
+    /// not checked"). The correct state for a deployment whose CA cannot yet be
+    /// authoritatively pinned.
+    None,
+    /// A pinned, bundled set of trusted CA certificates (DER). Offline and
+    /// out-of-band -- the authoritative way to trust a deployment whose issuing
+    /// CAs are not in a usable public trust list. An empty set behaves as
+    /// [`None`](TrustAnchors::None).
+    Pinned(Vec<Vec<u8>>),
+    /// Fetch anchors from an ETSI Trust Service List at this URL. For deployments
+    /// that publish a live, maintained TSL.
+    Tsl(String),
+}
+
 /// Describes a CoSign server deployment.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct ServerProfile {
@@ -145,8 +166,8 @@ pub struct ServerProfile {
     pub font: String,
     /// One-line CLI description for this profile.
     pub cli_description: String,
-    /// Trust Service List URL for chain validation, if the deployment has one.
-    pub tsl_url: Option<String>,
+    /// Where this deployment's certificate-chain trust anchors come from.
+    pub trust: TrustAnchors,
 }
 
 impl ServerProfile {
@@ -221,8 +242,28 @@ fn ekeng_profile() -> ServerProfile {
         font: "ghea-grapalat".to_owned(),
         cli_description: "Cross-platform CLI for ARX CoSign electronic signatures (EKENG profile)."
             .to_owned(),
-        tsl_url: Some("https://www.gov.am/files/TSL/AM-TL-1.xml".to_owned()),
+        // EKENG signatures chain to "Staff of Government of RA Root CA", which is
+        // NOT in the Armenian TSL (a separate, citizen-ID PKI) -- and that TSL is
+        // years past its NextUpdate anyway. So trust is pinned, not TSL-fetched.
+        trust: TrustAnchors::Pinned(ekeng_trust_anchors()),
     }
+}
+
+/// The pinned CA trust anchors for the EKENG deployment.
+///
+/// EKENG-issued signatures chain to a self-signed "Staff of Government of RA Root
+/// CA". That root is not distributed through any working channel we can verify
+/// automatically (it is absent from the Armenian TSL, and its AIA URL
+/// `http://www.gov.am/CAStaff/GovRootCA.crt` currently serves an HTML error
+/// page), so it must be obtained out-of-band and pinned here. Until then this is
+/// empty and EKENG chain validation is reported as indeterminate ("trust not
+/// checked") rather than falsely untrusted.
+///
+/// To enable it: obtain the root DER from an authoritative source, commit it as
+/// `testdata`/an embedded asset, and return
+/// `vec![include_bytes!("...").to_vec()]`.
+fn ekeng_trust_anchors() -> Vec<Vec<u8>> {
+    Vec::new()
 }
 
 impl ServerProfile {
@@ -285,7 +326,7 @@ impl ServerProfile {
             sig_fields: Vec::new(),
             font: "noto-sans".to_owned(),
             cli_description: String::new(),
-            tsl_url: None,
+            trust: TrustAnchors::None,
         })
     }
 
@@ -311,10 +352,8 @@ mod tests {
         assert_eq!(ekeng.tls_mode, TlsMode::Legacy);
         assert_eq!(ekeng.max_auth_attempts, 5);
         assert_eq!(ekeng.font, "ghea-grapalat");
-        assert_eq!(
-            ekeng.tsl_url.as_deref(),
-            Some("https://www.gov.am/files/TSL/AM-TL-1.xml")
-        );
+        // EKENG uses pinned trust anchors (the dead TSL is not a usable source).
+        assert!(matches!(ekeng.trust, TrustAnchors::Pinned(_)));
         assert!(ekeng.has_identity_method(IdentityMethod::Server));
         assert!(ekeng.has_identity_method(IdentityMethod::Manual));
         // Armenian marker round-trips.

@@ -10,7 +10,7 @@ use std::path::Path;
 
 use revenant_core::api::verify_pdf_all;
 use revenant_core::cms::SignatureStatus;
-use revenant_core::config::register_active_profile_tls;
+use revenant_core::config::{register_active_profile_tls, TrustAnchors};
 use revenant_core::net::{verify_pdf_server, ServerVerifyResult};
 use revenant_core::pdf::VerificationResult;
 use revenant_core::pki::{TrustStatus, TrustStoreCache};
@@ -35,15 +35,14 @@ pub(crate) fn check(app: &App, args: &CheckArgs) -> CliResult {
         format_size_kb(pdf_bytes.len())
     );
 
-    // Chain validation uses the active profile's Trust Service List, if any.
-    let tsl_url = app.store.active_profile().and_then(|p| p.tsl_url);
+    // Chain validation uses the active profile's configured trust anchors
+    // (pinned CAs or a TSL); an unconfigured profile leaves trust indeterminate.
+    let trust = app
+        .store
+        .active_profile()
+        .map_or(TrustAnchors::None, |p| p.trust);
     let cache = TrustStoreCache::new();
-    let results = match verify_pdf_all(
-        app.transport.as_ref(),
-        &cache,
-        &pdf_bytes,
-        tsl_url.as_deref(),
-    ) {
+    let results = match verify_pdf_all(app.transport.as_ref(), &cache, &pdf_bytes, &trust) {
         Ok(results) => results,
         Err(e) => {
             eprintln!("  ERROR: {e}");

@@ -27,7 +27,7 @@ use storage::Storage;
 pub use credentials::ResolvedCredentials;
 pub use profiles::{
     CertField, CertFieldSource, IdentityMethod, ServerProfile, SigAuto, SigField, SigFieldValue,
-    BUILTIN_PROFILES, EKENG,
+    TrustAnchors, BUILTIN_PROFILES, EKENG,
 };
 pub use secret::Secret;
 pub use settings::{ConfigLayer, ResolvedServerConfig, SignerInfo, SYSTEM_LANGUAGE};
