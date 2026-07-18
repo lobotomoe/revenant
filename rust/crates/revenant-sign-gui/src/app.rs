@@ -6,23 +6,33 @@
 //! swaps content by layer. Long-running work runs on the [`Worker`] and its
 //! results are folded back in on the UI thread.
 
+use std::path::{Path, PathBuf};
 use std::sync::Arc;
 use std::time::Duration;
 
 use eframe::egui;
+use revenant_sign_core::api::{self, ServerChoice};
+use revenant_sign_core::appearance::DEFAULT_FONT;
 use revenant_sign_core::config::{
     register_active_profile_tls, register_profile_tls_mode, ConfigLayer, ConfigStore,
     ServerProfile, SignerInfo,
 };
 use revenant_sign_core::net::{ping_server, PingOutcome, SoapSigningTransport, Transport};
 use revenant_sign_core::pki::{discover_identity_from_server, CertInfo};
+use revenant_sign_core::signing::EmbeddedSignatureOptions;
 use revenant_sign_core::RevenantError;
 
 use crate::i18n::Localizer;
+use crate::reveal;
+use crate::theme;
 use crate::views::{
     self, ConnectAction, ConnectState, LoginAction, LoginState, SettingsAction, SignAction,
+    SignForm,
 };
-use crate::worker::{IdentityOutcome, Worker, WorkerMsg};
+use crate::worker::{IdentityOutcome, SignedOutcome, Worker, WorkerMsg};
+
+/// PDF extension accepted by the file picker and drag-and-drop.
+const PDF_EXTENSION: &str = "pdf";
 
 #[derive(Clone, Copy, PartialEq, Eq)]
 enum Tab {
@@ -40,7 +50,9 @@ enum Dialog {
 
 /// The running GUI application.
 pub(crate) struct RevenantApp {
-    store: ConfigStore,
+    // Shared behind an `Arc` so background signing jobs can resolve credentials
+    // and sign off the UI thread. `ConfigStore` is `Send + Sync`.
+    store: Arc<ConfigStore>,
     transport: Arc<Transport>,
     l10n: Localizer,
     worker: Worker,
@@ -49,18 +61,23 @@ pub(crate) struct RevenantApp {
     connect: ConnectState,
     /// Present only while the login wizard is open (needs the active profile).
     login: Option<LoginState>,
+    sign_form: SignForm,
 }
 
 impl RevenantApp {
     pub(crate) fn new(cc: &eframe::CreationContext<'_>) -> Self {
         crate::fonts::install(&cc.egui_ctx);
-        let store = ConfigStore::new();
+        let store = Arc::new(ConfigStore::new());
         let l10n = Localizer::new(&store.language());
         let transport = Arc::new(Transport::new());
         // Register the saved profile's TLS mode so pings and signing use the
         // right stack (EKENG needs the legacy TLS 1.0 path).
         register_active_profile_tls(&transport, &store);
         let worker = Worker::new(cc.egui_ctx.clone());
+        // Default the appearance font to the configured profile's font.
+        let default_font = store
+            .active_profile()
+            .map_or_else(|| DEFAULT_FONT.to_owned(), |profile| profile.font);
         Self {
             store,
             transport,
@@ -70,6 +87,7 @@ impl RevenantApp {
             dialog: None,
             connect: ConnectState::new(),
             login: None,
+            sign_form: SignForm::new(default_font),
         }
     }
 
@@ -87,6 +105,7 @@ impl RevenantApp {
             match msg {
                 WorkerMsg::Ping { ok, detail } => self.on_ping_result(ok, &detail),
                 WorkerMsg::Identity(outcome) => self.on_identity_result(outcome),
+                WorkerMsg::Signed(outcome) => self.on_signed(outcome),
             }
         }
     }
@@ -215,6 +234,105 @@ impl RevenantApp {
             .set_session_credentials(login.username().to_owned(), login.password().to_owned());
     }
 
+    /// Native picker for the input PDF (blocking, on the UI thread as required).
+    fn browse_pdf(&mut self) {
+        if let Some(path) = rfd::FileDialog::new()
+            .add_filter(self.l10n.t("gui.pdf_files"), &[PDF_EXTENSION])
+            .pick_file()
+        {
+            self.sign_form.set_pdf(&path);
+        }
+    }
+
+    fn browse_image(&mut self) {
+        if let Some(path) = rfd::FileDialog::new()
+            .add_filter(self.l10n.t("gui.images"), &["png", "jpg", "jpeg"])
+            .pick_file()
+        {
+            self.sign_form.set_image(&path);
+        }
+    }
+
+    fn browse_output(&mut self) {
+        let mut dialog = rfd::FileDialog::new();
+        if let Some(default) = self.sign_form.default_output() {
+            if let Some(name) = default.file_name() {
+                dialog = dialog.set_file_name(name.to_string_lossy());
+            }
+            if let Some(dir) = default.parent() {
+                dialog = dialog.set_directory(dir);
+            }
+        }
+        if let Some(path) = dialog.save_file() {
+            self.sign_form.set_output(&path);
+        }
+    }
+
+    /// Accept a PDF dropped anywhere on the window (the drag-and-drop entry
+    /// point the Python client lacks). The first dropped PDF wins; batch drops
+    /// arrive in a later phase.
+    fn handle_dropped_files(&mut self, ctx: &egui::Context) {
+        let dropped = ctx.input(|i| {
+            i.raw
+                .dropped_files
+                .iter()
+                .filter_map(|file| file.path.clone())
+                .find(|path| is_pdf(path))
+        });
+        if let Some(path) = dropped {
+            self.sign_form.set_pdf(&path);
+            self.tab = Tab::Sign;
+        }
+    }
+
+    /// Validate the form and sign the PDF in the background.
+    fn start_sign(&mut self) {
+        if self.sign_form.pdf_path().is_empty() {
+            let message = self.l10n.t("gui.please_select_a_pdf_file").to_owned();
+            self.sign_form.on_signed_failed(message);
+            return;
+        }
+        let Some(output) = self.sign_form.resolved_output() else {
+            return;
+        };
+        let pdf_path = PathBuf::from(self.sign_form.pdf_path());
+        let detached = self.sign_form.is_detached();
+        let options = self.sign_form.embedded_options();
+        // Localize the "no credentials" fallback here; the worker cannot.
+        let no_creds = self
+            .l10n
+            .t("gui.server_connected_log_in_to_sign_documents")
+            .to_owned();
+        let store = Arc::clone(&self.store);
+        let transport = Arc::clone(&self.transport);
+        self.sign_form.begin_signing();
+        self.worker.spawn(move || {
+            let outcome = sign_job(
+                &store, &transport, &pdf_path, &output, detached, options, no_creds,
+            );
+            WorkerMsg::Signed(outcome)
+        });
+    }
+
+    fn on_signed(&mut self, outcome: SignedOutcome) {
+        match outcome {
+            SignedOutcome::Ok { path, size } => {
+                let filename = path
+                    .file_name()
+                    .map(|name| name.to_string_lossy().into_owned())
+                    .unwrap_or_default();
+                let human = format_bytes(size);
+                let message = self.l10n.tf(
+                    "gui.signed_filename_size",
+                    &[("filename", &filename), ("size", &human)],
+                );
+                self.sign_form.on_signed_ok(message);
+                reveal::in_file_manager(&path);
+            }
+            SignedOutcome::Failed(detail) => self.sign_form.on_signed_failed(detail),
+        }
+    }
+
     fn top_bar(&mut self, ctx: &egui::Context) {
         egui::TopBottomPanel::top("server_bar").show(ctx, |ui| {
             ui.add_space(4.0);
@@ -268,6 +386,9 @@ impl RevenantApp {
         } else {
             egui::Align::Min
         };
+        // Collect the sign-tab intent and act on it after the panel closes, so a
+        // blocking file dialog never runs mid-layout with the form borrowed.
+        let mut action = SignAction::None;
         egui::CentralPanel::default().show(ctx, |ui| {
             ui.with_layout(egui::Layout::top_down(align), |ui| {
                 ui.horizontal(|ui| {
@@ -278,16 +399,25 @@ impl RevenantApp {
                 match self.tab {
                     Tab::Sign => {
                         let layer = self.store.config_layer();
-                        match views::sign::show(ui, &self.l10n, layer) {
-                            SignAction::Connect => self.dialog = Some(Dialog::Connect),
-                            SignAction::Login => self.open_login(),
-                            SignAction::None => {}
-                        }
+                        action = views::sign::show(ui, &self.l10n, layer, &mut self.sign_form);
                     }
                     Tab::Verify => views::verify::show(ui, &self.l10n),
                 }
             });
         });
+        self.apply_sign_action(&action);
+    }
+
+    fn apply_sign_action(&mut self, action: &SignAction) {
+        match action {
+            SignAction::None => {}
+            SignAction::Connect => self.dialog = Some(Dialog::Connect),
+            SignAction::Login => self.open_login(),
+            SignAction::BrowsePdf => self.browse_pdf(),
+            SignAction::BrowseImage => self.browse_image(),
+            SignAction::BrowseOutput => self.browse_output(),
+            SignAction::Sign => self.start_sign(),
+        }
     }
 
     fn dialogs(&mut self, ctx: &egui::Context) {
@@ -332,10 +462,106 @@ impl RevenantApp {
 impl eframe::App for RevenantApp {
     fn update(&mut self, ctx: &egui::Context, _frame: &mut eframe::Frame) {
         self.process_worker_results();
+        self.handle_dropped_files(ctx);
         self.top_bar(ctx);
         self.footer(ctx);
         self.central(ctx);
         self.dialogs(ctx);
+        draw_drop_hint(ctx);
+    }
+}
+
+/// Highlight the window while a file is dragged over it.
+fn draw_drop_hint(ctx: &egui::Context) {
+    let hovering = ctx.input(|i| !i.raw.hovered_files.is_empty());
+    if !hovering {
+        return;
+    }
+    let screen = ctx.screen_rect();
+    let painter = ctx.layer_painter(egui::LayerId::new(
+        egui::Order::Foreground,
+        egui::Id::new("drop"),
+    ));
+    painter.rect_filled(screen, 0.0, egui::Color32::from_black_alpha(96));
+    painter.rect_stroke(
+        screen.shrink(12.0),
+        12.0,
+        egui::Stroke::new(3.0, theme::OK),
+        egui::StrokeKind::Inside,
+    );
+}
+
+/// Whether a dropped/selected path looks like a PDF (case-insensitive extension).
+fn is_pdf(path: &Path) -> bool {
+    path.extension()
+        .is_some_and(|ext| ext.eq_ignore_ascii_case(PDF_EXTENSION))
+}
+
+/// Sign `pdf_path` and write the result to `output`, resolving credentials from
+/// the store. Runs on the background worker; returns a routable outcome.
+fn sign_job(
+    store: &ConfigStore,
+    transport: &Arc<Transport>,
+    pdf_path: &Path,
+    output: &Path,
+    detached: bool,
+    options: EmbeddedSignatureOptions,
+    no_credentials_message: String,
+) -> SignedOutcome {
+    let creds = store.resolve_credentials();
+    let (Some(username), Some(password)) = (creds.username, creds.password) else {
+        return SignedOutcome::Failed(no_credentials_message);
+    };
+    let pdf = match std::fs::read(pdf_path) {
+        Ok(bytes) => bytes,
+        Err(err) => return SignedOutcome::Failed(err.to_string()),
+    };
+    let server = ServerChoice::default();
+    let result = if detached {
+        api::sign_detached(
+            store,
+            transport,
+            &pdf,
+            &username,
+            password.expose(),
+            &server,
+        )
+    } else {
+        api::sign(
+            store,
+            transport,
+            &pdf,
+            &username,
+            password.expose(),
+            &server,
+            options,
+        )
+    };
+    match result {
+        Ok(bytes) => {
+            if let Err(err) = std::fs::write(output, &bytes) {
+                return SignedOutcome::Failed(err.to_string());
+            }
+            let size = u64::try_from(bytes.len()).unwrap_or(u64::MAX);
+            SignedOutcome::Ok {
+                path: output.to_path_buf(),
+                size,
+            }
+        }
+        Err(err) => SignedOutcome::Failed(err.to_string()),
+    }
+}
+
+/// Human-readable byte size (integer math to avoid lossy float casts).
+fn format_bytes(bytes: u64) -> String {
+    const KB: u64 = 1024;
+    const MB: u64 = KB * 1024;
+    if bytes >= MB {
+        format!("{}.{} MB", bytes / MB, (bytes % MB) * 10 / MB)
+    } else if bytes >= KB {
+        format!("{}.{} KB", bytes / KB, (bytes % KB) * 10 / KB)
+    } else {
+        format!("{bytes} B")
     }
 }
 

@@ -5,6 +5,7 @@
 //! through a channel the UI polls each frame. Finishing a job requests a
 //! repaint so the result is shown promptly rather than on the next input event.
 
+use std::path::PathBuf;
 use std::sync::mpsc::{self, Receiver, Sender};
 use std::thread;
 
@@ -26,12 +27,22 @@ pub(crate) enum IdentityOutcome {
     OtherError(String),
 }
 
+/// Outcome of a background signing job.
+pub(crate) enum SignedOutcome {
+    /// The signed document was written; `size` is the output size in bytes.
+    Ok { path: PathBuf, size: u64 },
+    /// Signing failed; the string is the raw (not yet localized) error text.
+    Failed(String),
+}
+
 /// Result of a completed background job, tagged so the UI thread can route it.
 pub(crate) enum WorkerMsg {
     /// A server ping finished: whether it succeeded and a human-readable detail.
     Ping { ok: bool, detail: String },
     /// A signer-identity discovery finished.
     Identity(IdentityOutcome),
+    /// A signing job finished.
+    Signed(SignedOutcome),
 }
 
 /// Owns the channel between background jobs and the UI thread.
