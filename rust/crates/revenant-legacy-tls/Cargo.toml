@@ -1,0 +1,36 @@
+[package]
+name = "revenant-legacy-tls"
+description = "From-scratch TLS 1.0 + RC4-MD5 client for legacy CoSign appliances"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+authors.workspace = true
+repository.workspace = true
+documentation = "https://docs.rs/revenant-legacy-tls"
+readme = "README.md"
+keywords = ["tls", "rc4", "legacy", "handshake"]
+categories = ["cryptography", "network-programming"]
+
+# This crate is deliberately self-contained and knows nothing about Revenant,
+# SOAP, or CoSign. It implements the minimal RFC 2246 (TLS 1.0) handshake and
+# record layer needed to talk to appliances that only accept RC4-MD5 -- a
+# cipher suite no mainstream TLS stack still ships. Kept isolated so the broken
+# crypto it is forced to speak cannot leak into the rest of the workspace.
+[dependencies]
+rc4.workspace = true
+md-5.workspace = true
+sha1.workspace = true
+hmac.workspace = true
+rsa.workspace = true
+rand.workspace = true
+subtle.workspace = true
+der.workspace = true
+spki.workspace = true
+const-oid.workspace = true
+x509-cert.workspace = true
+thiserror.workspace = true
+log.workspace = true
+
+[lints]
+workspace = true

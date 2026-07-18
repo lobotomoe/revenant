@@ -127,7 +127,14 @@ jobs:
             Apache-2.0, MIT, BSD-2-Clause, BSD-3-Clause, ISC, PSF-2.0,
             MPL-2.0, LGPL-2.1-only, LGPL-2.1-or-later, LGPL-3.0-only,
             0BSD, Unlicense, CC0-1.0, Zlib, GPL-2.0, GPL-2.0-only,
-            WTFPL, BlueOak-1.0.0
+            WTFPL, BlueOak-1.0.0, Unicode-3.0, CDLA-Permissive-2.0
+          # These crates declare dual Apache-2.0/MIT with the old `/` separator,
+          # which is not valid SPDX, so the scanner tags the license as "bad".
+          # dbus/libdbus-sys are the Linux keyring backend; unicode-properties and
+          # stringprep come in via lopdf's PDF-encryption (SASLprep) path; all fine.
+          allow-dependencies-licenses: >-
+            pkg:cargo/dbus, pkg:cargo/libdbus-sys, pkg:cargo/rangemap,
+            pkg:cargo/unicode-properties, pkg:cargo/stringprep
 
   typecheck:
     name: Type Check
@@ -317,6 +324,146 @@ jobs:
 
       - name: Test CLI binary
         run: node dist/cli.js --help
+
+  # -- Rust ---------------------------------------------------------------------
+
+  rs-lint:
+    name: Rust Lint & Format
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    defaults:
+      run:
+        working-directory: rust
+
+    steps:
+      - uses: step-security/harden-runner@bf7454d06d71f1098171f2acdf0cd4708d7b5920 # v2.20.0
+        with:
+          egress-policy: audit
+
+      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v6
+
+      # The keyring Secret Service backend (dbus-secret-service -> libdbus-sys)
+      # links the system libdbus at build time; clippy --all-targets compiles it.
+      - name: Install libdbus (keyring Secret Service backend)
+        run: sudo apt-get update && sudo apt-get install -y libdbus-1-dev pkg-config
+
+      - name: Set up Rust
+        uses: dtolnay/rust-toolchain@2c7215f132e9ebf062739d9130488b56d53c060c # master
+        with:
+          toolchain: stable
+          components: rustfmt, clippy
+
+      - uses: Swatinem/rust-cache@c19371144df3bb44fab255c43d04cbc2ab54d1c4 # v2.9.1
+        with:
+          workspaces: rust
+
+      - name: Check formatting
+        run: cargo fmt --all --check
+
+      - name: Clippy (warnings as errors)
+        run: cargo clippy --workspace --all-targets -- -D warnings
+
+  rs-test:
+    name: Rust Test (${{ matrix.os }})
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 20
+    defaults:
+      run:
+        working-directory: rust
+
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, macos-latest, windows-latest]
+
+    steps:
+      - uses: step-security/harden-runner@bf7454d06d71f1098171f2acdf0cd4708d7b5920 # v2.20.0
+        with:
+          egress-policy: audit
+
+      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v6
+
+      - name: Install libdbus (Linux keyring backend)
+        if: runner.os == 'Linux'
+        run: sudo apt-get update && sudo apt-get install -y libdbus-1-dev pkg-config
+
+      - name: Set up Rust
+        uses: dtolnay/rust-toolchain@2c7215f132e9ebf062739d9130488b56d53c060c # master
+        with:
+          toolchain: stable
+
+      - uses: Swatinem/rust-cache@c19371144df3bb44fab255c43d04cbc2ab54d1c4 # v2.9.1
+        with:
+          workspaces: rust
+
+      - name: Run tests
+        run: cargo test --workspace
+
+  rs-msrv:
+    name: Rust MSRV (1.85)
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    defaults:
+      run:
+        working-directory: rust
+
+    steps:
+      - uses: step-security/harden-runner@bf7454d06d71f1098171f2acdf0cd4708d7b5920 # v2.20.0
+        with:
+          egress-policy: audit
+
+      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v6
+
+      - name: Install libdbus (keyring Secret Service backend)
+        run: sudo apt-get update && sudo apt-get install -y libdbus-1-dev pkg-config
+
+      - name: Set up Rust 1.85 (workspace MSRV)
+        uses: dtolnay/rust-toolchain@2c7215f132e9ebf062739d9130488b56d53c060c # master
+        with:
+          toolchain: "1.85"
+
+      - uses: Swatinem/rust-cache@c19371144df3bb44fab255c43d04cbc2ab54d1c4 # v2.9.1
+        with:
+          workspaces: rust
+
+      # Verifies the documented MSRV (rust-version = "1.85") still compiles the
+      # committed Cargo.lock -- a newer-stdlib slip or a dep MSRV bump fails here.
+      - name: Check (MSRV)
+        run: cargo check --workspace --all-targets
+
+  rs-build:
+    name: Rust Build
+    if: ${{ !inputs.skip-build-test }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    defaults:
+      run:
+        working-directory: rust
+
+    steps:
+      - uses: step-security/harden-runner@bf7454d06d71f1098171f2acdf0cd4708d7b5920 # v2.20.0
+        with:
+          egress-policy: audit
+
+      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v6
+
+      - name: Install libdbus (keyring Secret Service backend)
+        run: sudo apt-get update && sudo apt-get install -y libdbus-1-dev pkg-config
+
+      - name: Set up Rust
+        uses: dtolnay/rust-toolchain@2c7215f132e9ebf062739d9130488b56d53c060c # master
+        with:
+          toolchain: stable
+
+      - uses: Swatinem/rust-cache@c19371144df3bb44fab255c43d04cbc2ab54d1c4 # v2.9.1
+        with:
+          workspaces: rust
+
+      - name: Build (release)
+        run: cargo build --workspace --release
+
+      - name: Test CLI binary
+        run: ./target/release/revenant --help
 
   # -- Manifests & packaging ---------------------------------------------------
 

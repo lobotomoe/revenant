@@ -1,0 +1,36 @@
+[package]
+name = "revenant-cli"
+description = "Command-line client for ARX CoSign / DocuSign Signature Appliance electronic signatures"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+authors.workspace = true
+repository.workspace = true
+homepage.workspace = true
+documentation = "https://docs.rs/revenant-cli"
+readme = "README.md"
+keywords = ["signature", "pdf", "cosign", "cli", "sign"]
+categories = ["command-line-utilities", "cryptography"]
+
+# The installed binary is `revenant`, matching the Python and npm CLIs.
+[[bin]]
+name = "revenant"
+path = "src/main.rs"
+
+[dependencies]
+revenant-core = { path = "../revenant-core", version = "0.1.0" }
+
+clap = { workspace = true }
+log.workspace = true
+env_logger.workspace = true
+tempfile.workspace = true
+url.workspace = true
+
+# CLI-only: hidden password entry and a bounded wait on the `openssl` subprocess
+# used by `verify` (matching the Python client's detached-signature verification).
+rpassword = "7"
+wait-timeout = "0.2"
+
+[lints]
+workspace = true

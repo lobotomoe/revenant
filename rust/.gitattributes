@@ -1,0 +1,7 @@
+# Binary test fixtures and embedded font assets: never apply text/EOL
+# normalization. On a Windows checkout, autocrlf would otherwise mangle these
+# (LF -> CRLF), corrupting the bytes that `include_bytes!` embeds and breaking
+# the PDF/cert parsers (e.g. "Cannot parse PDF: Invalid file trailer").
+*.der binary
+*.pdf binary
+*.ttf binary
