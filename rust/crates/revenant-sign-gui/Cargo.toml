@@ -26,6 +26,8 @@ log.workspace = true
 env_logger.workspace = true
 eframe = "0.32.3"
 sys-locale = "0.3.2"
+# Native file open/save dialogs on all three platforms (AppKit / Win32 / xdg).
+rfd = "0.15.4"
 
 [lints]
 workspace = true

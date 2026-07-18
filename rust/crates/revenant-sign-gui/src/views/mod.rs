@@ -12,4 +12,4 @@ pub(crate) mod verify;
 pub(crate) use connect::{ConnectAction, ConnectState};
 pub(crate) use login::{LoginAction, LoginState};
 pub(crate) use settings::SettingsAction;
-pub(crate) use sign::SignAction;
+pub(crate) use sign::{SignAction, SignForm};
