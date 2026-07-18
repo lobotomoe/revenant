@@ -1,0 +1,591 @@
+# Revenant GUI -- Turkish translation
+# SPDX-License-Identifier: Apache-2.0
+#
+# NOTE: msgid values are stable keys used in GUI source code.
+msgid ""
+msgstr ""
+"Content-Type: text/plain; charset=UTF-8\n"
+"Content-Transfer-Encoding: 8bit\n"
+"Language: tr\n"
+
+msgid "gui.about_revenant"
+msgstr "Revenant Hakkında"
+
+msgid "gui.access_denied_your_account_may_not_have_permission_to_sign"
+msgstr "Erişim reddedildi. Hesabınızın imzalama izni olmayabilir."
+
+msgid "gui.account"
+msgstr "Hesap"
+
+msgid "gui.all_count_signatures_valid"
+msgstr "Tüm {count} imza GEÇERLİ"
+
+msgid "gui.all_files"
+msgstr "Tüm dosyalar"
+
+msgid "gui.authentication_failed_error"
+msgstr "Kimlik doğrulama başarısız: {error}"
+
+msgid "gui.authentication_rejected_check_your_username_and_password"
+msgstr "Kimlik doğrulama reddedildi. Kullanıcı adınızı ve parolanızı kontrol edin."
+
+msgid "gui.author_aleksandr_kraiz"
+msgstr "Yazar: Aleksandr Kraiz"
+
+msgid "gui.back"
+msgstr "Geri"
+
+msgid "gui.browse_ellipsis"
+msgstr "Gözat..."
+
+msgid "gui.cancel"
+msgstr "İptal"
+
+msgid "gui.cannot_connect_to_the_server_check_your_internet_connection"
+msgstr "Sunucuya bağlanılamıyor. İnternet bağlantınızı kontrol edin."
+
+msgid "gui.cannot_read_file_error"
+msgstr "Dosya okunamıyor: {error}"
+
+msgid "gui.certificate_inspection"
+msgstr "Sertifika incelemesi"
+
+msgid "gui.certificate_status"
+msgstr "Sertifika: {status}"
+
+msgid "gui.choose_server"
+msgstr "Sunucu Seç"
+
+msgid "gui.clearing_saved_credentials_ellipsis"
+msgstr "Kayıtlı kimlik bilgileri temizleniyor..."
+
+msgid "gui.close_window"
+msgstr "Pencereyi Kapat"
+
+msgid "gui.complete"
+msgstr "Tamamlandı"
+
+msgid "gui.connect"
+msgstr "Bağlan"
+
+msgid "gui.connect_to_a_server_to_sign_documents"
+msgstr "Belgeleri imzalamak için\nbir sunucuya bağlanın."
+
+msgid "gui.connect_to_server"
+msgstr "Sunucuya Bağlan"
+
+msgid "gui.connected_info"
+msgstr "Bağlandı ({info})"
+
+msgid "gui.connecting_to_url_ellipsis"
+msgstr "{url} adresine bağlanılıyor..."
+
+msgid "gui.copy"
+msgstr "Kopyala"
+
+msgid "gui.could_not_determine_identity_from_server"
+msgstr "Sunucudan kimlik belirlenemedi."
+
+msgid "gui.could_not_read_password_from_system_keychain_pleas_a490f2d1"
+msgstr "Parola sistem anahtarlığından okunamadı.\nLütfen parolanızı yeniden girin."
+
+msgid "gui.could_not_save_password_to_system_keychain_access_04b14699"
+msgstr "Parola sistem anahtarlığına kaydedilemedi\n(erişim reddedildi veya kullanılamıyor).\n\nParolanız bunun yerine yapılandırma dosyasına kaydedildi.\nGüvenli depolamayı kullanmak için istendiğinde\nanahtarlık erişimine izin verin."
+
+msgid "gui.credentials"
+msgstr "Kimlik bilgileri"
+
+msgid "gui.credentials_must_contain_only_latin_characters_ple_e9a0742d"
+msgstr "Kimlik bilgileri yalnızca Latin karakterler içermelidir.\nLütfen klavye düzeninizi kontrol edin."
+
+msgid "gui.cross_platform_client_for_arx_cosign_electronic_signatures"
+msgstr "ARX CoSign elektronik imzaları için\nplatformlar arası istemci."
+
+msgid "gui.custom_server"
+msgstr "Özel sunucu"
+
+msgid "gui.cut"
+msgstr "Kes"
+
+msgid "gui.detached_p7s"
+msgstr "Ayrık (.p7s)"
+
+msgid "gui.detached_signature"
+msgstr "Ayrık imza"
+
+msgid "gui.disconnect"
+msgstr "Bağlantıyı kes"
+
+msgid "gui.disconnect_from_name"
+msgstr "{name} bağlantısı kesilsin mi?"
+
+msgid "gui.disconnecting_ellipsis"
+msgstr "Bağlantı kesiliyor..."
+
+msgid "gui.discovering_signer_identity_ellipsis"
+msgstr "İmzalayan kimliği belirleniyor..."
+
+msgid "gui.edit"
+msgstr "Düzenle"
+
+msgid "gui.email"
+msgstr "E-posta"
+
+msgid "gui.email_label"
+msgstr "E-posta:"
+
+msgid "gui.embedded"
+msgstr "Gömülü"
+
+msgid "gui.embedded_signatures"
+msgstr "Gömülü imzalar"
+
+msgid "gui.enter_a_server_url"
+msgstr "Bir sunucu URL'si girin."
+
+msgid "gui.enter_manually_ellipsis"
+msgstr "Elle gir..."
+
+msgid "gui.enter_signer_identity_label"
+msgstr "İmzalayan kimliğini girin:"
+
+msgid "gui.error_error"
+msgstr "Hata: {error}"
+
+msgid "gui.failed"
+msgstr "Başarısız"
+
+msgid "gui.failed_info"
+msgstr "Başarısız: {info}"
+
+msgid "gui.failed_of_total_signature_s_failed"
+msgstr "{total} imzadan {failed} tanesi BAŞARISIZ"
+
+msgid "gui.failed_upper"
+msgstr "BAŞARISIZ"
+
+msgid "gui.file"
+msgstr "Dosya"
+
+msgid "gui.file_already_exists_filename_overwrite"
+msgstr "Dosya zaten mevcut:\n{filename}\n\nÜzerine yazılsın mı?"
+
+msgid "gui.file_not_found_path"
+msgstr "Dosya bulunamadı:\n{path}"
+
+msgid "gui.font_label"
+msgstr "Yazı tipi:"
+
+msgid "gui.github"
+msgstr "GitHub"
+
+msgid "gui.image_opt_label"
+msgstr "Görsel (isteğe bağlı):"
+
+msgid "gui.images"
+msgstr "Görseller"
+
+msgid "gui.inspecting_signature_ellipsis"
+msgstr "İmza inceleniyor..."
+
+msgid "gui.invisible_signature"
+msgstr "Görünmez imza"
+
+msgid "gui.reason_label"
+msgstr "Gerekçe:"
+
+msgid "gui.invalid_page_specification"
+msgstr "Geçersiz sayfa belirtimi"
+
+msgid "gui.language_label"
+msgstr "Dil:"
+
+msgid "gui.license_apache_2_0"
+msgstr "Lisans: Apache 2.0"
+
+msgid "gui.loading_credentials_ellipsis"
+msgstr "Kimlik bilgileri yükleniyor..."
+
+msgid "gui.loading_saved_credentials_ellipsis"
+msgstr "Kayıtlı kimlik bilgileri yükleniyor..."
+
+msgid "gui.log_in"
+msgstr "Oturum Aç"
+
+msgid "gui.log_out"
+msgstr "Oturumu Kapat"
+
+msgid "gui.log_out_server_connection_will_be_preserved"
+msgstr "Oturum kapatılsın mı?\nSunucu bağlantısı korunacak."
+
+msgid "gui.logging_out_ellipsis"
+msgstr "Oturum kapatılıyor..."
+
+msgid "gui.login"
+msgstr "Oturum Aç"
+
+msgid "gui.name"
+msgstr "Ad"
+
+msgid "gui.name_is_required"
+msgstr "Ad gereklidir."
+
+msgid "gui.name_required_label"
+msgstr "Ad (gerekli):"
+
+msgid "gui.next"
+msgstr "İleri"
+
+msgid "gui.no_server_configured"
+msgstr "Yapılandırılmış sunucu yok"
+
+msgid "gui.no_server_configured_click_setup_to_configure"
+msgstr "Yapılandırılmış sunucu yok.\nYapılandırmak için 'Kurulum...' düğmesine tıklayın."
+
+msgid "gui.no_signer"
+msgstr "(imzalayan yok)"
+
+msgid "gui.note_cryptographic_verification_requires_the_origi_d0fbbcbb"
+msgstr "  Not: kriptografik doğrulama orijinal PDF dosyasını gerektirir.\n  İmza bütünlüğünü doğrulamak için PDF dosyasını ekleyin."
+
+msgid "gui.ok_upper"
+msgstr "Tamam"
+
+msgid "gui.org"
+msgstr "Kurum"
+
+msgid "gui.organization"
+msgstr "Kuruluş"
+
+msgid "gui.organization_label"
+msgstr "Kuruluş:"
+
+msgid "gui.output_opt_label"
+msgstr "Çıktı (isteğe bağlı):"
+
+msgid "gui.output_path_must_be_absolute_use_browse_to_select_a_location"
+msgstr "Çıktı yolu mutlak olmalıdır.\nBir konum seçmek için 'Gözat...' kullanın."
+
+msgid "gui.page_label"
+msgstr "Sayfa:"
+
+msgid "gui.password_label"
+msgstr "Parola:"
+
+msgid "gui.paste"
+msgstr "Yapıştır"
+
+msgid "gui.pdf_file_label"
+msgstr "PDF dosyası:"
+
+msgid "gui.pdf_files"
+msgstr "PDF dosyaları"
+
+msgid "gui.permission_denied_path_try_saving_to_a_different_l_51ac0570"
+msgstr "Erişim reddedildi:\n{path}\n\n'Gözat...' kullanarak farklı bir konuma\nkaydetmeyi deneyin."
+
+msgid "gui.permission_denied_path_try_selecting_the_file_agai_de400967"
+msgstr "Erişim reddedildi:\n{path}\n\nDosyayı 'Gözat...' kullanarak yeniden seçmeyi deneyin."
+
+msgid "gui.pkcs_7_signature"
+msgstr "PKCS#7 imzası"
+
+msgid "gui.pkcs_7_signatures"
+msgstr "PKCS#7 imzaları"
+
+msgid "gui.please_select_a_file_to_verify"
+msgstr "Lütfen doğrulanacak bir dosya seçin."
+
+msgid "gui.please_select_a_pdf_file"
+msgstr "Lütfen bir PDF dosyası seçin."
+
+msgid "gui.position_label"
+msgstr "Konum:"
+
+msgid "gui.ready"
+msgstr "Hazır"
+
+msgid "gui.report_a_bug"
+msgstr "Hata bildir"
+
+msgid "gui.request_rejected_by_server_contact_your_system_administrator"
+msgstr "İstek sunucu tarafından reddedildi. Sistem yöneticinizle iletişime geçin."
+
+msgid "gui.restart_the_app_to_apply_the_new_language"
+msgstr "Yeni dili uygulamak için uygulama yeniden başlatılsın mı?"
+
+msgid "gui.retry"
+msgstr "Yeniden dene"
+
+msgid "gui.save"
+msgstr "Kaydet"
+
+msgid "gui.save_credentials"
+msgstr "Kimlik bilgilerini kaydet"
+
+msgid "gui.save_credentials_username_password"
+msgstr "Kimlik bilgilerini kaydet (kullanıcı adı/parola)"
+
+msgid "gui.save_signature_as"
+msgstr "İmzayı farklı kaydet"
+
+msgid "gui.save_signed_pdf_as"
+msgstr "İmzalı PDF'i farklı kaydet"
+
+msgid "gui.saving_credentials_ellipsis"
+msgstr "Kimlik bilgileri kaydediliyor..."
+
+msgid "gui.secure_connection_failed_contact_your_system_administrator"
+msgstr "Güvenli bağlantı başarısız. Sistem yöneticinizle iletişime geçin."
+
+msgid "gui.select_a_cosign_server_label"
+msgstr "Bir CoSign sunucusu seçin:"
+
+msgid "gui.select_a_pdf_file_and_click_verify_to_check_signat_8fbc47f0"
+msgstr "Bir PDF dosyası seçin ve imzaları kontrol etmek için Doğrula'ya tıklayın.\n\nModlar:\n  Yalnızca PDF -- gömülü imzaları doğrula\n  PDF + .p7s -- ayrık imzayı doğrula\n  Yalnızca .p7s -- sertifikayı incele (kriptografik doğrulama yok)"
+
+msgid "gui.select_a_server"
+msgstr "Bir sunucu seçin."
+
+msgid "gui.select_all"
+msgstr "Tümünü Seç"
+
+msgid "gui.select_pdf"
+msgstr "PDF Seç"
+
+msgid "gui.select_pdf_to_verify"
+msgstr "Doğrulanacak PDF'i seç"
+
+msgid "gui.select_signature_file"
+msgstr "İmza dosyasını seç"
+
+msgid "gui.select_signature_image"
+msgstr "İmza görselini seç"
+
+msgid "gui.server_address_not_found_check_the_server_url"
+msgstr "Sunucu adresi bulunamadı. Sunucu URL'sini kontrol edin."
+
+msgid "gui.server_connected_log_in_to_sign_documents"
+msgstr "Sunucuya bağlanıldı.\nBelgeleri imzalamak için oturum açın."
+
+msgid "gui.server_error_error"
+msgstr "Sunucu hatası: {error}"
+
+msgid "gui.server_error_the_signing_service_may_be_temporaril_d8163695"
+msgstr "Sunucu hatası. İmzalama hizmeti geçici olarak kullanılamıyor olabilir."
+
+msgid "gui.server_is_not_available_it_may_be_down_for_maintenance"
+msgstr "Sunucu kullanılamıyor. Bakım nedeniyle kapalı olabilir."
+
+msgid "gui.server_is_not_responding_check_your_internet_conne_cd87621d"
+msgstr "Sunucu yanıt vermiyor. İnternet bağlantınızı kontrol edip yeniden deneyin."
+
+msgid "gui.server_verification"
+msgstr "Sunucu doğrulaması"
+
+msgid "gui.settings"
+msgstr "Ayarlar"
+
+msgid "gui.setup_complete_summary_label"
+msgstr "Kurulum tamamlandı! Özet:"
+
+msgid "gui.sign"
+msgstr "İmzala"
+
+msgid "gui.sign_detached"
+msgstr "İmzala (Ayrık)"
+
+msgid "gui.sign_pdf"
+msgstr "PDF'i İmzala"
+
+msgid "gui.signature"
+msgstr "İmza"
+
+msgid "gui.signature_current_total_signer"
+msgstr "İmza {current}/{total} ({signer})"
+
+msgid "gui.signature_failed"
+msgstr "İmza BAŞARISIZ"
+
+msgid "gui.signature_p7s_label"
+msgstr "İmza (.p7s):"
+
+msgid "gui.signature_valid"
+msgstr "İmza GEÇERLİ"
+
+msgid "gui.signed_filename_size"
+msgstr "İmzalandı! -> {filename} ({size})"
+
+msgid "gui.signed_time"
+msgstr "İmzalandı: {time}"
+
+msgid "gui.signer_identity"
+msgstr "İmzalayan Kimliği"
+
+msgid "gui.signer_identity_found_label"
+msgstr "İmzalayan kimliği bulundu:"
+
+msgid "gui.signer_identity_is_required_click_enter_manually_t_397d205e"
+msgstr "İmzalayan kimliği gereklidir. Girmek için 'Elle gir...' düğmesine tıklayın."
+
+msgid "gui.signer_identity_is_required_retry_the_connection_o_6eb0ccec"
+msgstr "İmzalayan kimliği gereklidir. Bağlantıyı yeniden deneyin veya kimlik bilgilerini düzeltmek için geri dönün."
+
+msgid "gui.signer_name"
+msgstr "İmzalayan: {name}"
+
+msgid "gui.signing_ellipsis"
+msgstr "İmzalanıyor..."
+
+msgid "gui.step_current_of_total"
+msgstr "Adım {current} / {total}"
+
+msgid "gui.storage_storage"
+msgstr "Depolama: {storage}"
+
+msgid "gui.system"
+msgstr "Sistem"
+
+msgid "gui.telegram"
+msgstr "Telegram"
+
+msgid "gui.this_pdf_is_size_mb_mb_files_over_30_mb_may_take_a_64b3d55a"
+msgstr "Bu PDF {size_mb} MB.\n\n30 MB üzerindeki dosyaların imzalanması uzun sürebilir\nveya sunucuda başarısız olabilir.\n\nDevam edilsin mi?"
+
+msgid "gui.this_will_also_remove_your_credentials_and_signer_identity"
+msgstr "Bu işlem kimlik bilgilerinizi ve imzalayan\nkimliğinizi de kaldıracaktır."
+
+msgid "gui.unavailable_error"
+msgstr "Kullanılamıyor: {error}"
+
+msgid "gui.undo"
+msgstr "Geri al"
+
+msgid "gui.unexpected_error_error"
+msgstr "Beklenmeyen hata: {error}"
+
+msgid "gui.url_label_upper"
+msgstr "URL:"
+
+msgid "gui.username_and_password_are_required"
+msgstr "Kullanıcı adı ve parola gereklidir."
+
+msgid "gui.username_label"
+msgstr "Kullanıcı adı:"
+
+msgid "gui.username_username"
+msgstr "Kullanıcı adı: {username}"
+
+msgid "gui.valid_upper"
+msgstr "GEÇERLİ"
+
+msgid "gui.verify"
+msgstr "Doğrula"
+
+msgid "gui.verify_signature"
+msgstr "İmza doğrulama"
+
+msgid "gui.verify_details_header"
+msgstr "Ayrıntılar:"
+
+msgid "gui.verify_integrity_failed"
+msgstr "Bütünlük kontrolü BAŞARISIZ"
+
+msgid "gui.verify_integrity_ok"
+msgstr "Tamam"
+
+msgid "gui.verify_org_label"
+msgstr "Kuruluş:"
+
+msgid "gui.verify_signature_label"
+msgstr "İmza:"
+
+msgid "gui.verify_signer_label"
+msgstr "İmzalayan:"
+
+msgid "gui.verify_trust_label"
+msgstr "Güven:"
+
+msgid "gui.verify_trust_not_checked"
+msgstr "Kontrol edilmedi"
+
+msgid "gui.verify_trust_not_trusted"
+msgstr "Genel güven listesinde değil"
+
+msgid "gui.verify_trust_partial"
+msgstr "Eşleşti ({anchor}), tam olarak doğrulanmadı"
+
+msgid "gui.verify_trust_trusted"
+msgstr "Güvenilir ({anchor})"
+
+msgid "gui.verifying_detached_signature_ellipsis"
+msgstr "Ayrık imza doğrulanıyor..."
+
+msgid "gui.verifying_ellipsis"
+msgstr "Doğrulanıyor..."
+
+msgid "gui.verifying_embedded_signatures_ellipsis"
+msgstr "Gömülü imzalar doğrulanıyor..."
+
+msgid "gui.version_version"
+msgstr "Sürüm {version}"
+
+msgid "gui.warning_account_locks_after_max_attempts_failed_attempts"
+msgstr "Uyarı: hesap {max_attempts} başarısız denemeden sonra kilitlenir!"
+
+msgid "gui.remove"
+msgstr "Kaldır"
+
+msgid "gui.sign_n_pdfs"
+msgstr "{n} PDF imzala"
+
+msgid "gui.batch_signing"
+msgstr "Toplu imzalama"
+
+msgid "gui.preparing_ellipsis"
+msgstr "Hazırlanıyor..."
+
+msgid "gui.signing_n_of_total_filename"
+msgstr "İmzalanıyor {n}/{total}: {filename}..."
+
+msgid "gui.batch_complete_succeeded_failed"
+msgstr "Toplu işlem tamamlandı: {succeeded} imzalandı, {failed} başarısız oldu."
+
+msgid "gui.cancelling_ellipsis"
+msgstr "İptal ediliyor..."
+
+msgid "gui.show_password"
+msgstr "Parolayı göster"
+
+msgid "gui.cert_validity_unknown"
+msgstr "Sertifika geçerliliği bilinmiyor"
+
+msgid "gui.cert_valid_range"
+msgstr "{start} - {end} ({days} gün kaldı)"
+
+msgid "gui.cert_expiring_soon_range"
+msgstr "{start} - {end} ({days} gün kaldı!)"
+
+msgid "gui.cert_expired_range"
+msgstr "SÜRESİ DOLMUŞ: {start} - {end} ({days} gün önce)"
+
+msgid "gui.pos_bottom_center"
+msgstr "Alt orta"
+
+msgid "gui.pos_bottom_left"
+msgstr "Alt sol"
+
+msgid "gui.pos_bottom_right"
+msgstr "Alt sağ"
+
+msgid "gui.pos_top_left"
+msgstr "Üst sol"
+
+msgid "gui.pos_top_right"
+msgstr "Üst sağ"
+
+msgid "gui.page_last"
+msgstr "Son"
+
+msgid "gui.page_first"
+msgstr "İlk"

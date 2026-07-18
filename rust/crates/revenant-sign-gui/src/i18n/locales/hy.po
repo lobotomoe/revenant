@@ -1,0 +1,791 @@
+# Revenant GUI -- Armenian translation
+# SPDX-License-Identifier: Apache-2.0
+#
+# NOTE: msgid values are stable keys used in GUI source code.
+msgid ""
+msgstr ""
+"Content-Type: text/plain; charset=UTF-8\n"
+"Content-Transfer-Encoding: 8bit\n"
+"Language: hy\n"
+
+#. EN: About Revenant
+msgid "gui.about_revenant"
+msgstr "Revenant-ի մասին"
+
+#. EN: Access denied. Your account may not have permission to sign.
+msgid "gui.access_denied_your_account_may_not_have_permission_to_sign"
+msgstr "Մուտքն արգելված է։ Հնարավոր է՝ ձեր հաշիվը չունի ստորագրման թույլտվություն։"
+
+#. EN: Account
+msgid "gui.account"
+msgstr "Հաշիվ"
+
+#. EN: All {count} signatures VALID
+msgid "gui.all_count_signatures_valid"
+msgstr "Բոլոր {count} ստորագրությունները ՎԱՎԵՐ են"
+
+#. EN: All files
+msgid "gui.all_files"
+msgstr "Բոլոր ֆայլերը"
+
+#. EN: Authentication failed: {error}
+msgid "gui.authentication_failed_error"
+msgstr "Նույնականացումը ձախողվեց: {error}"
+
+#. EN: Authentication rejected. Check your username and password.
+msgid "gui.authentication_rejected_check_your_username_and_password"
+msgstr "Նույնականացումը մերժվեց։ Ստուգեք օգտանունն ու գաղտնաբառը։"
+
+#. EN: Author: Aleksandr Kraiz
+msgid "gui.author_aleksandr_kraiz"
+msgstr "Հեղինակ՝ Aleksandr Kraiz"
+
+#. EN: Back
+msgid "gui.back"
+msgstr "Հետ"
+
+#. EN: Browse...
+msgid "gui.browse_ellipsis"
+msgstr "Զննել..."
+
+#. EN: Cancel
+msgid "gui.cancel"
+msgstr "Չեղարկել"
+
+#. EN: Cannot connect to the server. Check your internet connection.
+msgid "gui.cannot_connect_to_the_server_check_your_internet_connection"
+msgstr "Չհաջողվեց միանալ սերվերին։ Ստուգեք ինտերնետ կապը։"
+
+#. EN: Cannot read file: {error}
+msgid "gui.cannot_read_file_error"
+msgstr "Չհաջողվեց կարդալ ֆայլը: {error}"
+
+#. EN: Certificate inspection
+msgid "gui.certificate_inspection"
+msgstr "Վկայագրի ստուգում"
+
+#. EN: Certificate: {status}
+msgid "gui.certificate_status"
+msgstr "Վկայագիր: {status}"
+
+#. EN: Choose Server
+msgid "gui.choose_server"
+msgstr "Ընտրել սերվեր"
+
+#. EN: Clearing saved credentials...
+msgid "gui.clearing_saved_credentials_ellipsis"
+msgstr "Պահված հավատարմագրերը ջնջվում են..."
+
+#. EN: Close Window
+msgid "gui.close_window"
+msgstr "Փակել պատուհանը"
+
+#. EN: Complete
+msgid "gui.complete"
+msgstr "Ավարտված"
+
+#. EN: Connect
+msgid "gui.connect"
+msgstr "Միանալ"
+
+#. EN: Connect to a server\nto sign documents.
+msgid "gui.connect_to_a_server_to_sign_documents"
+msgstr "Միացեք սերվերին՝\nփաստաթղթեր ստորագրելու համար։"
+
+#. EN: Connect to Server
+msgid "gui.connect_to_server"
+msgstr "Միանալ սերվերին"
+
+#. EN: Connected ({info})
+msgid "gui.connected_info"
+msgstr "Միացված է ({info})"
+
+#. EN: Connecting to {url}...
+msgid "gui.connecting_to_url_ellipsis"
+msgstr "Միանում է {url}-ին..."
+
+#. EN: Copy
+msgid "gui.copy"
+msgstr "Պատճենել"
+
+#. EN: Could not determine identity from server.
+msgid "gui.could_not_determine_identity_from_server"
+msgstr "Չհաջողվեց սերվերից որոշել ստորագրողի ինքնությունը։"
+
+#. EN: Could not read password from system keychain.\nPlease re-enter your password.
+msgid "gui.could_not_read_password_from_system_keychain_pleas_a490f2d1"
+msgstr "Չհաջողվեց կարդալ գաղտնաբառը համակարգային պահոցից։\nԽնդրում ենք կրկին մուտքագրել գաղտնաբառը։"
+
+#. EN: Could not save password to system keychain\n(access was denied or unavailable).\n\nYour password
+#.     was saved to the config file instead.\nTo use secure storage, allow keychain access\nwhen
+#.     prompted.
+msgid "gui.could_not_save_password_to_system_keychain_access_04b14699"
+msgstr "Չհաջողվեց պահել գաղտնաբառը համակարգային պահոցում\n(մուտքը մերժված է կամ անհասանելի)։\n\nԳաղտնաբառը պահվեց կազմաձևման ֆայլում։\nԱպահով պահոց օգտագործելու համար\nթույլ տվեք մուտք, երբ հարցնեն։"
+
+#. EN: Credentials
+msgid "gui.credentials"
+msgstr "Հավատարմագրեր"
+
+#. EN: Credentials must contain only Latin characters.\nPlease check your keyboard layout.
+msgid "gui.credentials_must_contain_only_latin_characters_ple_e9a0742d"
+msgstr "Հավատարմագրերը պետք է պարունակեն միայն լատինատառ նիշեր։\nՍտուգեք ձեր ստեղնաշարի դասավորությունը։"
+
+#. EN: Cross-platform client for ARX CoSign\nelectronic signatures.
+msgid "gui.cross_platform_client_for_arx_cosign_electronic_signatures"
+msgstr "Բազմապլատֆորմ հաճախորդ ARX CoSign\nէլեկտրոնային ստորագրությունների համար։"
+
+#. EN: Custom server
+msgid "gui.custom_server"
+msgstr "Հատուկ սերվեր"
+
+#. EN: Cut
+msgid "gui.cut"
+msgstr "Կտրել"
+
+#. EN: Detached (.p7s)
+msgid "gui.detached_p7s"
+msgstr "Անջատված (.p7s)"
+
+#. EN: Detached signature
+msgid "gui.detached_signature"
+msgstr "Անջատված ստորագրություն"
+
+#. EN: Disconnect
+msgid "gui.disconnect"
+msgstr "Անջատվել"
+
+#. EN: Disconnect from {name}?
+msgid "gui.disconnect_from_name"
+msgstr "Անջատվե՞լ {name}-ից։"
+
+#. EN: Disconnecting...
+msgid "gui.disconnecting_ellipsis"
+msgstr "Անջատվում ենք..."
+
+#. EN: Discovering signer identity...
+msgid "gui.discovering_signer_identity_ellipsis"
+msgstr "Ստորագրողի ինքնությունը որոշվում է..."
+
+#. EN: Edit
+msgid "gui.edit"
+msgstr "Խմբագրել"
+
+#. EN: Email
+msgid "gui.email"
+msgstr "Էլ. փոստ"
+
+#. EN: Email:
+msgid "gui.email_label"
+msgstr "Էլ. փոստ:"
+
+#. EN: Embedded
+msgid "gui.embedded"
+msgstr "Ներդրված"
+
+#. EN: Embedded signatures
+msgid "gui.embedded_signatures"
+msgstr "Ներդրված ստորագրություններ"
+
+#. EN: Enter a server URL.
+msgid "gui.enter_a_server_url"
+msgstr "Մուտքագրեք սերվերի URL-ը։"
+
+#. EN: Enter manually...
+msgid "gui.enter_manually_ellipsis"
+msgstr "Մուտքագրել ձեռքով..."
+
+#. EN: Enter signer identity:
+msgid "gui.enter_signer_identity_label"
+msgstr "Մուտքագրեք ստորագրողի տվյալները:"
+
+#. EN: Error: {error}
+msgid "gui.error_error"
+msgstr "Սխալ: {error}"
+
+#. EN: Failed
+msgid "gui.failed"
+msgstr "Ձախողվեց"
+
+#. EN: Failed: {info}
+msgid "gui.failed_info"
+msgstr "Ձախողվեց: {info}"
+
+#. EN: {failed} of {total} signature(s) FAILED
+msgid "gui.failed_of_total_signature_s_failed"
+msgstr "{total}-ից {failed} ստորագրություն(ներ) ԱՆՎԱՎԵՐ ԵՆ"
+
+#. EN: FAILED
+msgid "gui.failed_upper"
+msgstr "ԱՆՎԱՎԵՐ"
+
+#. EN: File
+msgid "gui.file"
+msgstr "Ֆայլ"
+
+#. EN: File already exists:\n{filename}\n\nOverwrite?
+msgid "gui.file_already_exists_filename_overwrite"
+msgstr "Ֆայլն արդեն գոյություն ունի:\n{filename}\n\nՎերագրե՞լ։"
+
+#. EN: File not found:\n{path}
+msgid "gui.file_not_found_path"
+msgstr "Ֆայլը չի գտնվել:\n{path}"
+
+#. EN: Font:
+msgid "gui.font_label"
+msgstr "Տառատեսակ:"
+
+#. EN: GitHub
+msgid "gui.github"
+msgstr "GitHub"
+
+#. EN: Image (opt):
+msgid "gui.image_opt_label"
+msgstr "Պատկեր (ըստ ցանկության):"
+
+#. EN: Images
+msgid "gui.images"
+msgstr "Պատկերներ"
+
+#. EN: Inspecting signature...
+msgid "gui.inspecting_signature_ellipsis"
+msgstr "Ստորագրությունը ստուգվում է..."
+
+#. EN: Invisible signature
+msgid "gui.invisible_signature"
+msgstr "Անտեսանելի ստորագրություն"
+
+#. EN: Reason:
+msgid "gui.reason_label"
+msgstr "Պատճառ:"
+
+#. EN: Invalid page specification
+msgid "gui.invalid_page_specification"
+msgstr "Էջի անվավեր նշում"
+
+#. EN: Language:
+msgid "gui.language_label"
+msgstr "Լեզու:"
+
+#. EN: License: Apache 2.0
+msgid "gui.license_apache_2_0"
+msgstr "Լիցենզիա: Apache 2.0"
+
+#. EN: Loading credentials...
+msgid "gui.loading_credentials_ellipsis"
+msgstr "Հավատարմագրերը բեռնվում են..."
+
+#. EN: Loading saved credentials...
+msgid "gui.loading_saved_credentials_ellipsis"
+msgstr "Պահված հավատարմագրերը բեռնվում են..."
+
+#. EN: Log In
+msgid "gui.log_in"
+msgstr "Մուտք գործել"
+
+#. EN: Log Out
+msgid "gui.log_out"
+msgstr "Դուրս գալ"
+
+#. EN: Log out?\nServer connection will be preserved.
+msgid "gui.log_out_server_connection_will_be_preserved"
+msgstr "Դուրս գա՞լ հաշվից։\nՍերվերի կապը կպահպանվի։"
+
+#. EN: Logging out...
+msgid "gui.logging_out_ellipsis"
+msgstr "Հաշվից դուրս գալ..."
+
+#. EN: Login
+msgid "gui.login"
+msgstr "Մուտք"
+
+#. EN: Name
+msgid "gui.name"
+msgstr "Անուն"
+
+#. EN: Name is required.
+msgid "gui.name_is_required"
+msgstr "Անունը պարտադիր է։"
+
+#. EN: Name (required):
+msgid "gui.name_required_label"
+msgstr "Անուն (պարտադիր):"
+
+#. EN: Next
+msgid "gui.next"
+msgstr "Հաջորդ"
+
+#. EN: No server configured
+msgid "gui.no_server_configured"
+msgstr "Սերվեր կազմաձևված չէ"
+
+#. EN: No server configured.\nClick 'Setup...' to configure.
+msgid "gui.no_server_configured_click_setup_to_configure"
+msgstr "Սերվեր կազմաձևված չէ։\nԿազմաձևելու համար սեղմեք «Կարգավորել...»։"
+
+#. EN: (no signer)
+msgid "gui.no_signer"
+msgstr "(ստորագրող չկա)"
+
+#. EN:   Note: cryptographic verification requires the original PDF.\n  Add the PDF to verify the
+#.     signature integrity.
+msgid "gui.note_cryptographic_verification_requires_the_origi_d0fbbcbb"
+msgstr "  Ծածկագրական ստուգումը պահանջում է բնօրինակ PDF-ը։\n  Ավելացրեք PDF-ը ստորագրության ամբողջականությունը ստուգելու համար։"
+
+#. EN: OK
+msgid "gui.ok_upper"
+msgstr "OK"
+
+#. EN: Org
+msgid "gui.org"
+msgstr "Կազմ."
+
+#. EN: Organization
+msgid "gui.organization"
+msgstr "Կազմակերպություն"
+
+#. EN: Organization:
+msgid "gui.organization_label"
+msgstr "Կազմակերպություն:"
+
+#. EN: Output (opt):
+msgid "gui.output_opt_label"
+msgstr "Արդյունք (ըստ ցանկության):"
+
+#. EN: Output path must be absolute.\nUse 'Browse...' to select a location.
+msgid "gui.output_path_must_be_absolute_use_browse_to_select_a_location"
+msgstr "Ելքային ճանապարհը պետք է բացարձակ լինի։\nՏեղ ընտրելու համար սեղմեք «Թերթել...»։"
+
+#. EN: Page:
+msgid "gui.page_label"
+msgstr "Էջ:"
+
+#. EN: Password:
+msgid "gui.password_label"
+msgstr "Գաղտնաբառ:"
+
+#. EN: Paste
+msgid "gui.paste"
+msgstr "Տեղադրել"
+
+#. EN: PDF file:
+msgid "gui.pdf_file_label"
+msgstr "PDF ֆայլ:"
+
+#. EN: PDF files
+msgid "gui.pdf_files"
+msgstr "PDF ֆայլեր"
+
+#. EN: Permission denied:\n{path}\n\nTry saving to a different location\nusing 'Browse...'.
+msgid "gui.permission_denied_path_try_saving_to_a_different_l_51ac0570"
+msgstr "Մուտքն արգելված է:\n{path}\n\nՓորձեք պահել այլ տեղ՝\n«Թերթել...» կոճակի միջոցով։"
+
+#. EN: Permission denied:\n{path}\n\nTry selecting the file again using 'Browse...'.
+msgid "gui.permission_denied_path_try_selecting_the_file_agai_de400967"
+msgstr "Մուտքն արգելված է:\n{path}\n\nՓորձեք կրկին ընտրել ֆայլը «Թերթել...» կոճակի միջոցով։"
+
+#. EN: PKCS#7 signature
+msgid "gui.pkcs_7_signature"
+msgstr "PKCS#7 ստորագրություն"
+
+#. EN: PKCS#7 signatures
+msgid "gui.pkcs_7_signatures"
+msgstr "PKCS#7 ստորագրություններ"
+
+#. EN: Please select a file to verify.
+msgid "gui.please_select_a_file_to_verify"
+msgstr "Խնդրում ենք ընտրել ստուգման ֆայլ։"
+
+#. EN: Please select a PDF file.
+msgid "gui.please_select_a_pdf_file"
+msgstr "Խնդրում ենք ընտրել PDF ֆայլ։"
+
+#. EN: Position:
+msgid "gui.position_label"
+msgstr "Դիրք:"
+
+#. EN: Ready
+msgid "gui.ready"
+msgstr "Պատրաստ"
+
+#. EN: Report a Bug
+msgid "gui.report_a_bug"
+msgstr "Հաղորդել սխալի մասին"
+
+#. EN: Request rejected by server. Contact your system administrator.
+msgid "gui.request_rejected_by_server_contact_your_system_administrator"
+msgstr "Հարցումը մերժվեց սերվերի կողմից։ Դիմեք ձեր համակարգի ադմինիստրատորին։"
+
+#. EN: Restart the app to apply the new language?
+msgid "gui.restart_the_app_to_apply_the_new_language"
+msgstr "Վերագործարկե՞լ հավելվածը՝ նոր լեզուն կիրառելու համար։"
+
+#. EN: Retry
+msgid "gui.retry"
+msgstr "Կրկնել"
+
+#. EN: Save
+msgid "gui.save"
+msgstr "Պահպանել"
+
+#. EN: Save credentials
+msgid "gui.save_credentials"
+msgstr "Պահպանել հավատարմագրերը"
+
+#. EN: Save credentials (username/password)
+msgid "gui.save_credentials_username_password"
+msgstr "Պահպանել հավատարմագրերը (օգտանուն/գաղտնաբառ)"
+
+#. EN: Save signature as
+msgid "gui.save_signature_as"
+msgstr "Պահպանել ստորագրությունը որպես"
+
+#. EN: Save signed PDF as
+msgid "gui.save_signed_pdf_as"
+msgstr "Պահպանել ստորագրված PDF-ը որպես"
+
+#. EN: Saving credentials...
+msgid "gui.saving_credentials_ellipsis"
+msgstr "Հավատարմագրերը պահպանվում են..."
+
+#. EN: Secure connection failed. Contact your system administrator.
+msgid "gui.secure_connection_failed_contact_your_system_administrator"
+msgstr "Անվտանգ կապը ձախողվեց։ Դիմեք ձեր համակարգի ադմինիստրատորին։"
+
+#. EN: Select a CoSign server:
+msgid "gui.select_a_cosign_server_label"
+msgstr "Ընտրեք CoSign սերվերը:"
+
+#. EN: Select a PDF file and click Verify to check signatures.\n\nModes:\n  PDF only -- verify embedded
+#.     signatures\n  PDF + .p7s -- verify detached signature\n  .p7s only -- inspect certificate (no
+#.     crypto verification)
+msgid "gui.select_a_pdf_file_and_click_verify_to_check_signat_8fbc47f0"
+msgstr "Ընտրեք PDF ֆայլ և սեղմեք «Ստուգել»՝ ստորագրությունները ստուգելու համար։\n\nՌեժիմներ:\n  Միայն PDF -- ներդրված ստորագրությունների ստուգում\n  PDF + .p7s -- անջատված ստորագրության ստուգում\n  Միայն .p7s -- վկայագրի դիտում (առանց ծածկագրային ստուգման)"
+
+#. EN: Select a server.
+msgid "gui.select_a_server"
+msgstr "Ընտրեք սերվեր։"
+
+#. EN: Select All
+msgid "gui.select_all"
+msgstr "Ընտրել բոլորը"
+
+#. EN: Select PDF
+msgid "gui.select_pdf"
+msgstr "Ընտրել PDF"
+
+#. EN: Select PDF to verify
+msgid "gui.select_pdf_to_verify"
+msgstr "Ընտրել PDF ստուգման համար"
+
+#. EN: Select signature file
+msgid "gui.select_signature_file"
+msgstr "Ընտրել ստորագրության ֆայլ"
+
+#. EN: Select signature image
+msgid "gui.select_signature_image"
+msgstr "Ընտրել ստորագրության պատկեր"
+
+#. EN: Server address not found. Check the server URL.
+msgid "gui.server_address_not_found_check_the_server_url"
+msgstr "Սերվերի հասցեն չի գտնվել։ Ստուգեք սերվերի URL-ը։"
+
+#. EN: Server connected.\nLog in to sign documents.
+msgid "gui.server_connected_log_in_to_sign_documents"
+msgstr "Սերվերը միացված է։\nՄուտք գործեք՝ փաստաթղթեր ստորագրելու համար։"
+
+#. EN: Server error: {error}
+msgid "gui.server_error_error"
+msgstr "Սերվերի սխալ: {error}"
+
+#. EN: Server error. The signing service may be temporarily unavailable.
+msgid "gui.server_error_the_signing_service_may_be_temporaril_d8163695"
+msgstr "Սերվերի սխալ։ Ստորագրման ծառայությունը կարող է ժամանակավորապես անհասանելի լինել։"
+
+#. EN: Server is not available. It may be down for maintenance.
+msgid "gui.server_is_not_available_it_may_be_down_for_maintenance"
+msgstr "Սերվերն անհասանելի է։ Հնարավոր է՝ կատարվում է սպասարկում։"
+
+#. EN: Server is not responding. Check your internet connection and try again.
+msgid "gui.server_is_not_responding_check_your_internet_conne_cd87621d"
+msgstr "Սերվերը չի արձագանքում։ Ստուգեք ինտերնետ կապը և կրկնեք փորձը։"
+
+#. EN: Server verification
+msgid "gui.server_verification"
+msgstr "Սերվերային ստուգում"
+
+#. EN: Settings
+msgid "gui.settings"
+msgstr "Կարգավորումներ"
+
+#. EN: Setup complete! Summary:
+msgid "gui.setup_complete_summary_label"
+msgstr "Կարգավորումն ավարտված է։ Ամփոփում:"
+
+#. EN: Sign
+msgid "gui.sign"
+msgstr "Ստորագրել"
+
+#. EN: Sign (Detached)
+msgid "gui.sign_detached"
+msgstr "Ստորագրել (անջատված)"
+
+#. EN: Sign PDF
+msgid "gui.sign_pdf"
+msgstr "Ստորագրել PDF"
+
+#. EN: Signature
+msgid "gui.signature"
+msgstr "Ստորագրություն"
+
+#. EN: Signature {current}/{total} ({signer})
+msgid "gui.signature_current_total_signer"
+msgstr "Ստորագրություն {current}/{total} ({signer})"
+
+#. EN: Signature FAILED
+msgid "gui.signature_failed"
+msgstr "Ստորագրությունը ԱՆՎԱՎԵՐ է"
+
+#. EN: Signature (.p7s):
+msgid "gui.signature_p7s_label"
+msgstr "Ստորագրություն (.p7s):"
+
+#. EN: Signature VALID
+msgid "gui.signature_valid"
+msgstr "Ստորագրությունը ՎԱՎԵՐ է"
+
+#. EN: Signed! -> {filename} ({size})
+msgid "gui.signed_filename_size"
+msgstr "Ստորագրված է! -> {filename} ({size})"
+
+#. EN: Signed: {time}
+msgid "gui.signed_time"
+msgstr "Ստորագրված: {time}"
+
+#. EN: Signer Identity
+msgid "gui.signer_identity"
+msgstr "Ստորագրողի ինքնություն"
+
+#. EN: Signer identity found:
+msgid "gui.signer_identity_found_label"
+msgstr "Ստորագրողի ինքնությունը որոշվեց:"
+
+#. EN: Signer identity is required. Click 'Enter manually...' to provide it.
+msgid "gui.signer_identity_is_required_click_enter_manually_t_397d205e"
+msgstr "Ստորագրողի ինքնությունը պարտադիր է։ Այն նշելու համար սեղմեք «Մուտքագրել ձեռքով...»։"
+
+#. EN: Signer identity is required. Retry the connection or go back to fix credentials.
+msgid "gui.signer_identity_is_required_retry_the_connection_o_6eb0ccec"
+msgstr "Ստորագրողի ինքնությունը պարտադիր է։ Կրկին փորձեք միանալ կամ վերադարձեք՝ հավատարմագրերը շտկելու համար։"
+
+#. EN: Signer: {name}
+msgid "gui.signer_name"
+msgstr "Ստորագրող: {name}"
+
+#. EN: Signing...
+msgid "gui.signing_ellipsis"
+msgstr "Ստորագրում..."
+
+#. EN: Step {current} of {total}
+msgid "gui.step_current_of_total"
+msgstr "Քայլ {current} / {total}"
+
+#. EN: Storage: {storage}
+msgid "gui.storage_storage"
+msgstr "Պահոց: {storage}"
+
+#. EN: System
+msgid "gui.system"
+msgstr "Համակարգ"
+
+#. EN: Telegram
+msgid "gui.telegram"
+msgstr "Telegram"
+
+#. EN: This PDF is {size_mb} MB.\n\nFiles over 30 MB may take a long time to sign\nor fail on the
+#.     server.\n\nContinue?
+msgid "gui.this_pdf_is_size_mb_mb_files_over_30_mb_may_take_a_64b3d55a"
+msgstr "PDF-ի չափը՝ {size_mb} ՄԲ։\n\n30 ՄԲ-ից մեծ ֆայլերը կարող են երկար ժամանակ ստորագրվել\nկամ սերվերում սխալ առաջացնել։\n\nՇարունակե՞լ։"
+
+#. EN: This will also remove your credentials\nand signer identity.
+msgid "gui.this_will_also_remove_your_credentials_and_signer_identity"
+msgstr "Հավատարմագրերն ու ստորագրողի ինքնությունը\nնույնպես կհեռացվեն։"
+
+#. EN: Unavailable: {error}
+msgid "gui.unavailable_error"
+msgstr "Անհասանելի: {error}"
+
+#. EN: Undo
+msgid "gui.undo"
+msgstr "Հետարկել"
+
+#. EN: Unexpected error: {error}
+msgid "gui.unexpected_error_error"
+msgstr "Անսպասելի սխալ: {error}"
+
+#. EN: URL:
+msgid "gui.url_label_upper"
+msgstr "URL:"
+
+#. EN: Username and password are required.
+msgid "gui.username_and_password_are_required"
+msgstr "Մուտքագրեք օգտանունն ու գաղտնաբառը։"
+
+#. EN: Username:
+msgid "gui.username_label"
+msgstr "Օգտանուն:"
+
+#. EN: Username: {username}
+msgid "gui.username_username"
+msgstr "Օգտանուն: {username}"
+
+#. EN: VALID
+msgid "gui.valid_upper"
+msgstr "ՎԱՎԵՐ"
+
+#. EN: Verify
+msgid "gui.verify"
+msgstr "Ստուգել"
+
+#. EN: Verify Signature
+msgid "gui.verify_signature"
+msgstr "Ստորագրության ստուգում"
+
+#. EN: Details:
+msgid "gui.verify_details_header"
+msgstr "Մանրամասներ:"
+
+#. EN: Integrity check FAILED
+msgid "gui.verify_integrity_failed"
+msgstr "Ամբողջականության ստուգումը ԱՆՀԱՋՈՂ"
+
+#. EN: OK
+msgid "gui.verify_integrity_ok"
+msgstr "OK"
+
+#. EN: Organization:
+msgid "gui.verify_org_label"
+msgstr "Կազմակերպություն:"
+
+#. EN: Signature:
+msgid "gui.verify_signature_label"
+msgstr "Ստորագրություն:"
+
+#. EN: Signer:
+msgid "gui.verify_signer_label"
+msgstr "Ստորագրող:"
+
+#. EN: Trust:
+msgid "gui.verify_trust_label"
+msgstr "Վստահություն:"
+
+#. EN: Not checked
+msgid "gui.verify_trust_not_checked"
+msgstr "Չստուգված"
+
+#. EN: Not publicly trusted
+msgid "gui.verify_trust_not_trusted"
+msgstr "Հանրային վստահություն չկա"
+
+#. EN: Matched ({anchor}), not fully verified
+msgid "gui.verify_trust_partial"
+msgstr "Համապատասխանում ({anchor}), ոչ լիովին ստուգված"
+
+#. EN: Trusted ({anchor})
+msgid "gui.verify_trust_trusted"
+msgstr "Վստահելի ({anchor})"
+
+#. EN: Verifying detached signature...
+msgid "gui.verifying_detached_signature_ellipsis"
+msgstr "Անջատված ստորագրությունը ստուգվում է..."
+
+#. EN: Verifying...
+msgid "gui.verifying_ellipsis"
+msgstr "Ստուգում..."
+
+#. EN: Verifying embedded signatures...
+msgid "gui.verifying_embedded_signatures_ellipsis"
+msgstr "Ներդրված ստորագրությունները ստուգվում են..."
+
+#. EN: Version {version}
+msgid "gui.version_version"
+msgstr "Տարբերակ {version}"
+
+#. EN: Warning: account locks after {max_attempts} failed attempts!
+msgid "gui.warning_account_locks_after_max_attempts_failed_attempts"
+msgstr "Զգուշացում. Հաշիվը կարգելափակվի {max_attempts} անհաջող փորձից հետո!"
+
+#. EN: Remove
+msgid "gui.remove"
+msgstr "Հեռացնել"
+
+#. EN: Sign {n} PDFs
+msgid "gui.sign_n_pdfs"
+msgstr "Ստորագրել {n} PDF"
+
+#. EN: Batch Signing
+msgid "gui.batch_signing"
+msgstr "Խմբային ստորագրում"
+
+#. EN: Preparing...
+msgid "gui.preparing_ellipsis"
+msgstr "Նախապատրաստում..."
+
+#. EN: Signing {n}/{total}: {filename}...
+msgid "gui.signing_n_of_total_filename"
+msgstr "Ստորագրում {n}/{total}: {filename}..."
+
+#. EN: Batch complete: {succeeded} signed, {failed} failed.
+msgid "gui.batch_complete_succeeded_failed"
+msgstr "Ավարտված: {succeeded} ստորագրված, {failed} ձախողված:"
+
+#. EN: Cancelling...
+msgid "gui.cancelling_ellipsis"
+msgstr "Չեղարկում..."
+
+#. EN: Show password
+msgid "gui.show_password"
+msgstr "Ցույց տալ գաղտնաբառը"
+
+#. EN: Certificate validity unknown
+msgid "gui.cert_validity_unknown"
+msgstr "Վկայագրի վավերականությունն անհայտ է"
+
+#. EN: {start} - {end} ({days} days remaining)
+msgid "gui.cert_valid_range"
+msgstr "{start} - {end} ({days} օր մնացել է)"
+
+#. EN: {start} - {end} ({days} days left!)
+msgid "gui.cert_expiring_soon_range"
+msgstr "{start} - {end} ({days} օր մնացել է!)"
+
+#. EN: EXPIRED: {start} - {end} ({days} days ago)
+msgid "gui.cert_expired_range"
+msgstr "ԺԱՄԿԵՏՆ ԱՆՑԱԾ: {start} - {end} ({days} օր առաջ)"
+
+#. EN: Bottom center
+msgid "gui.pos_bottom_center"
+msgstr "Ներքև կենտրոն"
+
+#. EN: Bottom left
+msgid "gui.pos_bottom_left"
+msgstr "Ներքև ձախ"
+
+#. EN: Bottom right
+msgid "gui.pos_bottom_right"
+msgstr "Ներքև աջ"
+
+#. EN: Top left
+msgid "gui.pos_top_left"
+msgstr "Վերև ձախ"
+
+#. EN: Top right
+msgid "gui.pos_top_right"
+msgstr "Վերև աջ"
+
+#. EN: Last
+msgid "gui.page_last"
+msgstr "Վերջին"
+
+#. EN: First
+msgid "gui.page_first"
+msgstr "Առաջին"
