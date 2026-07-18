@@ -249,11 +249,15 @@ pub fn compute_sig_rect(
         Vertical::Top => page_height - margin_v - sig_h,
     };
 
-    if x < 0.0 || y < 0.0 {
+    // The stamp must fit entirely within the page. A non-negative origin is not
+    // sufficient: a fixed-size stamp on a very small page can clear the near edge
+    // yet overrun the far one (e.g. a multi-line stamp taller than a short page
+    // overflows the top edge, which a `y < 0` check alone misses). Check all four
+    // bounds so such a page is rejected rather than emitting a clipped appearance.
+    if x < 0.0 || y < 0.0 || x + sig_w > page_width || y + sig_h > page_height {
         return Err(RevenantError::Pdf(format!(
-            "Signature does not fit on page: computed position ({x:.1}, {y:.1}) is negative. \
-             Page: {page_width:.0}x{page_height:.0} pt, \
-             signature: {sig_w:.0}x{sig_h:.0} pt, \
+            "Signature does not fit on page: rect ({x:.1}, {y:.1}) size {sig_w:.0}x{sig_h:.0} pt \
+             exceeds the page. Page: {page_width:.0}x{page_height:.0} pt, \
              margins: {margin_h:.0}x{margin_v:.0} pt"
         )));
     }
@@ -350,6 +354,25 @@ mod tests {
             100.0,
             100.0,
             Position::BottomRight,
+            SIG_WIDTH,
+            SIG_HEIGHT,
+            SIG_MARGIN_H,
+            SIG_MARGIN_V,
+        )
+        .unwrap_err();
+        assert!(err.to_string().contains("does not fit"), "{err}");
+    }
+
+    #[test]
+    fn rejects_stamp_overrunning_far_edge() {
+        // The near edges clear (x = margin >= 0, y = margin >= 0) but the stamp
+        // is taller than the short page, so it overruns the top edge. A
+        // `x < 0 || y < 0` check alone would wrongly accept this and emit a
+        // clipped appearance; the full bounds check must reject it.
+        let err = compute_sig_rect(
+            250.0,
+            100.0,
+            Position::BottomLeft,
             SIG_WIDTH,
             SIG_HEIGHT,
             SIG_MARGIN_H,
