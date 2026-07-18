@@ -10,6 +10,8 @@ use std::sync::mpsc::{self, Receiver, Sender};
 use std::thread;
 
 use eframe::egui;
+use revenant_sign_core::net::ServerVerifyResult;
+use revenant_sign_core::pdf::VerificationResult;
 use revenant_sign_core::pki::CertInfo;
 
 /// Outcome of a background signer-identity discovery. Errors are pre-classified
@@ -35,6 +37,19 @@ pub(crate) enum SignedOutcome {
     Failed(String),
 }
 
+/// Outcome of a background verification job.
+pub(crate) enum VerifyOutcome {
+    /// The input file could not be read.
+    ReadError(String),
+    /// Verification ran. `local` holds the offline per-signature results (or an
+    /// error such as "no embedded signatures"); `server` holds the server-side
+    /// verdict when a server is configured.
+    Done {
+        local: Result<Vec<VerificationResult>, String>,
+        server: Option<ServerVerifyResult>,
+    },
+}
+
 /// Result of a completed background job, tagged so the UI thread can route it.
 pub(crate) enum WorkerMsg {
     /// A server ping finished: whether it succeeded and a human-readable detail.
@@ -43,6 +58,8 @@ pub(crate) enum WorkerMsg {
     Identity(IdentityOutcome),
     /// A signing job finished.
     Signed(SignedOutcome),
+    /// A verification job finished.
+    Verified(VerifyOutcome),
 }
 
 /// Owns the channel between background jobs and the UI thread.
