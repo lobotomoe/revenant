@@ -8,9 +8,13 @@ license.workspace = true
 authors.workspace = true
 repository.workspace = true
 homepage.workspace = true
+documentation = "https://docs.rs/revenant-core"
+readme = "README.md"
+keywords = ["signature", "pdf", "cms", "pkcs7", "cosign"]
+categories = ["cryptography", "authentication"]
 
 [dependencies]
-revenant-legacy-tls = { path = "../revenant-legacy-tls" }
+revenant-legacy-tls = { path = "../revenant-legacy-tls", version = "0.1.0" }
 
 # ASN.1 / X.509 / CMS
 der.workspace = true

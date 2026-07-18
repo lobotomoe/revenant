@@ -9,6 +9,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- **Rust port: a library plus a `revenant` CLI, published as three crates.**
+  A new idiomatic Rust implementation targeting the same surface as the Python
+  and TypeScript ports (no GUI):
+  - `revenant-legacy-tls` — from-scratch TLS 1.0 + RC4-MD5 client for the
+    legacy CoSign appliances (EKENG's `ca.gov.am`) that no maintained Rust TLS
+    library can reach, mirroring `tlslite-ng` / `node-forge`.
+  - `revenant-core` — the client library: config and credential storage, the
+    CoSign DSS SOAP client with auto-detecting transport, CMS extraction,
+    PDF signature preparation / embedding / verification, and TSL-based
+    certificate-chain validation.
+  - `revenant-cli` — the `revenant` binary (`sign`, `verify`, `check`, `info`,
+    `cert`, `setup`, `logout`, `reset`), a thin front-end over `revenant-core`.
 - **Three new GUI languages: Turkish (tr), Georgian (ka), and Persian (fa).**
   The desktop app now ships in six languages. Persian is right-to-left;
   text in labels, messages, and input fields is right-aligned automatically

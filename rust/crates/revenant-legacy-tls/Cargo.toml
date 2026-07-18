@@ -7,6 +7,10 @@ rust-version.workspace = true
 license.workspace = true
 authors.workspace = true
 repository.workspace = true
+documentation = "https://docs.rs/revenant-legacy-tls"
+readme = "README.md"
+keywords = ["tls", "rc4", "legacy", "handshake"]
+categories = ["cryptography", "network-programming"]
 
 # This crate is deliberately self-contained and knows nothing about Revenant,
 # SOAP, or CoSign. It implements the minimal RFC 2246 (TLS 1.0) handshake and
