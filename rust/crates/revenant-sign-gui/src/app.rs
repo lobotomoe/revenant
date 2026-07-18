@@ -7,6 +7,7 @@
 //! results are folded back in on the UI thread.
 
 use std::path::{Path, PathBuf};
+use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::Arc;
 use std::time::Duration;
 
@@ -31,7 +32,7 @@ use crate::views::{
     self, ConnectAction, ConnectState, LoginAction, LoginState, SettingsAction, SignAction,
     SignForm, VerifyAction, VerifyState,
 };
-use crate::worker::{IdentityOutcome, SignedOutcome, VerifyOutcome, Worker, WorkerMsg};
+use crate::worker::{Emit, IdentityOutcome, SignedOutcome, VerifyOutcome, Worker, WorkerMsg};
 
 /// PDF extension accepted by the file picker and drag-and-drop.
 const PDF_EXTENSION: &str = "pdf";
@@ -65,6 +66,9 @@ pub(crate) struct RevenantApp {
     login: Option<LoginState>,
     sign_form: SignForm,
     verify: VerifyState,
+    /// Set to request cancellation of the in-progress batch (checked between
+    /// files by the worker).
+    batch_cancel: Arc<AtomicBool>,
 }
 
 impl RevenantApp {
@@ -92,6 +96,7 @@ impl RevenantApp {
             login: None,
             sign_form: SignForm::new(default_font),
             verify: VerifyState::new(),
+            batch_cancel: Arc::new(AtomicBool::new(false)),
         }
     }
 
@@ -111,6 +116,16 @@ impl RevenantApp {
                 WorkerMsg::Identity(outcome) => self.on_identity_result(outcome),
                 WorkerMsg::Signed(outcome) => self.on_signed(outcome),
                 WorkerMsg::Verified(outcome) => self.on_verified(outcome),
+                WorkerMsg::BatchProgress {
+                    current,
+                    total,
+                    filename,
+                } => self.sign_form.on_batch_progress(current, total, filename),
+                WorkerMsg::BatchDone {
+                    succeeded,
+                    failed,
+                    aborted,
+                } => self.on_batch_done(succeeded, failed, aborted),
             }
         }
     }
@@ -239,13 +254,14 @@ impl RevenantApp {
             .set_session_credentials(login.username().to_owned(), login.password().to_owned());
     }
 
-    /// Native picker for the input PDF (blocking, on the UI thread as required).
+    /// Native picker for the input PDF(s) (blocking, on the UI thread as
+    /// required). Multiple selections switch the form to batch mode.
     fn browse_pdf(&mut self) {
-        if let Some(path) = rfd::FileDialog::new()
+        if let Some(paths) = rfd::FileDialog::new()
             .add_filter(self.l10n.t("gui.pdf_files"), &[PDF_EXTENSION])
-            .pick_file()
+            .pick_files()
         {
-            self.sign_form.set_pdf(&path);
+            self.sign_form.set_files(paths);
         }
     }
 
@@ -273,21 +289,27 @@ impl RevenantApp {
         }
     }
 
-    /// Accept a PDF dropped anywhere on the window (the drag-and-drop entry
-    /// point the Python client lacks). The file loads into the active tab's
-    /// input. The first dropped PDF wins; batch drops arrive in a later phase.
+    /// Accept PDFs dropped anywhere on the window (the drag-and-drop entry point
+    /// the Python client lacks). Files load into the active tab's input; the
+    /// Sign tab accepts several at once (batch), the Verify tab takes the first.
     fn handle_dropped_files(&mut self, ctx: &egui::Context) {
-        let dropped = ctx.input(|i| {
+        let dropped: Vec<PathBuf> = ctx.input(|i| {
             i.raw
                 .dropped_files
                 .iter()
                 .filter_map(|file| file.path.clone())
-                .find(|path| is_pdf(path))
+                .filter(|path| is_pdf(path))
+                .collect()
         });
-        if let Some(path) = dropped {
-            match self.tab {
-                Tab::Sign => self.sign_form.set_pdf(&path),
-                Tab::Verify => self.verify.set_pdf(&path),
+        if dropped.is_empty() {
+            return;
+        }
+        match self.tab {
+            Tab::Sign => self.sign_form.set_files(dropped),
+            Tab::Verify => {
+                if let Some(first) = dropped.first() {
+                    self.verify.set_pdf(first);
+                }
             }
         }
     }
@@ -338,6 +360,52 @@ impl RevenantApp {
             }
             SignedOutcome::Failed(detail) => self.sign_form.on_signed_failed(detail),
         }
+    }
+
+    /// Sign every queued file in the background, reporting per-file progress.
+    fn start_batch(&mut self) {
+        let files = self.sign_form.batch_files();
+        if files.is_empty() {
+            return;
+        }
+        let detached = self.sign_form.is_detached();
+        let options = self.sign_form.embedded_options();
+        let no_creds = self
+            .l10n
+            .t("gui.server_connected_log_in_to_sign_documents")
+            .to_owned();
+        let store = Arc::clone(&self.store);
+        let transport = Arc::clone(&self.transport);
+        self.batch_cancel.store(false, Ordering::Relaxed);
+        let cancel = Arc::clone(&self.batch_cancel);
+        self.sign_form.begin_batch();
+        self.worker.spawn_batch(move |emit| {
+            let ctx = BatchContext {
+                store: &store,
+                transport: &transport,
+                detached,
+                options: &options,
+                no_credentials_message: &no_creds,
+            };
+            batch_sign_job(emit, &ctx, &files, &cancel);
+        });
+    }
+
+    fn on_batch_done(&mut self, succeeded: usize, failed: usize, aborted: Option<String>) {
+        let (message, ok) = match aborted {
+            Some(reason) => (reason, false),
+            None => (
+                self.l10n.tf(
+                    "gui.batch_complete_succeeded_failed",
+                    &[
+                        ("succeeded", &succeeded.to_string()),
+                        ("failed", &failed.to_string()),
+                    ],
+                ),
+                failed == 0,
+            ),
+        };
+        self.sign_form.on_batch_done(message, ok);
     }
 
     fn browse_verify_pdf(&mut self) {
@@ -466,7 +534,14 @@ impl RevenantApp {
             SignAction::BrowsePdf => self.browse_pdf(),
             SignAction::BrowseImage => self.browse_image(),
             SignAction::BrowseOutput => self.browse_output(),
-            SignAction::Sign => self.start_sign(),
+            SignAction::Sign => {
+                if self.sign_form.is_batch() {
+                    self.start_batch();
+                } else {
+                    self.start_sign();
+                }
+            }
+            SignAction::CancelBatch => self.batch_cancel.store(true, Ordering::Relaxed),
         }
     }
 
@@ -608,6 +683,97 @@ fn sign_job(
         }
         Err(err) => SignedOutcome::Failed(err.to_string()),
     }
+}
+
+/// The signing configuration shared across a batch's files.
+struct BatchContext<'a> {
+    store: &'a ConfigStore,
+    transport: &'a Arc<Transport>,
+    detached: bool,
+    options: &'a EmbeddedSignatureOptions,
+    /// Localized message for the "no saved credentials" case.
+    no_credentials_message: &'a str,
+}
+
+/// Sign every file in `files` sequentially, emitting progress before each and a
+/// final tally. A fatal error (bad credentials, TLS failure) aborts the whole
+/// batch; per-file read/write errors are counted and the run continues.
+/// Cancellation is honored between files. Runs on the background worker.
+fn batch_sign_job(emit: &Emit<'_>, ctx: &BatchContext<'_>, files: &[PathBuf], cancel: &AtomicBool) {
+    let creds = ctx.store.resolve_credentials();
+    let (Some(username), Some(password)) = (creds.username, creds.password) else {
+        emit(WorkerMsg::BatchDone {
+            succeeded: 0,
+            failed: 0,
+            aborted: Some(ctx.no_credentials_message.to_owned()),
+        });
+        return;
+    };
+    let total = files.len();
+    let server = ServerChoice::default();
+    let mut succeeded = 0;
+    let mut failed = 0;
+    for (index, path) in files.iter().enumerate() {
+        if cancel.load(Ordering::Relaxed) {
+            break;
+        }
+        let filename = path
+            .file_name()
+            .map_or_else(String::new, |name| name.to_string_lossy().into_owned());
+        emit(WorkerMsg::BatchProgress {
+            current: index + 1,
+            total,
+            filename,
+        });
+        let Ok(pdf) = std::fs::read(path) else {
+            failed += 1;
+            continue;
+        };
+        let output = views::sign::default_output(path, ctx.detached);
+        let result = if ctx.detached {
+            api::sign_detached(
+                ctx.store,
+                ctx.transport,
+                &pdf,
+                &username,
+                password.expose(),
+                &server,
+            )
+        } else {
+            api::sign(
+                ctx.store,
+                ctx.transport,
+                &pdf,
+                &username,
+                password.expose(),
+                &server,
+                ctx.options.clone(),
+            )
+        };
+        match result {
+            Err(err) if is_fatal_batch_error(&err) => {
+                emit(WorkerMsg::BatchDone {
+                    succeeded,
+                    failed,
+                    aborted: Some(err.to_string()),
+                });
+                return;
+            }
+            Ok(bytes) if std::fs::write(&output, &bytes).is_ok() => succeeded += 1,
+            // A non-fatal signing error or a failed write: count it and continue.
+            _ => failed += 1,
+        }
+    }
+    emit(WorkerMsg::BatchDone {
+        succeeded,
+        failed,
+        aborted: None,
+    });
+}
+
+/// Whether an error should abort the whole batch rather than just fail one file.
+fn is_fatal_batch_error(err: &RevenantError) -> bool {
+    matches!(err, RevenantError::Auth(_) | RevenantError::Tls { .. })
 }
 
 /// Verify `pdf_path` offline (per signature) and, when `server` is set, against
