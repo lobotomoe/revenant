@@ -8,6 +8,9 @@
 mod app;
 mod fonts;
 mod i18n;
+mod theme;
+mod views;
+mod worker;
 
 use app::RevenantApp;
 
