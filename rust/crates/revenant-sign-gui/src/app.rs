@@ -110,6 +110,7 @@ impl RevenantApp {
             match msg {
                 WorkerMsg::Ping { ok, detail } => self.on_ping_result(ok, &detail),
                 WorkerMsg::Identity(outcome) => self.on_identity_result(outcome),
+                WorkerMsg::SavedPassword(password) => self.on_saved_password(password),
                 WorkerMsg::Signed(outcome) => self.on_signed(outcome),
                 WorkerMsg::Verified(outcome) => self.on_verified(outcome),
                 WorkerMsg::BatchProgress {
@@ -163,9 +164,29 @@ impl RevenantApp {
             return;
         };
         let saved_username = self.store.saved_username();
+        let has_saved_credentials = saved_username.is_some();
         let storage_info = self.store.credential_storage_info();
         self.login = Some(LoginState::new(profile, saved_username, storage_info));
         self.dialog = Some(Dialog::Login);
+        // Pre-fill the saved password in the background: keychain reads can
+        // block or prompt, and the result only lands if the user has not begun
+        // typing (see `LoginState::prefill_password`).
+        if has_saved_credentials {
+            let store = Arc::clone(&self.store);
+            self.worker.spawn(move || {
+                let password = store
+                    .get_credentials()
+                    .password
+                    .map(|secret| secret.expose().to_owned());
+                WorkerMsg::SavedPassword(password)
+            });
+        }
+    }
+
+    fn on_saved_password(&mut self, password: Option<String>) {
+        if let (Some(login), Some(password)) = (self.login.as_mut(), password) {
+            login.prefill_password(password);
+        }
     }
 
     /// Discover the signer identity in the background using the entered

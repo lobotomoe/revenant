@@ -56,6 +56,9 @@ pub(crate) enum WorkerMsg {
     Ping { ok: bool, detail: String },
     /// A signer-identity discovery finished.
     Identity(IdentityOutcome),
+    /// A background read of the saved password finished, for login pre-fill.
+    /// `None` when nothing is stored. The password is never logged.
+    SavedPassword(Option<String>),
     /// A signing job finished.
     Signed(SignedOutcome),
     /// A verification job finished.

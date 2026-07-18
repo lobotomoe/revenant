@@ -104,6 +104,15 @@ impl LoginState {
         self.password.trim()
     }
 
+    /// Pre-fill the password from saved credentials read in the background. Only
+    /// applies while the user is still on the credentials step and has not typed
+    /// one, so a slow keychain read never clobbers live input.
+    pub(crate) fn prefill_password(&mut self, password: String) {
+        if self.step == Step::Credentials && self.password.is_empty() {
+            self.password = password;
+        }
+    }
+
     pub(crate) fn should_save_credentials(&self) -> bool {
         self.save_credentials
     }
@@ -458,4 +467,38 @@ pub(crate) fn show(ctx: &egui::Context, l10n: &Localizer, state: &mut LoginState
         action = LoginAction::Cancel;
     }
     action
+}
+
+#[cfg(test)]
+mod tests {
+    use super::{LoginState, Step};
+    use revenant_sign_core::config::ServerProfile;
+
+    fn state() -> LoginState {
+        let profile = ServerProfile::builtin("ekeng").expect("ekeng profile");
+        LoginState::new(profile, Some("user".to_owned()), "keychain".to_owned())
+    }
+
+    #[test]
+    fn prefill_fills_empty_password_on_credentials_step() {
+        let mut login = state();
+        login.prefill_password("secret".to_owned());
+        assert_eq!(login.password, "secret");
+    }
+
+    #[test]
+    fn prefill_skips_when_user_already_typed() {
+        let mut login = state();
+        login.password = "typed".to_owned();
+        login.prefill_password("secret".to_owned());
+        assert_eq!(login.password, "typed");
+    }
+
+    #[test]
+    fn prefill_skips_past_the_credentials_step() {
+        let mut login = state();
+        login.step = Step::Identity;
+        login.prefill_password("secret".to_owned());
+        assert!(login.password.is_empty());
+    }
 }
