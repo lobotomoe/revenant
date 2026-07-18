@@ -1,3 +1,7 @@
 /target
 **/*.rs.bk
 Cargo.lock.orig
+
+# The repo-root .gitignore excludes *.der, but these certificate fixtures are
+# committed on purpose -- they are load-bearing include_bytes! inputs for tests.
+!crates/revenant-core/src/pki/testdata/*.der

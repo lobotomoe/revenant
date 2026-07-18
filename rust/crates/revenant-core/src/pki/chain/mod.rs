@@ -26,7 +26,7 @@ use steps::{build_chain, fetch_intermediate, find_matching_anchor, verify_chain_
 /// Tri-state and best-effort: [`Trusted`](TrustStatus::Trusted) means a trusted
 /// anchor was found and the chain's signatures verify; [`Untrusted`](TrustStatus::Untrusted)
 /// means no trusted anchor is present; [`Indeterminate`](TrustStatus::Indeterminate)
-/// means trust could not be decided (an unparseable CMS, or an anchor matched by
+/// means trust could not be decided (an unparsable CMS, or an anchor matched by
 /// key id but cryptographic verification did not complete).
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum TrustStatus {

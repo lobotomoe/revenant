@@ -128,6 +128,11 @@ jobs:
             MPL-2.0, LGPL-2.1-only, LGPL-2.1-or-later, LGPL-3.0-only,
             0BSD, Unlicense, CC0-1.0, Zlib, GPL-2.0, GPL-2.0-only,
             WTFPL, BlueOak-1.0.0, Unicode-3.0, CDLA-Permissive-2.0
+          # These crates declare dual Apache-2.0/MIT with the old `/` separator,
+          # which is not valid SPDX, so the scanner tags the license as "bad".
+          # dbus/libdbus-sys are the Linux keyring backend; all three are fine.
+          allow-dependencies-licenses: >-
+            pkg:cargo/dbus, pkg:cargo/libdbus-sys, pkg:cargo/rangemap
 
   typecheck:
     name: Type Check
