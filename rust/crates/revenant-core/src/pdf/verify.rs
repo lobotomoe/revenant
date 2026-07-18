@@ -14,7 +14,8 @@
 use super::reader::PdfReader;
 use crate::cms::{
     check_ltv_status, extract_digest_info, extract_signature_data_for, extract_signer_info,
-    find_byteranges, ByteRange, DigestAlgorithm, ASN1_SEQUENCE_TAG, MIN_CMS_SIZE,
+    find_byteranges, verify_signer_signature, ByteRange, DigestAlgorithm, SignatureStatus,
+    ASN1_SEQUENCE_TAG, MIN_CMS_SIZE,
 };
 use crate::pki::{CertInfo, ChainResult, TrustStatus};
 use crate::{Result, RevenantError};
@@ -30,6 +31,9 @@ pub struct VerificationResult {
     pub structure_ok: bool,
     /// The ByteRange hash matches the expected/declared value.
     pub hash_ok: bool,
+    /// Whether the signer's cryptographic signature over the CMS signed
+    /// attributes verifies against the signer certificate.
+    pub signature: SignatureStatus,
     /// The CMS embeds long-term-validation revocation data.
     pub ltv_enabled: bool,
     /// Human-readable diagnostic lines.
@@ -44,10 +48,27 @@ pub struct VerificationResult {
 }
 
 impl VerificationResult {
-    /// Overall validity: structurally sound *and* the hash checks out.
+    /// Structural integrity: the CMS parses and the ByteRange hash matches the
+    /// expected or CMS-declared digest. This proves the signed bytes are intact
+    /// but NOT that the named signer produced the signature -- use [`valid`] for
+    /// the full cryptographic verdict. It is the right check for the post-sign
+    /// self-test, which only asks "did the splice preserve the signed bytes?".
+    ///
+    /// [`valid`]: VerificationResult::valid
+    #[must_use]
+    pub fn integrity_ok(&self) -> bool {
+        self.structure_ok && self.hash_ok
+    }
+
+    /// Full cryptographic validity: structurally sound, the hash matches, *and*
+    /// the signer's signature verifies against its certificate. This is what a
+    /// caller asking "is this a genuine signature?" wants. Trust in the signer's
+    /// certificate chain is reported separately via [`trust_status`].
+    ///
+    /// [`trust_status`]: VerificationResult::trust_status
     #[must_use]
     pub fn valid(&self) -> bool {
-        self.structure_ok && self.hash_ok
+        self.integrity_ok() && self.signature.is_valid()
     }
 
     /// The result for a signature whose structure could not even be extracted.
@@ -55,6 +76,7 @@ impl VerificationResult {
         Self {
             structure_ok: false,
             hash_ok: false,
+            signature: SignatureStatus::Unverifiable("structure could not be extracted"),
             ltv_enabled: false,
             details: vec![message],
             signer: None,
@@ -93,10 +115,16 @@ fn verify_signature_match(
         details.push(format!("Signer: {name}"));
     }
 
-    // 4. Hash verification.
+    // 4. Hash verification (messageDigest == hash of the signed bytes).
     let hash_ok = verify_hash(&signed_data, &cms_der, expected_hash, &mut details);
 
-    // 5. LTV status.
+    // 5. Cryptographic signature verification (the signer's key signed the
+    //    signed attributes). Together with the hash check this proves the named
+    //    signer signed exactly these bytes.
+    let signature = verify_signer_signature(&cms_der);
+    details.push(signature.describe());
+
+    // 6. LTV status.
     let ltv = check_ltv_status(&cms_der);
     let ltv_enabled = ltv.ltv_enabled();
     details.push(format!(
@@ -111,6 +139,7 @@ fn verify_signature_match(
     let mut result = VerificationResult {
         structure_ok,
         hash_ok,
+        signature,
         ltv_enabled,
         details,
         signer,
@@ -118,7 +147,7 @@ fn verify_signature_match(
         trust_status: Some(TrustStatus::Indeterminate),
     };
 
-    // 6. Chain validation (optional, injected, best-effort).
+    // 7. Chain validation (optional, injected, best-effort).
     apply_chain(&mut result, &cms_der, validate_chain);
     result
 }
@@ -310,6 +339,10 @@ pub fn verify_detached_signature(
         details.push(format!("Signer: {name}"));
     }
 
+    // Cryptographic signature verification (signer's key over the signed attrs).
+    let signature = verify_signer_signature(cms_der);
+    details.push(signature.describe());
+
     // Detached signatures are always verified against the CMS-declared digest.
     let hash_ok = if let Some((algo, cms_digest)) = extract_digest_info(cms_der) {
         let actual = algo.hash(data_bytes);
@@ -347,6 +380,7 @@ pub fn verify_detached_signature(
     let mut result = VerificationResult {
         structure_ok,
         hash_ok,
+        signature,
         ltv_enabled,
         details,
         signer,
@@ -391,7 +425,14 @@ mod tests {
         let result = verify_embedded_signature(&signed, Some(&hash), None);
         assert!(result.structure_ok, "{:?}", result.details);
         assert!(result.hash_ok, "{:?}", result.details);
-        assert!(result.valid());
+        // The splice preserved the signed bytes: integrity holds.
+        assert!(result.integrity_ok());
+        // But the fake CMS carries no real signature, so full validity does not.
+        assert!(!result.valid());
+        assert!(matches!(
+            result.signature,
+            crate::cms::SignatureStatus::Unverifiable(_)
+        ));
         assert!(result
             .details
             .iter()
@@ -433,13 +474,17 @@ mod tests {
 
     #[test]
     fn detached_signature_verifies_against_data() {
-        // The committed CMS fixture signs SHA-256("test data").
+        // The committed CMS fixture signs SHA-256("test data") with a real key.
         let result = verify_detached_signature(b"test data", CMS_LEAF, None);
         assert!(result.structure_ok, "{:?}", result.details);
         assert!(result.hash_ok, "{:?}", result.details);
-        // Wrong data -> mismatch.
+        // The signer's cryptographic signature verifies -> fully valid.
+        assert_eq!(result.signature, crate::cms::SignatureStatus::Valid);
+        assert!(result.valid(), "{:?}", result.details);
+        // Wrong data -> hash mismatch, and no longer valid.
         let bad = verify_detached_signature(b"other data", CMS_LEAF, None);
         assert!(!bad.hash_ok);
+        assert!(!bad.valid());
     }
 
     #[test]

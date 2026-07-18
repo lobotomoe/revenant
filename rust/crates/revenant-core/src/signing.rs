@@ -247,10 +247,14 @@ pub fn sign_pdf_embedded(
         )));
     }
 
-    // Step 5: verify before returning -- never emit a corrupt signed PDF.
+    // Step 5: verify before returning -- never emit a corrupt signed PDF. This
+    // is an integrity self-test (did the splice preserve the signed byte range?),
+    // so it checks structure + hash, not the appliance's signature: the exact
+    // SHA-1 we sent is the oracle. Full cryptographic verification is what the
+    // `check`/verify path performs on an arbitrary signed PDF.
     let br_hash = compute_byterange_hash(&prepared, hex_start, hex_len)?;
     let result = verify_embedded_signature(&signed, Some(&br_hash), None);
-    if !result.valid() {
+    if !result.integrity_ok() {
         let detail = result.details.join("\n  ");
         log::error!("Post-sign verification failed: {detail}");
         return Err(RevenantError::Pdf(format!(

@@ -9,10 +9,11 @@ use std::fs;
 use std::path::Path;
 
 use revenant_core::api::verify_pdf_all;
+use revenant_core::cms::SignatureStatus;
 use revenant_core::config::register_active_profile_tls;
 use revenant_core::net::{verify_pdf_server, ServerVerifyResult};
 use revenant_core::pdf::VerificationResult;
-use revenant_core::pki::TrustStoreCache;
+use revenant_core::pki::{TrustStatus, TrustStoreCache};
 
 use crate::app::App;
 use crate::cli::CheckArgs;
@@ -125,22 +126,69 @@ fn print_server_verify_result(result: &ServerVerifyResult) {
     }
 }
 
-/// Print the final RESULT line and return the process outcome.
+/// Classify one signature into a display label and whether it counts as a pass.
+///
+/// The verdict reflects the full cryptographic result, not just structure: a
+/// signature that does not verify, cannot be verified, or comes from a signer
+/// outside the configured trust list does NOT pass. A genuine signature whose
+/// trust was simply not checked (no Trust Service List configured) passes with a
+/// note, so `check` without a TSL still works.
+fn classify(result: &VerificationResult) -> (String, bool) {
+    if !result.integrity_ok() {
+        return (
+            "FAILED -- document structure or hash is broken".to_owned(),
+            false,
+        );
+    }
+    match result.signature {
+        SignatureStatus::Invalid => {
+            return (
+                "INVALID -- signature does not verify (document altered)".to_owned(),
+                false,
+            );
+        }
+        SignatureStatus::Unverifiable(why) => {
+            return (
+                format!("UNVERIFIED -- signature could not be checked ({why})"),
+                false,
+            );
+        }
+        SignatureStatus::Valid => {}
+    }
+    match result.trust_status {
+        Some(TrustStatus::Untrusted) => (
+            "VALID signature, but the signer is NOT in the trusted list".to_owned(),
+            false,
+        ),
+        Some(TrustStatus::Trusted) => ("VALID and trusted".to_owned(), true),
+        // Indeterminate / None: the signature is genuine; trust was not established.
+        _ => ("VALID (signer trust not checked)".to_owned(), true),
+    }
+}
+
+/// Print the final RESULT line(s) and return the process outcome.
 fn print_result_line(results: &[VerificationResult]) -> CliResult {
     let total = results.len();
-    let failed = results.iter().filter(|r| !r.valid()).count();
+    let verdicts: Vec<(String, bool)> = results.iter().map(classify).collect();
+    let passed = verdicts.iter().filter(|(_, ok)| *ok).count();
 
     println!();
-    if failed == 0 {
-        let sig_word = if total == 1 {
-            "Signature".to_owned()
-        } else {
-            format!("All {total} signatures")
-        };
-        println!("  RESULT: {sig_word} VALID");
+    if total == 1 {
+        let (label, ok) = &verdicts[0];
+        println!("  RESULT: {label}");
+        return if *ok { Ok(()) } else { Err(CliError::silent()) };
+    }
+    for (index, (label, _)) in verdicts.iter().enumerate() {
+        println!("  Signature {}/{total}: {label}", index + 1);
+    }
+    if passed == total {
+        println!("  RESULT: all {total} signatures VALID");
         Ok(())
     } else {
-        println!("  RESULT: {failed} of {total} signature(s) FAILED");
+        println!(
+            "  RESULT: {} of {total} signature(s) did not pass",
+            total - passed
+        );
         Err(CliError::silent())
     }
 }

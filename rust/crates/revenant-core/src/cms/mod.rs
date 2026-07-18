@@ -14,6 +14,7 @@ mod digest;
 mod extraction;
 mod inspect;
 mod ltv;
+mod signature;
 
 use cms::content_info::ContentInfo;
 use cms::signed_data::SignedData;
@@ -29,6 +30,7 @@ pub use extraction::{
 };
 pub use inspect::{extract_signer_info, inspect_cms_blob, CmsInspection};
 pub use ltv::{check_ltv_status, LtvStatus};
+pub use signature::{verify_signer_signature, SignatureStatus};
 
 /// Parse a DER-encoded CMS/PKCS#7 blob into its `SignedData`.
 ///

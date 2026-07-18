@@ -112,12 +112,15 @@ mod tests {
     }
 
     #[test]
-    fn verify_pdf_without_tsl_is_offline_and_valid() {
+    fn verify_pdf_without_tsl_is_offline_and_intact() {
         let (signed, hash) = prepare_and_fake_sign();
         let transport = Transport::new();
         let cache = TrustStoreCache::new();
         let result = verify_pdf(&transport, &cache, &signed, Some(&hash), None);
-        assert!(result.valid(), "{:?}", result.details);
+        // The fake CMS has intact byte-range integrity, but no real signature,
+        // so full cryptographic validity does not hold.
+        assert!(result.integrity_ok(), "{:?}", result.details);
+        assert!(!result.valid());
         // No TSL -> chain not attempted.
         assert_eq!(result.trust_status, Some(TrustStatus::Indeterminate));
     }
