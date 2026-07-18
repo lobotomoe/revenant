@@ -251,19 +251,18 @@ fn ekeng_profile() -> ServerProfile {
 
 /// The pinned CA trust anchors for the EKENG deployment.
 ///
-/// EKENG-issued signatures chain to a self-signed "Staff of Government of RA Root
-/// CA". That root is not distributed through any working channel we can verify
-/// automatically (it is absent from the Armenian TSL, and its AIA URL
-/// `http://www.gov.am/CAStaff/GovRootCA.crt` currently serves an HTML error
-/// page), so it must be obtained out-of-band and pinned here. Until then this is
-/// empty and EKENG chain validation is reported as indeterminate ("trust not
-/// checked") rather than falsely untrusted.
-///
-/// To enable it: obtain the root DER from an authoritative source, commit it as
-/// `testdata`/an embedded asset, and return
-/// `vec![include_bytes!("...").to_vec()]`.
+/// EKENG-issued signatures chain to the self-signed "Staff of Government of RA
+/// Root CA" (O=Staff of Government of RA, C=AM; valid 2009-2038), which is a
+/// separate PKI from the CAs in the Armenian TSL. The bundled DER was obtained
+/// from the government's own publication (`https://www.gov.am/CAStaff/GovRootCA.crt`,
+/// via a browser -- the host is behind a bot manager that blocks plain fetches)
+/// and pinned after verifying it: SHA-256 `671c272eaf581886e549fbd2d2879188b3aee1c6188a33a65ef8ccfa457ee2bc`,
+/// and -- decisively -- its public key verifies the signature on a real leaf the
+/// appliance returned, which a tampered download could not.
 fn ekeng_trust_anchors() -> Vec<Vec<u8>> {
-    Vec::new()
+    const STAFF_GOV_RA_ROOT_CA: &[u8] =
+        include_bytes!("anchors/staff_of_government_of_ra_root_ca.der");
+    vec![STAFF_GOV_RA_ROOT_CA.to_vec()]
 }
 
 impl ServerProfile {
@@ -363,6 +362,21 @@ mod tests {
             .any(|m| m == "\u{0567}\u{056f}\u{0565}\u{0576}\u{0563}"));
         assert_eq!(ekeng.cert_fields.len(), 3);
         assert_eq!(ekeng.sig_fields.len(), 3);
+    }
+
+    #[test]
+    fn ekeng_pins_the_verified_government_root() {
+        use sha2::Digest as _;
+
+        let anchors = ekeng_trust_anchors();
+        assert_eq!(anchors.len(), 1, "EKENG should pin exactly one root");
+        // Pin the exact, authenticated "Staff of Government of RA Root CA" so an
+        // accidental swap of the bundled DER is caught.
+        let fingerprint = hex::encode(sha2::Sha256::digest(&anchors[0]));
+        assert_eq!(
+            fingerprint,
+            "671c272eaf581886e549fbd2d2879188b3aee1c6188a33a65ef8ccfa457ee2bc"
+        );
     }
 
     #[test]
