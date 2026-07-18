@@ -45,7 +45,6 @@ fn catalog_source(code: &str) -> Option<&'static str> {
 /// Active-locale translator. Holds the resolved catalog (active locale overlaid
 /// on the English fallback) and enough metadata to drive layout direction.
 pub(crate) struct Localizer {
-    code: String,
     rtl: bool,
     catalog: HashMap<String, String>,
 }
@@ -72,14 +71,8 @@ impl Localizer {
 
         Self {
             rtl: is_rtl(&code),
-            code,
             catalog,
         }
-    }
-
-    /// The active locale code (e.g. `"en"`, `"hy"`).
-    pub(crate) fn code(&self) -> &str {
-        &self.code
     }
 
     /// Whether the active locale is written right-to-left.
@@ -145,6 +138,14 @@ fn is_supported(code: &str) -> bool {
     SUPPORTED_LOCALES.iter().any(|(c, _)| *c == code)
 }
 
+/// The endonym (self-name) for a locale code, or the code itself if unknown.
+pub(crate) fn endonym(code: &str) -> &str {
+    SUPPORTED_LOCALES
+        .iter()
+        .find(|(c, _)| *c == code)
+        .map_or(code, |(_, name)| name)
+}
+
 fn is_rtl(code: &str) -> bool {
     RTL_LOCALES.contains(&code)
 }
@@ -164,7 +165,6 @@ mod tests {
 
         for (code, _) in SUPPORTED_LOCALES {
             let loc = Localizer::new(code);
-            assert_eq!(loc.code(), *code);
             // The English overlay guarantees no key ever resolves to itself.
             for key in &english_keys {
                 assert_ne!(loc.t(key), key.as_str(), "'{code}' left '{key}' unresolved");
