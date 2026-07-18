@@ -14,6 +14,8 @@ pub(crate) enum SignAction {
     None,
     /// Open the connect dialog.
     Connect,
+    /// Open the login wizard.
+    Login,
 }
 
 pub(crate) fn show(ui: &mut egui::Ui, l10n: &Localizer, layer: ConfigLayer) -> SignAction {
@@ -30,6 +32,10 @@ pub(crate) fn show(ui: &mut egui::Ui, l10n: &Localizer, layer: ConfigLayer) -> S
             }
             ConfigLayer::ServerConfigured => {
                 ui.label(l10n.t("gui.server_connected_log_in_to_sign_documents"));
+                ui.add_space(12.0);
+                if ui.button(l10n.t("gui.log_in")).clicked() {
+                    action = SignAction::Login;
+                }
             }
             ConfigLayer::FullyConfigured => {
                 ui.heading(l10n.t("gui.sign_pdf"));

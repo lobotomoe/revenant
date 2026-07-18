@@ -9,11 +9,29 @@ use std::sync::mpsc::{self, Receiver, Sender};
 use std::thread;
 
 use eframe::egui;
+use revenant_sign_core::pki::CertInfo;
+
+/// Outcome of a background signer-identity discovery. Errors are pre-classified
+/// on the worker thread so the UI thread only has to pick the localized message;
+/// the detail string is the raw error text to interpolate.
+pub(crate) enum IdentityOutcome {
+    /// A certificate was retrieved. Boxed because [`CertInfo`] dwarfs the other
+    /// variants.
+    Ok(Box<CertInfo>),
+    /// Wrong username or password.
+    AuthFailed(String),
+    /// A transport/TLS-level failure talking to the server.
+    ServerError(String),
+    /// Any other failure (bad certificate, malformed response, ...).
+    OtherError(String),
+}
 
 /// Result of a completed background job, tagged so the UI thread can route it.
 pub(crate) enum WorkerMsg {
     /// A server ping finished: whether it succeeded and a human-readable detail.
     Ping { ok: bool, detail: String },
+    /// A signer-identity discovery finished.
+    Identity(IdentityOutcome),
 }
 
 /// Owns the channel between background jobs and the UI thread.

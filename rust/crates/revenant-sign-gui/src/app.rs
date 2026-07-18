@@ -11,13 +11,18 @@ use std::time::Duration;
 
 use eframe::egui;
 use revenant_sign_core::config::{
-    register_active_profile_tls, register_profile_tls_mode, ConfigLayer, ConfigStore, ServerProfile,
+    register_active_profile_tls, register_profile_tls_mode, ConfigLayer, ConfigStore,
+    ServerProfile, SignerInfo,
 };
-use revenant_sign_core::net::{ping_server, PingOutcome, Transport};
+use revenant_sign_core::net::{ping_server, PingOutcome, SoapSigningTransport, Transport};
+use revenant_sign_core::pki::{discover_identity_from_server, CertInfo};
+use revenant_sign_core::RevenantError;
 
 use crate::i18n::Localizer;
-use crate::views::{self, ConnectAction, ConnectState, SettingsAction, SignAction};
-use crate::worker::{Worker, WorkerMsg};
+use crate::views::{
+    self, ConnectAction, ConnectState, LoginAction, LoginState, SettingsAction, SignAction,
+};
+use crate::worker::{IdentityOutcome, Worker, WorkerMsg};
 
 #[derive(Clone, Copy, PartialEq, Eq)]
 enum Tab {
@@ -28,6 +33,7 @@ enum Tab {
 #[derive(Clone, Copy, PartialEq, Eq)]
 enum Dialog {
     Connect,
+    Login,
     Settings,
     About,
 }
@@ -41,6 +47,8 @@ pub(crate) struct RevenantApp {
     tab: Tab,
     dialog: Option<Dialog>,
     connect: ConnectState,
+    /// Present only while the login wizard is open (needs the active profile).
+    login: Option<LoginState>,
 }
 
 impl RevenantApp {
@@ -61,6 +69,7 @@ impl RevenantApp {
             tab: Tab::Sign,
             dialog: None,
             connect: ConnectState::new(),
+            login: None,
         }
     }
 
@@ -77,6 +86,7 @@ impl RevenantApp {
         for msg in self.worker.drain() {
             match msg {
                 WorkerMsg::Ping { ok, detail } => self.on_ping_result(ok, &detail),
+                WorkerMsg::Identity(outcome) => self.on_identity_result(outcome),
             }
         }
     }
@@ -109,6 +119,100 @@ impl RevenantApp {
             };
             WorkerMsg::Ping { ok, detail }
         });
+    }
+
+    /// Open the login wizard for the configured server (requires layer >= 1).
+    fn open_login(&mut self) {
+        let Some(profile) = self.store.active_profile() else {
+            log::error!("cannot open login without a configured server");
+            return;
+        };
+        let saved_username = self.store.saved_username();
+        let storage_info = self.store.credential_storage_info();
+        self.login = Some(LoginState::new(profile, saved_username, storage_info));
+        self.dialog = Some(Dialog::Login);
+    }
+
+    /// Discover the signer identity in the background using the entered
+    /// credentials against the active profile.
+    fn start_discovery(&mut self) {
+        let Some(login) = &self.login else { return };
+        let Some(profile) = self.store.active_profile() else {
+            log::error!("login discovery started without an active profile");
+            return;
+        };
+        // EKENG needs its legacy TLS stack registered before the SOAP call.
+        register_active_profile_tls(&self.transport, &self.store);
+        let transport = Arc::clone(&self.transport);
+        let url = profile.url.clone();
+        let timeout = Duration::from_secs(u64::from(profile.timeout));
+        let username = login.username().to_owned();
+        let password = login.password().to_owned();
+        self.worker.spawn(move || {
+            let soap = SoapSigningTransport::new(transport, url);
+            let outcome = match discover_identity_from_server(&soap, &username, &password, timeout)
+            {
+                Ok(info) => IdentityOutcome::Ok(Box::new(info)),
+                Err(err) => categorize_identity_error(&err),
+            };
+            WorkerMsg::Identity(outcome)
+        });
+    }
+
+    fn on_identity_result(&mut self, outcome: IdentityOutcome) {
+        // Localize the status line first so the mutable `login` borrow below does
+        // not overlap the immutable `l10n` borrow.
+        let status = match &outcome {
+            IdentityOutcome::Ok(_) => self
+                .l10n
+                .t("gui.could_not_determine_identity_from_server")
+                .to_owned(),
+            IdentityOutcome::AuthFailed(detail) => self
+                .l10n
+                .tf("gui.authentication_failed_error", &[("error", detail)]),
+            IdentityOutcome::ServerError(detail) => {
+                self.l10n.tf("gui.server_error_error", &[("error", detail)])
+            }
+            IdentityOutcome::OtherError(detail) => {
+                self.l10n.tf("gui.error_error", &[("error", detail)])
+            }
+        };
+        let Some(login) = &mut self.login else { return };
+        match outcome {
+            IdentityOutcome::Ok(info) => login.on_identity_found(*info, status),
+            _ => login.on_discovery_failed(status),
+        }
+    }
+
+    /// Persist the login result (signer identity + optional credentials) and
+    /// close the wizard, advancing the config to the fully-configured layer.
+    fn finish_login(&mut self) {
+        let Some(login) = self.login.take() else {
+            return;
+        };
+        self.dialog = None;
+
+        if let Some(info) = login.identity() {
+            let signer = signer_info_from_cert(info);
+            if let Err(err) = self.store.save_signer_info(&signer) {
+                log::error!("failed to save signer info: {err}");
+            }
+        }
+
+        if login.should_save_credentials() {
+            if let Err(err) = self
+                .store
+                .save_credentials(login.username(), login.password())
+            {
+                log::error!("failed to save credentials: {err}");
+            }
+        } else if let Err(err) = self.store.clear_credentials() {
+            log::error!("failed to clear saved credentials: {err}");
+        }
+
+        // Keep the session credentials so signing works without a re-entry.
+        self.store
+            .set_session_credentials(login.username().to_owned(), login.password().to_owned());
     }
 
     fn top_bar(&mut self, ctx: &egui::Context) {
@@ -174,8 +278,10 @@ impl RevenantApp {
                 match self.tab {
                     Tab::Sign => {
                         let layer = self.store.config_layer();
-                        if let SignAction::Connect = views::sign::show(ui, &self.l10n, layer) {
-                            self.dialog = Some(Dialog::Connect);
+                        match views::sign::show(ui, &self.l10n, layer) {
+                            SignAction::Connect => self.dialog = Some(Dialog::Connect),
+                            SignAction::Login => self.open_login(),
+                            SignAction::None => {}
                         }
                     }
                     Tab::Verify => views::verify::show(ui, &self.l10n),
@@ -194,6 +300,21 @@ impl RevenantApp {
                 ConnectAction::Ping(profile) => self.start_ping(*profile),
                 ConnectAction::None => {}
             },
+            Dialog::Login => {
+                let Some(login) = &mut self.login else {
+                    self.dialog = None;
+                    return;
+                };
+                match views::login::show(ctx, &self.l10n, login) {
+                    LoginAction::Cancel => {
+                        self.dialog = None;
+                        self.login = None;
+                    }
+                    LoginAction::Discover => self.start_discovery(),
+                    LoginAction::Finish => self.finish_login(),
+                    LoginAction::None => {}
+                }
+            }
             Dialog::Settings => match views::settings::show(ctx, &self.l10n, &self.store) {
                 SettingsAction::Close => self.dialog = None,
                 SettingsAction::SetLanguage(code) => self.set_language(&code),
@@ -215,5 +336,28 @@ impl eframe::App for RevenantApp {
         self.footer(ctx);
         self.central(ctx);
         self.dialogs(ctx);
+    }
+}
+
+/// Classify a discovery error so the UI thread can pick the localized message.
+fn categorize_identity_error(err: &RevenantError) -> IdentityOutcome {
+    let detail = err.to_string();
+    match err {
+        RevenantError::Auth(_) => IdentityOutcome::AuthFailed(detail),
+        RevenantError::Tls { .. } => IdentityOutcome::ServerError(detail),
+        _ => IdentityOutcome::OtherError(detail),
+    }
+}
+
+/// Adapt a discovered certificate into the config store's signer record. Both
+/// carry the same fields; the store owns the persisted view.
+fn signer_info_from_cert(info: &CertInfo) -> SignerInfo {
+    SignerInfo {
+        name: info.name.clone(),
+        email: info.email.clone(),
+        organization: info.organization.clone(),
+        dn: info.dn.clone(),
+        not_before: info.not_before.clone(),
+        not_after: info.not_after.clone(),
     }
 }
