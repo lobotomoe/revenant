@@ -1,0 +1,151 @@
+[workspace]
+resolver = "2"
+members = [
+    "crates/revenant-legacy-tls",
+    "crates/revenant-core",
+    "crates/revenant-cli",
+]
+
+[workspace.package]
+version = "0.1.0"
+edition = "2021"
+rust-version = "1.85"
+license = "Apache-2.0"
+authors = ["Aleksandr Kraiz"]
+repository = "https://github.com/lobotomoe/revenant"
+homepage = "https://github.com/lobotomoe/revenant"
+
+# Shared dependency catalog. Versions are pinned once here so every crate in
+# the workspace resolves to the same build of each library. The RustCrypto
+# "formats" stack (der/spki/const-oid/x509-cert/cms) is kept version-aligned:
+# cms 0.2 pulls der 0.7 / x509-cert 0.2 / spki 0.7 / const-oid 0.9, and mixing
+# majors across that set does not compile.
+[workspace.dependencies]
+# -- legacy TLS 1.0 + RC4-MD5 building blocks (from-scratch handshake) --------
+rc4 = "0.1"
+md-5 = "0.10"
+sha1 = "0.10"
+# SHA-2 for verifying a signature's ByteRange against the algorithm declared in
+# its CMS (CoSign uses SHA-1, but standalone verification auto-detects).
+sha2 = "0.10"
+hmac = "0.12"
+rsa = "0.9"
+rand = "0.8"
+# Constant-time byte comparison for MAC verification -- data-independent, unlike
+# a hand-rolled loop the optimizer may legally short-circuit.
+subtle = "2"
+
+# -- ASN.1 / X.509 / CMS (RustCrypto formats, version-aligned) ---------------
+# All pinned to the der-0.7 family: it is the only combination where x509-cert,
+# cms, and x509-verify all have STABLE releases that share one `der`/`Certificate`
+# type. The der-0.8 family would force a `cms` pre-release, unacceptable for a
+# signing tool. See the Phase 4 notes in the port-status memory.
+der = "0.7"
+spki = "0.7"
+const-oid = "0.9"
+x509-cert = "0.2"
+cms = "0.2"
+# Per-link certificate signature verification (RFC 5280 path checking is done by
+# building the chain ourselves via SKI/AKI, then verifying each link's signature).
+# Dispatches on the signature-algorithm OID; defaults cover RSA PKCS#1v1.5, ECDSA
+# (p256/p384/...), Ed25519, SHA-2. `x509` adds `verify(&Certificate)`, `sha1`
+# covers legacy SHA-1-signed CA certs. No RSA-PSS support -> such certs downgrade
+# to an indeterminate chain result rather than a hard failure.
+x509-verify = { version = "0.4.8", features = ["x509", "std", "sha1"] }
+
+# -- Date/time --------------------------------------------------------------
+# `time` handles certificate validity arithmetic (parsing DER dates). `chrono`
+# is used only for the signature-appearance date string, which needs the
+# machine's *local* wall-clock offset: `time::OffsetDateTime::now_local()`
+# returns Err in a multi-threaded process (the real CLI), silently degrading to
+# UTC, whereas `chrono::Local` reads the zone reliably. chrono is already in the
+# tree via lopdf, so this adds no new compilation.
+time = { version = "0.3", features = ["parsing", "formatting", "macros"] }
+chrono = { version = "0.4", default-features = false, features = ["clock", "std"] }
+
+# -- PDF (read-side structure parsing only; writes are raw bytes) ------------
+lopdf = "0.34"
+
+# -- Signature image loading (optional visual element) -----------------------
+# Trimmed to exactly the formats the Python client accepts via Pillow. Pulls in
+# the pure-Rust codecs; resampling uses the crate's own Lanczos3 (visually
+# equivalent to Pillow, not bit-identical -- the image is decorative and outside
+# the signed hash, so this is fine).
+image = { version = "0.25", default-features = false, features = [
+    "png",
+    "jpeg",
+    "gif",
+    "bmp",
+    "tiff",
+    "webp",
+] }
+
+# -- Byte-level parsing of signed PDFs (ByteRange discovery) and hex codec ----
+# `regex::bytes` mirrors the Python client's `re.finditer` over raw PDF bytes;
+# `hex` decodes the `/Contents` placeholder strictly (errors on odd length or a
+# non-hex digit), matching Python's `bytes.fromhex` rather than truncating.
+regex = "1"
+hex = "0.4"
+
+# -- XML (entity-expansion disabled at call sites to avoid billion-laughs) ---
+quick-xml = "0.37"
+
+# -- HTTP for the standard (non-legacy) TLS path -----------------------------
+ureq = "2.12"
+url = "2.5"
+
+# -- Config persistence ------------------------------------------------------
+# serde_json with preserve_order keeps unknown keys in their on-disk order on
+# rewrite (forward-compat), mirroring the Python client's insertion-ordered
+# dict. tempfile provides the secure temp-file-plus-rename atomic write.
+serde_json = { version = "1", features = ["preserve_order"] }
+tempfile = "3"
+
+# -- Secret storage, CLI, encoding, errors, logging --------------------------
+# keyring has NO default backend: without an explicit platform feature it
+# silently uses a non-persistent in-memory mock. Each backend dep is target-
+# gated inside keyring (security-framework->apple, dbus-secret-service->linux,
+# windows-sys->windows), so enabling all three compiles only the host's. Linux
+# uses the D-Bus Secret Service (GNOME Keyring / KWallet), matching what Python
+# `keyring` and the TS port's `keytar` target; crypto-rust keeps it OpenSSL-free.
+keyring = { version = "3", default-features = false, features = [
+    "apple-native",
+    "windows-native",
+    "sync-secret-service",
+    "crypto-rust",
+] }
+clap = { version = "4", features = ["derive"] }
+base64 = "0.22"
+thiserror = "2"
+flate2 = "1"
+log = "0.4"
+env_logger = "0.11"
+
+# Release profile: this is a signing tool shipped as desktop binaries, so
+# optimize for a small, fast, panic-free artifact.
+[profile.release]
+opt-level = "z"
+lto = true
+codegen-units = 1
+strip = true
+panic = "abort"
+
+# Strict-by-default lints, applied to every crate via `[lints] workspace = true`.
+# Warnings stay warnings locally for a fast edit loop; CI promotes them to hard
+# errors with `RUSTFLAGS="-D warnings"` + `cargo clippy -- -D warnings`.
+[workspace.lints.rust]
+unsafe_code = "forbid"
+missing_debug_implementations = "warn"
+unreachable_pub = "warn"
+rust_2018_idioms = { level = "warn", priority = -1 }
+
+[workspace.lints.clippy]
+all = { level = "warn", priority = -1 }
+pedantic = { level = "warn", priority = -1 }
+# These pedantic lints fight readability more than they help; opt out explicitly.
+module_name_repetitions = "allow"
+missing_errors_doc = "allow"
+missing_panics_doc = "allow"
+# doc_markdown flags every product/proper noun (CoSign, EKENG, SAPIWS, ...) in
+# our prose-heavy doc comments demanding backticks. Not worth backticking names.
+doc_markdown = "allow"

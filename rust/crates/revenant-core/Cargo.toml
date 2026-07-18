@@ -1,0 +1,60 @@
+[package]
+name = "revenant-core"
+description = "Cross-platform client library for ARX CoSign / DocuSign Signature Appliance electronic signatures via the OASIS DSS SOAP API"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+authors.workspace = true
+repository.workspace = true
+homepage.workspace = true
+
+[dependencies]
+revenant-legacy-tls = { path = "../revenant-legacy-tls" }
+
+# ASN.1 / X.509 / CMS
+der.workspace = true
+spki.workspace = true
+const-oid.workspace = true
+x509-cert.workspace = true
+cms.workspace = true
+x509-verify.workspace = true
+
+# Certificate validity-date arithmetic (time) + appearance date string (chrono)
+time.workspace = true
+chrono.workspace = true
+
+# PDF read-side parsing; writes are raw bytes
+lopdf.workspace = true
+
+# Signature image decoding/resizing
+image.workspace = true
+
+# Byte-level signed-PDF scanning (ByteRange) and strict hex decoding
+regex.workspace = true
+hex.workspace = true
+
+# XML
+quick-xml.workspace = true
+
+# Standard-path HTTP
+ureq.workspace = true
+url.workspace = true
+
+# Config persistence
+serde_json.workspace = true
+tempfile.workspace = true
+
+# Secrets, encoding, compression, hashing, errors, logging
+keyring.workspace = true
+base64.workspace = true
+flate2.workspace = true
+sha1.workspace = true
+sha2.workspace = true
+thiserror.workspace = true
+log.workspace = true
+
+[dev-dependencies]
+
+[lints]
+workspace = true
