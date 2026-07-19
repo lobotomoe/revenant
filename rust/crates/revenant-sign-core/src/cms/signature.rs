@@ -169,7 +169,7 @@ fn finalize_valid(
         SigningCertBinding::Mismatch => SignatureStatus::Unverifiable(
             "signingCertificate attribute names a different certificate",
         ),
-        SigningCertBinding::Unparseable => {
+        SigningCertBinding::Unparsable => {
             SignatureStatus::Unverifiable("signingCertificate attribute could not be parsed")
         }
     }
@@ -207,7 +207,7 @@ enum SigningCertBinding {
     /// that verified -- a substitution indicator.
     Mismatch,
     /// The attribute is present but could not be parsed -- fail closed.
-    Unparseable,
+    Unparsable,
 }
 
 /// Check the ESS `signingCertificate` (v1) / `signingCertificateV2` binding.
@@ -243,14 +243,14 @@ fn signing_cert_binding(signer_info: &SignerInfo, signer_cert: &Certificate) -> 
         .and_then(|value| value.to_der().ok())
         .and_then(|der| ess_cert_hash(&der, v2))
     else {
-        return SigningCertBinding::Unparseable;
+        return SigningCertBinding::Unparsable;
     };
 
     // The hash is over the certificate's exact DER encoding. Re-encoding the
     // parsed certificate reproduces those bytes for any canonical-DER input
     // (which every conformant X.509 certificate is).
     let Ok(cert_der) = signer_cert.to_der() else {
-        return SigningCertBinding::Unparseable;
+        return SigningCertBinding::Unparsable;
     };
     if algo.hash(&cert_der) == want_hash {
         SigningCertBinding::Match
@@ -262,7 +262,7 @@ fn signing_cert_binding(signer_info: &SignerInfo, signer_cert: &Certificate) -> 
 /// Extract the (hash algorithm, certHash) of the first `ESSCertID`/`ESSCertIDv2`
 /// in a `SigningCertificate`/`SigningCertificateV2` attribute value.
 ///
-/// Structure (RFC 5035), descending three nested SEQUENCEs to the first cert:
+/// Structure (RFC 5035), descending three nested SEQUENCE layers to the cert:
 /// `SigningCertificate ::= SEQUENCE { certs SEQUENCE OF ESSCertID, ... }` and
 /// `ESSCertID ::= SEQUENCE { certHash OCTET STRING, issuerSerial OPTIONAL }`.
 /// v2 differs only in an optional leading `hashAlgorithm` (DEFAULT SHA-256).
