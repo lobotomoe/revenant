@@ -14,6 +14,8 @@
 //!                          <--   [ChangeCipherSpec], Finished
 //! ```
 
+use std::time::{Duration, Instant};
+
 use const_oid::ObjectIdentifier;
 use der::Decode;
 use rand::RngCore;
@@ -25,7 +27,44 @@ use x509_cert::Certificate;
 use crate::error::TlsError;
 use crate::record::{
     constant_time_eq, Connection, MacAlg, CT_ALERT, CT_CHANGE_CIPHER_SPEC, CT_HANDSHAKE,
+    TLS_VERSION,
 };
+
+/// A wall-clock bound on the whole handshake.
+///
+/// The per-read socket timeout only fires when the server sends *nothing*. It
+/// does not fire against a server that makes just enough progress to keep each
+/// read returning -- e.g. a flood of empty `CT_HANDSHAKE` records, which never
+/// completes a handshake message yet never blocks. Without an overall deadline
+/// [`HandshakeReader::next`] would spin forever; this bounds it, mirroring the
+/// deadline `http::read_response` already applies to the response body.
+#[derive(Clone, Copy)]
+struct Deadline {
+    at: Instant,
+    timeout_secs: u64,
+}
+
+impl Deadline {
+    fn new(timeout: Duration) -> Self {
+        Self {
+            at: Instant::now() + timeout,
+            timeout_secs: timeout.as_secs().max(1),
+        }
+    }
+
+    fn is_expired(&self) -> bool {
+        Instant::now() > self.at
+    }
+
+    fn err(&self, conn: &Connection) -> TlsError {
+        let (host, port) = conn.peer();
+        TlsError::Timeout {
+            host,
+            port,
+            timeout_secs: self.timeout_secs,
+        }
+    }
+}
 
 // Handshake message types (RFC 2246 section 7.4).
 const HT_SERVER_HELLO: u8 = 2;
@@ -48,7 +87,8 @@ const ENC_KEY_LEN: usize = 16;
 
 /// Run the handshake to completion, leaving `conn` with both cipher directions
 /// active and ready for application data.
-pub(crate) fn perform(conn: &mut Connection) -> Result<(), TlsError> {
+pub(crate) fn perform(conn: &mut Connection, timeout: Duration) -> Result<(), TlsError> {
+    let deadline = Deadline::new(timeout);
     let mut transcript: Vec<u8> = Vec::new();
 
     // -- ClientHello ---------------------------------------------------------
@@ -60,7 +100,7 @@ pub(crate) fn perform(conn: &mut Connection) -> Result<(), TlsError> {
 
     // -- Server flight: ServerHello .. ServerHelloDone -----------------------
     let mut reader = HandshakeReader::default();
-    let server = read_server_flight(conn, &mut reader, &mut transcript)?;
+    let server = read_server_flight(conn, &mut reader, &mut transcript, deadline)?;
     let ServerParams {
         server_random,
         mac_alg,
@@ -140,10 +180,10 @@ pub(crate) fn perform(conn: &mut Connection) -> Result<(), TlsError> {
         finished_verify_data(&master_secret, b"server finished", &transcript);
 
     // -- Server ChangeCipherSpec + Finished ----------------------------------
-    read_change_cipher_spec(conn)?;
+    read_change_cipher_spec(conn, deadline)?;
     conn.activate_read(server_write_key, server_mac_key, mac_alg);
 
-    let (msg_type, body) = reader.next(conn, &mut transcript)?;
+    let (msg_type, body) = reader.next(conn, &mut transcript, deadline)?;
     if msg_type != HT_FINISHED {
         return Err(handshake_err(
             conn,
@@ -172,6 +212,7 @@ fn read_server_flight(
     conn: &mut Connection,
     reader: &mut HandshakeReader,
     transcript: &mut Vec<u8>,
+    deadline: Deadline,
 ) -> Result<ServerParams, TlsError> {
     let mut server_random: Option<[u8; 32]> = None;
     let mut mac_alg: Option<MacAlg> = None;
@@ -179,7 +220,7 @@ fn read_server_flight(
     let mut client_cert_requested = false;
 
     loop {
-        let (msg_type, body) = reader.next(conn, transcript)?;
+        let (msg_type, body) = reader.next(conn, transcript, deadline)?;
         match msg_type {
             HT_SERVER_HELLO => {
                 let hello = parse_server_hello(&body).map_err(|r| handshake_err(conn, &r))?;
@@ -244,7 +285,16 @@ struct ServerHello {
 fn parse_server_hello(body: &[u8]) -> Result<ServerHello, String> {
     // version(2) random(32) sid_len(1) sid(n) cipher(2) compression(1)
     let mut r = ByteReader::new(body);
-    r.skip(2)?; // server_version -- we already committed to TLS 1.0
+    // We advertise TLS 1.0 only, so the server must not select anything else.
+    // A mismatch means the peer negotiated a version we do not implement -- abort
+    // rather than continue framing records as TLS 1.0 against it.
+    let server_version: [u8; 2] = r.take(2)?.try_into().expect("took exactly 2 bytes");
+    if server_version != TLS_VERSION {
+        return Err(format!(
+            "server selected unsupported TLS version {server_version:02x?}; \
+             only TLS 1.0 [03, 01] is supported"
+        ));
+    }
     let random: [u8; 32] = r.take(32)?.try_into().expect("took exactly 32 bytes");
     let sid_len = usize::from(r.take(1)?[0]);
     r.skip(sid_len)?;
@@ -293,7 +343,10 @@ fn finished_verify_data(master_secret: &[u8], label: &[u8], transcript: &[u8]) -
 }
 
 /// Read the server's ChangeCipherSpec record, surfacing any alert as an error.
-fn read_change_cipher_spec(conn: &mut Connection) -> Result<(), TlsError> {
+fn read_change_cipher_spec(conn: &mut Connection, deadline: Deadline) -> Result<(), TlsError> {
+    if deadline.is_expired() {
+        return Err(deadline.err(conn));
+    }
     let record = conn
         .read()?
         .ok_or_else(|| handshake_err(conn, "peer closed before ChangeCipherSpec"))?;
@@ -319,6 +372,7 @@ impl HandshakeReader {
         &mut self,
         conn: &mut Connection,
         transcript: &mut Vec<u8>,
+        deadline: Deadline,
     ) -> Result<(u8, Vec<u8>), TlsError> {
         loop {
             if self.buffer.len() >= 4 {
@@ -331,6 +385,12 @@ impl HandshakeReader {
                     let body = message[4..].to_vec();
                     return Ok((message[0], body));
                 }
+            }
+            // The buffer lacks a complete message and we are about to block on
+            // more data: enforce the overall handshake deadline so a server that
+            // dribbles records (or empty ones) cannot spin this loop forever.
+            if deadline.is_expired() {
+                return Err(deadline.err(conn));
             }
             let record = conn
                 .read()?
@@ -448,5 +508,42 @@ mod tests {
     #[test]
     fn u24_roundtrip() {
         assert_eq!(u24(put_u24(0x0012_3456)), 0x0012_3456);
+    }
+
+    #[test]
+    fn deadline_expiry() {
+        // A zero-length budget is already spent; a real one is not.
+        assert!(Deadline::new(Duration::ZERO).is_expired());
+        assert!(!Deadline::new(Duration::from_secs(60)).is_expired());
+        // The reported timeout is floored at 1 second even for sub-second budgets.
+        assert_eq!(Deadline::new(Duration::ZERO).timeout_secs, 1);
+    }
+
+    /// A minimal ServerHello body: version, 32-byte random, empty session id, a
+    /// cipher suite, and null compression.
+    fn server_hello_body(version: [u8; 2], suite: u16) -> Vec<u8> {
+        let mut body = version.to_vec();
+        body.extend_from_slice(&[7u8; 32]);
+        body.push(0); // session id length
+        body.extend_from_slice(&suite.to_be_bytes());
+        body.push(0); // compression method
+        body
+    }
+
+    #[test]
+    fn server_hello_rejects_non_tls10_version() {
+        // A server that answers TLS 1.2 (03 03) to our TLS 1.0 ClientHello.
+        let body = server_hello_body([3, 3], SUITE_RSA_RC4_MD5);
+        match parse_server_hello(&body) {
+            Err(err) => assert!(err.contains("unsupported TLS version"), "{err}"),
+            Ok(_) => panic!("a non-TLS-1.0 ServerHello must be rejected"),
+        }
+    }
+
+    #[test]
+    fn server_hello_accepts_tls10() {
+        let hello = parse_server_hello(&server_hello_body([3, 1], SUITE_RSA_RC4_SHA)).unwrap();
+        assert!(matches!(hello.mac_alg, MacAlg::Sha1));
+        assert_eq!(hello.random, [7u8; 32]);
     }
 }

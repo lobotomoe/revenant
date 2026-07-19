@@ -39,7 +39,7 @@ pub(crate) fn request(
         target.host,
         target.port
     );
-    handshake::perform(&mut conn)?;
+    handshake::perform(&mut conn, timeout)?;
     log::warn!(
         "using legacy TLS (TLS 1.0 + RC4) for {}:{}; this cipher suite is deprecated",
         target.host,
@@ -72,14 +72,34 @@ impl Target {
             None => (rest, "/"),
         };
 
-        let (host, port) = match authority.rsplit_once(':') {
-            Some((h, p)) => {
-                let port = p
+        let (host, port) = if let Some(rest) = authority.strip_prefix('[') {
+            // IPv6 literal: `[addr]` or `[addr]:port`. A plain rsplit on ':'
+            // would split inside the address, so parse the brackets explicitly.
+            let (addr, after) = rest.split_once(']').ok_or_else(|| {
+                TlsError::InvalidUrl(format!("unterminated IPv6 literal in URL: {url}"))
+            })?;
+            let port = match after.strip_prefix(':') {
+                Some(p) => p
                     .parse::<u16>()
-                    .map_err(|_| TlsError::InvalidUrl(format!("invalid port in URL: {url}")))?;
-                (h.to_string(), port)
+                    .map_err(|_| TlsError::InvalidUrl(format!("invalid port in URL: {url}")))?,
+                None if after.is_empty() => 443,
+                None => {
+                    return Err(TlsError::InvalidUrl(format!(
+                        "unexpected text after IPv6 literal in URL: {url}"
+                    )))
+                }
+            };
+            (addr.to_string(), port)
+        } else {
+            match authority.rsplit_once(':') {
+                Some((h, p)) => {
+                    let port = p
+                        .parse::<u16>()
+                        .map_err(|_| TlsError::InvalidUrl(format!("invalid port in URL: {url}")))?;
+                    (h.to_string(), port)
+                }
+                None => (authority.to_string(), 443),
             }
-            None => (authority.to_string(), 443),
         };
 
         if host.is_empty() {
@@ -100,10 +120,16 @@ impl Target {
 
     /// The `Host` header value, including the port only when non-standard.
     fn host_header(&self) -> String {
-        if STANDARD_PORTS.contains(&self.port) {
-            self.host.clone()
+        // An IPv6 literal must be bracketed in a Host header (RFC 7230 section 5.4).
+        let host = if self.host.contains(':') {
+            format!("[{}]", self.host)
         } else {
-            format!("{}:{}", self.host, self.port)
+            self.host.clone()
+        };
+        if STANDARD_PORTS.contains(&self.port) {
+            host
+        } else {
+            format!("{host}:{}", self.port)
         }
     }
 }
@@ -121,9 +147,20 @@ fn connect(target: &Target, timeout: Duration) -> Result<TcpStream, TlsError> {
     for addr in addrs {
         match TcpStream::connect_timeout(&addr, timeout) {
             Ok(stream) => {
-                stream.set_read_timeout(Some(timeout)).ok();
-                stream.set_write_timeout(Some(timeout)).ok();
-                stream.set_nodelay(true).ok();
+                // The read/write timeout underpins every deadline in this module.
+                // If the OS refuses it, fail loud rather than silently fall back
+                // to a socket that can block forever.
+                let set_timeout = stream
+                    .set_read_timeout(Some(timeout))
+                    .and_then(|()| stream.set_write_timeout(Some(timeout)));
+                if let Err(source) = set_timeout {
+                    return Err(TlsError::Connect {
+                        host: target.host.clone(),
+                        port: target.port,
+                        source,
+                    });
+                }
+                stream.set_nodelay(true).ok(); // latency hint only; non-fatal
                 return Ok(stream);
             }
             Err(err) => last_err = Some(err),
@@ -314,6 +351,29 @@ mod tests {
     #[test]
     fn parse_url_rejects_http() {
         assert!(Target::parse("http://example.com").is_err());
+    }
+
+    #[test]
+    fn parse_ipv6_literal_with_port() {
+        let t = Target::parse("https://[2001:db8::1]:8080/x").unwrap();
+        assert_eq!(t.host, "2001:db8::1");
+        assert_eq!(t.port, 8080);
+        assert_eq!(t.path, "/x");
+        // The Host header must re-bracket the IPv6 literal.
+        assert_eq!(t.host_header(), "[2001:db8::1]:8080");
+    }
+
+    #[test]
+    fn parse_ipv6_literal_default_port() {
+        let t = Target::parse("https://[::1]").unwrap();
+        assert_eq!(t.host, "::1");
+        assert_eq!(t.port, 443);
+        assert_eq!(t.host_header(), "[::1]");
+    }
+
+    #[test]
+    fn parse_ipv6_unterminated_is_rejected() {
+        assert!(Target::parse("https://[::1:8080/x").is_err());
     }
 
     #[test]
