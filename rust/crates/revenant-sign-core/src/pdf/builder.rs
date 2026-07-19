@@ -85,6 +85,17 @@ pub fn prepare_pdf_with_sig_field(
 ) -> Result<PreparedPdf> {
     // Read-only analysis of the original PDF.
     let root = find_root_obj_num(pdf_bytes)?;
+    // The incremental-update assembly redefines the catalog as `N 0 obj` and
+    // lists every appended object in the xref at generation 0. A catalog at a
+    // non-zero generation (effectively never seen in practice) would leave the
+    // new `/Root N G R` reference dangling against a gen-0 xref entry, so reject
+    // it up front rather than emit a structurally inconsistent file.
+    if root.gen != 0 {
+        return Err(RevenantError::Pdf(format!(
+            "Catalog /Root has generation {}; only generation 0 is supported.",
+            root.gen
+        )));
+    }
     let reader = PdfReader::open(pdf_bytes)?;
     if reader.is_encrypted() {
         return Err(RevenantError::Pdf(

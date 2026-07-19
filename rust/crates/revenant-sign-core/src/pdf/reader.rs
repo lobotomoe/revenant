@@ -17,6 +17,10 @@ use crate::{Result, RevenantError};
 /// A page tree deeper than this is almost certainly malformed or cyclic.
 const MAX_PARENT_DEPTH: usize = 64;
 
+/// `/SigFlags` bits to OR into an AcroForm when adding a signature field:
+/// bit 1 = SignaturesExist, bit 2 = AppendOnly (ISO 32000-1 Table 219).
+const SIG_FLAGS_SIGNED_APPEND: i64 = 1 | 2;
+
 /// An indirect-object reference: object number and generation. Displays as the
 /// PDF `"N G R"` reference syntax.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -132,8 +136,13 @@ impl PdfReader {
         }
         if let Ok(id_obj) = self.doc.trailer.get(b"ID") {
             let mut buf = Vec::new();
-            write_object(id_obj, &mut buf);
-            out.push(format!("/ID {}", String::from_utf8_lossy(&buf)));
+            write_id_forcing_hex(id_obj, &mut buf);
+            // Forcing the hex form guarantees ASCII output, so this conversion is
+            // lossless -- a literal /ID carrying raw bytes would otherwise be
+            // corrupted by String::from_utf8_lossy.
+            if let Ok(id_str) = String::from_utf8(buf) {
+                out.push(format!("/ID {id_str}"));
+            }
         }
         out
     }
@@ -268,6 +277,120 @@ impl PdfReader {
         Ok(out)
     }
 
+    /// Build a raw catalog override that installs the signature field into the
+    /// document's AcroForm, **merging** with any AcroForm the document already
+    /// has instead of replacing it.
+    ///
+    /// A signing tool must not destroy an existing form. Overwriting `/AcroForm`
+    /// wholesale orphans every existing field -- and, when re-signing, the prior
+    /// signature's field -- so a reader reports the earlier form/signature as
+    /// removed. This preserves the existing `/Fields` (appending the new one),
+    /// keeps ancillary keys (`/DR`, `/DA`, `/NeedAppearances`, `/CO`, ...), and
+    /// OR-s the append-only / signatures-exist bits into `/SigFlags`.
+    ///
+    /// With no existing AcroForm it emits the minimal `<< /Fields [N 0 R]
+    /// /SigFlags 3 >>`, matching the fresh-form case.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`RevenantError::Pdf`] if the catalog object is missing or is not
+    /// a dictionary.
+    pub fn catalog_override_with_sig_field(
+        &self,
+        root_obj_num: u32,
+        new_field_obj_num: u32,
+    ) -> Result<Vec<u8>> {
+        let obj = self
+            .doc
+            .get_object((root_obj_num, 0))
+            .map_err(|e| RevenantError::Pdf(format!("Cannot read catalog {root_obj_num}: {e}")))?;
+        let dict = obj.as_dict().map_err(|e| {
+            RevenantError::Pdf(format!("Catalog {root_obj_num} is not a dictionary: {e}"))
+        })?;
+
+        let mut out = Vec::new();
+        out.extend_from_slice(format!("{root_obj_num} 0 obj\n<<\n").as_bytes());
+        for (key, value) in dict {
+            if key.as_slice() == b"AcroForm" {
+                continue;
+            }
+            out.extend_from_slice(b"  ");
+            write_name(key, &mut out);
+            out.push(b' ');
+            write_object(value, &mut out);
+            out.push(b'\n');
+        }
+        out.extend_from_slice(b"  /AcroForm << ");
+        self.write_merged_acroform_body(dict.get(b"AcroForm").ok(), new_field_obj_num, &mut out);
+        out.extend_from_slice(b">>\n>>\nendobj\n");
+        Ok(out)
+    }
+
+    /// Write the body (between `<<` and `>>`) of the merged AcroForm dictionary.
+    ///
+    /// `existing` is the catalog's current `/AcroForm` value, if any (an inline
+    /// dict or an indirect reference -- both are handled via [`Self::deref`]).
+    fn write_merged_acroform_body(
+        &self,
+        existing: Option<&Object>,
+        new_field_obj_num: u32,
+        out: &mut Vec<u8>,
+    ) {
+        let existing_dict = existing
+            .map(|o| self.deref(o))
+            .and_then(|o| o.as_dict().ok());
+
+        let mut wrote_fields = false;
+        let mut wrote_sigflags = false;
+        if let Some(acroform) = existing_dict {
+            for (key, value) in acroform {
+                match key.as_slice() {
+                    b"Fields" => {
+                        self.write_merged_fields(value, new_field_obj_num, out);
+                        wrote_fields = true;
+                    }
+                    b"SigFlags" => {
+                        let flags =
+                            self.deref(value).as_i64().unwrap_or(0) | SIG_FLAGS_SIGNED_APPEND;
+                        out.extend_from_slice(format!("/SigFlags {flags} ").as_bytes());
+                        wrote_sigflags = true;
+                    }
+                    _ => {
+                        write_name(key, out);
+                        out.push(b' ');
+                        write_object(value, out);
+                        out.push(b' ');
+                    }
+                }
+            }
+        }
+        if !wrote_fields {
+            out.extend_from_slice(format!("/Fields [{new_field_obj_num} 0 R] ").as_bytes());
+        }
+        if !wrote_sigflags {
+            out.extend_from_slice(format!("/SigFlags {SIG_FLAGS_SIGNED_APPEND} ").as_bytes());
+        }
+    }
+
+    /// Write `/Fields [ <existing...> <new> 0 R ]`, preserving the existing field
+    /// references. Those objects live in the original bytes, untouched by the
+    /// incremental update, so referencing them by number stays valid.
+    fn write_merged_fields(
+        &self,
+        fields_value: &Object,
+        new_field_obj_num: u32,
+        out: &mut Vec<u8>,
+    ) {
+        out.extend_from_slice(b"/Fields [");
+        if let Ok(array) = self.deref(fields_value).as_array() {
+            for elem in array {
+                write_object(elem, out);
+                out.push(b' ');
+            }
+        }
+        out.extend_from_slice(format!("{new_field_obj_num} 0 R] ").as_bytes());
+    }
+
     /// Resolve `key` on `start`, walking `/Parent` for inheritable page
     /// attributes (MediaBox/CropBox/Rotate), depth-capped against cycles.
     fn get_inherited(&self, start: ObjectId, key: &[u8]) -> Option<&Object> {
@@ -362,6 +485,32 @@ fn format_real(value: f32) -> String {
     format!("{value}")
 }
 
+/// Serialize a trailer `/ID` value, forcing every string element to the
+/// hexadecimal `<...>` form.
+///
+/// `/ID` is an array of two byte strings. Emitting them as hex keeps the output
+/// pure ASCII and byte-exact; a literal `(...)` string carrying raw binary bytes
+/// (which `/ID` values routinely are) would otherwise be mangled when the entry
+/// is folded into the trailer text. Hex and literal forms encode the same bytes,
+/// so the carried-forward `/ID` stays identical to the original -- what a
+/// revision-consistency check requires.
+fn write_id_forcing_hex(obj: &Object, out: &mut Vec<u8>) {
+    match obj {
+        Object::String(text, _) => write_string(text, lopdf::StringFormat::Hexadecimal, out),
+        Object::Array(array) => {
+            out.push(b'[');
+            for (i, elem) in array.iter().enumerate() {
+                if i > 0 {
+                    out.push(b' ');
+                }
+                write_id_forcing_hex(elem, out);
+            }
+            out.push(b']');
+        }
+        other => write_object(other, out),
+    }
+}
+
 fn write_string(text: &[u8], format: lopdf::StringFormat, out: &mut Vec<u8>) {
     match format {
         lopdf::StringFormat::Literal => {
@@ -441,6 +590,20 @@ mod tests {
     }
 
     #[test]
+    fn id_carried_forward_as_hex_preserves_binary() {
+        // A literal /ID string carrying raw (non-UTF-8) bytes must survive the
+        // carry-forward; forcing hex keeps the bytes exact and the output ASCII.
+        let id = Object::Array(vec![
+            Object::String(vec![0x00, 0xFF, 0x41, 0x9A], lopdf::StringFormat::Literal),
+            Object::String(vec![0xDE, 0xAD], lopdf::StringFormat::Hexadecimal),
+        ]);
+        let mut buf = Vec::new();
+        write_id_forcing_hex(&id, &mut buf);
+        let text = String::from_utf8(buf).expect("forced-hex /ID output must be ASCII");
+        assert_eq!(text, "[<00FF419A> <DEAD>]");
+    }
+
+    #[test]
     fn reads_single_letter_page() {
         let r = PdfReader::open(BLANK_LETTER).unwrap();
         assert_eq!(r.page_count(), 1);
@@ -512,5 +675,92 @@ mod tests {
         let text = String::from_utf8_lossy(&raw);
         assert!(!text.contains("/Type /Page"), "{text}");
         assert!(text.contains("/Extra 1"), "{text}");
+    }
+
+    /// The object number of the catalog (`/Root`) in a PDF.
+    fn root_obj_num(pdf: &[u8]) -> u32 {
+        let doc = Document::load_mem(pdf).unwrap();
+        doc.trailer.get(b"Root").unwrap().as_reference().unwrap().0
+    }
+
+    /// A minimal one-page PDF carrying an AcroForm with a single text field and
+    /// `SigFlags` = 1. Returns `(bytes, existing_field_num, catalog_num)`.
+    fn pdf_with_acroform() -> (Vec<u8>, u32, u32) {
+        use lopdf::{dictionary, Object};
+
+        let mut doc = Document::with_version("1.7");
+        let page_tree_id = doc.new_object_id();
+        let field_id = doc.add_object(dictionary! {
+            "Type" => "Annot",
+            "Subtype" => "Widget",
+            "FT" => "Tx",
+            "T" => Object::string_literal("existing_field"),
+            "Rect" => vec![0.into(), 0.into(), 100.into(), 20.into()],
+        });
+        let page_id = doc.add_object(dictionary! {
+            "Type" => "Page",
+            "Parent" => page_tree_id,
+            "MediaBox" => vec![0.into(), 0.into(), 612.into(), 792.into()],
+            "Annots" => vec![Object::Reference(field_id)],
+        });
+        doc.objects.insert(
+            page_tree_id,
+            Object::Dictionary(dictionary! {
+                "Type" => "Pages",
+                "Kids" => vec![Object::Reference(page_id)],
+                "Count" => 1,
+            }),
+        );
+        let acroform_id = doc.add_object(dictionary! {
+            "Fields" => vec![Object::Reference(field_id)],
+            "SigFlags" => 1,
+            "NeedAppearances" => true,
+        });
+        let catalog_id = doc.add_object(dictionary! {
+            "Type" => "Catalog",
+            "Pages" => page_tree_id,
+            "AcroForm" => Object::Reference(acroform_id),
+        });
+        doc.trailer.set("Root", catalog_id);
+
+        let mut buf = Vec::new();
+        doc.save_to(&mut buf).expect("save fixture PDF");
+        (buf, field_id.0, catalog_id.0)
+    }
+
+    #[test]
+    fn catalog_override_creates_acroform_when_absent() {
+        // No existing form: the minimal field-only AcroForm, byte-identical to the
+        // pre-merge behavior, so plain-document signing is unchanged.
+        let r = PdfReader::open(BLANK_LETTER).unwrap();
+        let root = root_obj_num(BLANK_LETTER);
+        let raw = r.catalog_override_with_sig_field(root, 99).unwrap();
+        let text = String::from_utf8_lossy(&raw);
+        assert!(
+            text.contains("/AcroForm << /Fields [99 0 R] /SigFlags 3 >>"),
+            "{text}"
+        );
+        assert!(text.contains("/Type /Catalog"), "{text}");
+    }
+
+    #[test]
+    fn catalog_override_merges_existing_acroform() {
+        // Regression for the form-destroying bug: signing a PDF that already has
+        // an AcroForm must keep the existing fields and merge, not replace.
+        let (pdf, field_num, root) = pdf_with_acroform();
+        let r = PdfReader::open(&pdf).unwrap();
+        let raw = r.catalog_override_with_sig_field(root, 99).unwrap();
+        let text = String::from_utf8_lossy(&raw);
+
+        assert!(text.contains("/Type /Catalog"), "{text}");
+        // Existing field preserved, new field appended after it.
+        assert!(
+            text.contains(&format!("/Fields [{field_num} 0 R 99 0 R]")),
+            "{text}"
+        );
+        // SigFlags 1 (SignaturesExist) OR-ed with append-only -> 3.
+        assert!(text.contains("/SigFlags 3"), "{text}");
+        // Ancillary AcroForm keys carried forward, not dropped.
+        assert!(text.contains("/NeedAppearances true"), "{text}");
     }
 }
