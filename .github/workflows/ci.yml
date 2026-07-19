@@ -132,9 +132,14 @@ jobs:
           # which is not valid SPDX, so the scanner tags the license as "bad".
           # dbus/libdbus-sys are the Linux keyring backend; unicode-properties and
           # stringprep come in via lopdf's PDF-encryption (SASLprep) path; all fine.
+          # The last three arrive with the egui/eframe GUI stack: clipboard-win and
+          # error-code are BSL-1.0 (permissive, OSI-approved); epaint_default_fonts
+          # bundles fonts under OFL-1.1 / Ubuntu-font-1.0 (redistribution-friendly).
           allow-dependencies-licenses: >-
             pkg:cargo/dbus, pkg:cargo/libdbus-sys, pkg:cargo/rangemap,
-            pkg:cargo/unicode-properties, pkg:cargo/stringprep
+            pkg:cargo/unicode-properties, pkg:cargo/stringprep,
+            pkg:cargo/clipboard-win, pkg:cargo/error-code,
+            pkg:cargo/epaint_default_fonts
 
   typecheck:
     name: Type Check
