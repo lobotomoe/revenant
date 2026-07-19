@@ -94,7 +94,7 @@ regex = "1"
 hex = "0.4"
 
 # -- XML (entity-expansion disabled at call sites to avoid billion-laughs) ---
-quick-xml = "0.37"
+quick-xml = "0.41"
 
 # -- HTTP for the standard (non-legacy) TLS path -----------------------------
 ureq = "2.12"
