@@ -241,7 +241,9 @@ pub(super) fn deflate(data: &[u8]) -> Result<Vec<u8>> {
         .map_err(|e| RevenantError::Pdf(format!("Deflate compression failed: {e}")))
 }
 
-/// Build a raw override of the catalog that adds `/AcroForm`.
+/// Build a raw override of the catalog that installs the signature field into
+/// the AcroForm, merging with any existing form (see
+/// [`PdfReader::catalog_override_with_sig_field`]).
 ///
 /// # Errors
 ///
@@ -252,11 +254,7 @@ pub fn build_catalog_override(
     root_obj_num: u32,
     annot_obj_num: u32,
 ) -> Result<Vec<u8>> {
-    reader.object_override(
-        root_obj_num,
-        "/AcroForm",
-        &format!("  /AcroForm << /Fields [{annot_obj_num} 0 R] /SigFlags 3 >>"),
-    )
+    reader.catalog_override_with_sig_field(root_obj_num, annot_obj_num)
 }
 
 #[cfg(test)]

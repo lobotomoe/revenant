@@ -290,6 +290,18 @@ pub fn build_xref_stream(
 
     let actual_size = xref_obj_num + 1;
     let max_offset = all_entries.values().copied().max().unwrap_or(0);
+    // Offsets are written as fixed-width big-endian fields whose width
+    // `bytes_needed` caps at 4. An offset past 4 bytes would be silently
+    // truncated to a wrong location, corrupting the xref stream -- reject the
+    // document instead (fail loud). The table path has an equivalent limit via
+    // the 10-digit `/ByteRange` field.
+    if max_offset > 0xFFFF_FFFF {
+        return Err(RevenantError::Pdf(
+            "Document too large to sign with a cross-reference stream: a byte \
+             offset exceeds the 4-byte xref field width."
+                .to_owned(),
+        ));
+    }
     let w2 = bytes_needed(max_offset);
 
     let nums: Vec<u32> = all_entries.keys().copied().collect();
@@ -463,5 +475,14 @@ mod tests {
     fn empty_xref_errors() {
         let entries = BTreeMap::new();
         assert!(build_xref_and_trailer(&entries, 1, 0, 1, 0, &[], 0).is_err());
+    }
+
+    #[test]
+    fn xref_stream_rejects_offset_beyond_four_bytes() {
+        // A 4 GiB offset needs five bytes; the fixed-width field would truncate
+        // it, so signing must fail loudly rather than emit a corrupt xref stream.
+        let mut entries = BTreeMap::new();
+        entries.insert(4u32, 0x1_0000_0000usize);
+        assert!(build_xref_stream(&entries, 0, 1, 0, &[], 100, 5).is_err());
     }
 }
