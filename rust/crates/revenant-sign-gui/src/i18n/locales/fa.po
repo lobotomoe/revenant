@@ -589,3 +589,11 @@ msgstr "آخر"
 
 msgid "gui.page_first"
 msgstr "اول"
+
+#. EN: Drop a PDF here or click to browse
+msgid "gui.drop_pdf_hint"
+msgstr "یک PDF را اینجا رها کنید یا برای انتخاب کلیک کنید"
+
+#. EN: Drop an image or click (optional)
+msgid "gui.drop_image_hint"
+msgstr "یک تصویر را رها کنید یا کلیک کنید (اختیاری)"

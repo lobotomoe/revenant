@@ -63,6 +63,10 @@ pub(crate) fn install(ctx: &egui::Context) {
         }
     }
 
+    // Phosphor icon glyphs, registered as a proportional fallback so the
+    // `egui_phosphor::regular::*` code points render inline with text.
+    egui_phosphor::add_to_fonts(&mut fonts, egui_phosphor::Variant::Regular);
+
     ctx.set_fonts(fonts);
 }
 

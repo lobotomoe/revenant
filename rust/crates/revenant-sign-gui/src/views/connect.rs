@@ -131,8 +131,9 @@ pub(crate) fn show(
         ui.separator();
         ui.horizontal(|ui| {
             let busy = matches!(state.status, Status::Pinging);
+            let connect_label = format!("{}  {}", crate::icons::CONNECT, l10n.t("gui.connect"));
             if ui
-                .add_enabled(!busy, egui::Button::new(l10n.t("gui.connect")))
+                .add_enabled(!busy, crate::style::primary_button(connect_label))
                 .clicked()
             {
                 action = state.resolve();

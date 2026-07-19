@@ -26,7 +26,7 @@ pub(crate) fn show(ui: &mut egui::Ui, l10n: &Localizer, store: &ConfigStore) -> 
     let signer = store.signer_info();
     let profile = store.active_profile();
 
-    egui::Frame::group(ui.style()).show(ui, |ui| {
+    crate::style::card(ui).show(ui, |ui| {
         let rows = identity_rows(profile.as_ref(), &signer, l10n);
         if rows.is_empty() {
             ui.label(egui::RichText::new(l10n.t("gui.no_signer")).color(theme::MUTED));
@@ -54,7 +54,8 @@ pub(crate) fn show(ui: &mut egui::Ui, l10n: &Localizer, store: &ConfigStore) -> 
 
         ui.label(egui::RichText::new(store.credential_storage_info()).color(theme::MUTED));
 
-        if ui.button(l10n.t("gui.log_out")).clicked() {
+        let log_out = format!("{}  {}", crate::icons::LOG_OUT, l10n.t("gui.log_out"));
+        if ui.button(log_out).clicked() {
             action = AccountAction::LogOut;
         }
     });

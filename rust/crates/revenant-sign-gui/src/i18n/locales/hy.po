@@ -789,3 +789,11 @@ msgstr "Վերջին"
 #. EN: First
 msgid "gui.page_first"
 msgstr "Առաջին"
+
+#. EN: Drop a PDF here or click to browse
+msgid "gui.drop_pdf_hint"
+msgstr "Քաշեք PDF-ն այստեղ կամ սեղմեք ընտրելու համար"
+
+#. EN: Drop an image or click (optional)
+msgid "gui.drop_image_hint"
+msgstr "Քաշեք պատկերը կամ սեղմեք (ըստ ցանկության)"

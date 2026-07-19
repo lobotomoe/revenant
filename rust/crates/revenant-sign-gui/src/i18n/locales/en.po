@@ -110,6 +110,12 @@ msgstr "Cut"
 msgid "gui.detached_p7s"
 msgstr "Detached (.p7s)"
 
+msgid "gui.drop_pdf_hint"
+msgstr "Drop a PDF here or click to browse"
+
+msgid "gui.drop_image_hint"
+msgstr "Drop an image or click (optional)"
+
 msgid "gui.detached_signature"
 msgstr "Detached signature"
 
@@ -261,7 +267,7 @@ msgid "gui.organization_label"
 msgstr "Organization:"
 
 msgid "gui.output_opt_label"
-msgstr "Output (opt):"
+msgstr "Save to:"
 
 msgid "gui.output_path_must_be_absolute_use_browse_to_select_a_location"
 msgstr "Output path must be absolute.\nUse 'Browse...' to select a location."

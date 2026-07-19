@@ -85,19 +85,30 @@ pub(crate) fn show(ui: &mut egui::Ui, l10n: &Localizer, state: &mut VerifyState)
     let mut action = VerifyAction::None;
     ui.add_space(8.0);
 
-    ui.horizontal(|ui| {
-        ui.label(l10n.t("gui.pdf_file_label"));
-        ui.text_edit_singleline(&mut state.pdf_path);
-        if ui.button(l10n.t("gui.browse_ellipsis")).clicked() {
-            action = VerifyAction::BrowsePdf;
-        }
-    });
+    let title = crate::style::zone_title(l10n.t("gui.pdf_file_label"));
+    let name = crate::style::zone_basename(&state.pdf_path);
+    let zone = crate::style::drop_zone(
+        ui,
+        crate::icons::PDF,
+        &title,
+        name.as_deref(),
+        l10n.t("gui.drop_pdf_hint"),
+        crate::style::PDF_EXTS,
+    );
+    if zone.clicked {
+        action = VerifyAction::BrowsePdf;
+    }
 
-    ui.add_space(6.0);
+    ui.add_space(8.0);
     let busy = matches!(state.status, Status::Running);
     let ready = !busy && !state.pdf_path.trim().is_empty();
+    let verify_label = format!(
+        "{}  {}",
+        crate::icons::VERIFY,
+        l10n.t("gui.verify_signature")
+    );
     if ui
-        .add_enabled(ready, egui::Button::new(l10n.t("gui.verify_signature")))
+        .add_enabled(ready, crate::style::primary_button(verify_label))
         .clicked()
     {
         action = VerifyAction::Verify;
