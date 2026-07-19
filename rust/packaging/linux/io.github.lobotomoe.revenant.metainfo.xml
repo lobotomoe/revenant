@@ -1,0 +1,193 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<component type="desktop-application">
+  <id>io.github.lobotomoe.revenant</id>
+  <name>Revenant</name>
+  <summary>Electronic document signing with ARX CoSign</summary>
+  <metadata_license>CC0-1.0</metadata_license>
+  <project_license>Apache-2.0</project_license>
+
+  <keywords>
+    <keyword>sign</keyword>
+    <keyword>pdf</keyword>
+    <keyword>signature</keyword>
+    <keyword>electronic</keyword>
+    <keyword>cosign</keyword>
+    <keyword>pkcs7</keyword>
+  </keywords>
+
+  <description>
+    <p>
+      Cross-platform client for signing PDF documents via the ARX CoSign
+      SOAP API (OASIS DSS standard). Works on macOS, Linux, and Windows
+      without requiring a Windows-only CoSign client.
+    </p>
+    <p>Features:</p>
+    <ul>
+      <li>Embedded PDF signatures with visual appearance</li>
+      <li>Detached CMS/PKCS#7 signatures</li>
+      <li>Pre-computed SHA-1 hash signing</li>
+      <li>Automatic signer identity discovery from server or signed PDFs</li>
+      <li>Secure credential storage via system keychain</li>
+    </ul>
+  </description>
+
+  <categories>
+    <category>Office</category>
+    <category>Security</category>
+  </categories>
+
+  <launchable type="desktop-id">io.github.lobotomoe.revenant.desktop</launchable>
+
+  <url type="homepage">https://github.com/lobotomoe/revenant</url>
+  <url type="bugtracker">https://github.com/lobotomoe/revenant/issues</url>
+  <url type="vcs-browser">https://github.com/lobotomoe/revenant</url>
+  <url type="contribute">https://github.com/lobotomoe/revenant</url>
+
+  <developer id="io.github.lobotomoe">
+    <name>Aleksandr Kraiz</name>
+  </developer>
+
+  <provides>
+    <binary>revenant-gui</binary>
+    <binary>revenant</binary>
+  </provides>
+
+  <requires>
+    <display_length compare="ge">640</display_length>
+  </requires>
+
+  <supports>
+    <control>pointing</control>
+    <control>keyboard</control>
+  </supports>
+
+  <content_rating type="oars-1.1" />
+
+
+  <branding>
+    <color type="primary" scheme_preference="light">#4a90d9</color>
+    <color type="primary" scheme_preference="dark">#1c4a7e</color>
+  </branding>
+
+  <releases>
+    <release version="1.2.1" date="2026-04-16">
+      <description>
+        <p>Completed Armenian locale -- 21 untranslated strings fixed.</p>
+      </description>
+    </release>
+    <release version="1.2.0" date="2026-04-14">
+      <description>
+        <p>PKI certificate chain validation and improved verification UX.</p>
+        <ul>
+          <li>Validate signer certificate chains against ETSI Trust Service Lists (TSL)</li>
+          <li>Human-readable trust status in verify results (trusted / not publicly trusted)</li>
+          <li>Test coverage expanded to 95%+ (740 tests)</li>
+        </ul>
+      </description>
+    </release>
+    <release version="1.1.1" date="2026-04-10">
+      <description>
+        <p>Improved Russian and Armenian translations, added English locale.</p>
+      </description>
+    </release>
+    <release version="1.1.0" date="2026-04-09">
+      <description>
+        <p>Russian and Armenian localization, signature position preview, friendly error messages, BER signature support.</p>
+        <ul>
+          <li>Mac App Store, Homebrew, and DMG now support Intel Macs</li>
+          <li>Universal binary merging via lipo</li>
+        </ul>
+      </description>
+    </release>
+    <release version="1.0.0" date="2026-02-26">
+      <description>
+        <p>First stable release. MS Store and MAS distribution.</p>
+        <ul>
+          <li>Configure Microsoft Store identity (Revenant Sign)</li>
+          <li>Release pipeline now includes MAS .pkg in GitHub Releases</li>
+          <li>TypeScript/Node.js client (revenant-sign on npm) with 662 tests at 97%+ coverage</li>
+        </ul>
+      </description>
+    </release>
+    <release version="0.2.6" date="2026-02-26">
+      <description>
+        <p>MAS build fix and UI cleanup.</p>
+        <ul>
+          <li>Bump minimum macOS deployment target to 12.0 for arm64-only MAS builds</li>
+          <li>Remove version from window title</li>
+        </ul>
+      </description>
+    </release>
+    <release version="0.2.5" date="2026-02-26">
+      <description>
+        <p>Mac App Store compliance fixes.</p>
+        <ul>
+          <li>Switch to Tk 9.0 for MAS build (resolves private API rejection)</li>
+          <li>Add macOS menu bar with File and Edit menus</li>
+          <li>Add Cmd+W keyboard shortcut to close windows</li>
+          <li>Add privacy policy URL to Info.plist</li>
+        </ul>
+      </description>
+    </release>
+    <release version="0.2.4" date="2026-02-21">
+      <description>
+        <p>Mac App Store fix.</p>
+        <ul>
+          <li>Use separate entitlements for nested executables (TestFlight compatibility)</li>
+        </ul>
+      </description>
+    </release>
+    <release version="0.2.3" date="2026-02-21">
+      <description>
+        <p>Mac App Store fix.</p>
+        <ul>
+          <li>Add application identifier to sandbox entitlements for TestFlight compatibility</li>
+        </ul>
+      </description>
+    </release>
+    <release version="0.2.2" date="2026-02-21">
+      <description>
+        <p>Mac App Store fix.</p>
+        <ul>
+          <li>Embed provisioning profile in MAS build for TestFlight and App Store submission</li>
+        </ul>
+      </description>
+    </release>
+    <release version="0.2.1" date="2026-02-20">
+      <description>
+        <p>Distribution improvements.</p>
+        <ul>
+          <li>Add Linux ARM64 build support</li>
+          <li>Automatic Homebrew tap update on release</li>
+        </ul>
+      </description>
+    </release>
+    <release version="0.2.0" date="2026-02-16">
+      <description>
+        <p>Naming and convention fixes.</p>
+        <ul>
+          <li>Rename position presets to Y-first convention (bottom-right, top-left, etc.)</li>
+          <li>Rename position aliases to match (br, tl, tr, bl, bc)</li>
+          <li>Fix Windows artifact naming in CI (revenant-windows-x64.zip)</li>
+          <li>Fix integration tests TLS setup for env-var-only credentials</li>
+        </ul>
+      </description>
+    </release>
+    <release version="0.1.0" date="2026-02-14">
+      <description>
+        <p>Initial alpha release with full signing and verification support.</p>
+        <ul>
+          <li>PDF digital signing via CoSign SAPI Web Service (SOAP/DSS)</li>
+          <li>Embedded visible signatures with customizable appearance</li>
+          <li>Detached CMS/PKCS#7 signature support</li>
+          <li>PDF signature verification (embedded and detached)</li>
+          <li>Cross-platform GUI with sign, verify, and setup dialogs</li>
+          <li>CLI with sign, verify, check, info, and setup commands</li>
+          <li>Multi-profile configuration with secure credential storage</li>
+          <li>Armenian font support (GHEA Grapalat, GHEA Mariam)</li>
+          <li>Legacy TLS 1.0 transport for EKENG appliance</li>
+        </ul>
+      </description>
+    </release>
+  </releases>
+</component>

@@ -481,12 +481,14 @@ jobs:
 
       - name: Validate MSIX identity
         run: |
-          # Verify AppxManifest.xml has the real Partner Center identity (not a placeholder)
-          if ! grep -q 'Publisher="CN=' python/msix/AppxManifest.xml; then
+          # Verify the active (Rust) AppxManifest has the real Partner Center
+          # identity (not a placeholder). The Python manifest is preserved under
+          # python/msix/ but no longer the shipped one.
+          if ! grep -q 'Publisher="CN=' rust/packaging/windows/AppxManifest.xml; then
             echo "::error::MSIX AppxManifest.xml is missing Publisher identity"
             exit 1
           fi
-          if grep -q 'CN=PLACEHOLDER' python/msix/AppxManifest.xml; then
+          if grep -q 'CN=PLACEHOLDER' rust/packaging/windows/AppxManifest.xml; then
             echo "::error::MSIX AppxManifest.xml still contains CN=PLACEHOLDER"
             exit 1
           fi
@@ -496,14 +498,14 @@ jobs:
           # The in-repo manifest is a reference template. The actual Flathub
           # submission uses a separate repo (flathub/io.github.lobotomoe.revenant)
           # where the commit hash is filled in after tagging. Warn but don't block.
-          if grep -q 'commit: null' python/flatpak/io.github.lobotomoe.revenant.yml; then
+          if grep -q 'commit: null' rust/packaging/linux/io.github.lobotomoe.revenant.yml; then
             echo "::warning::Flatpak manifest has null commit hashes -- update the Flathub repo after tagging"
           fi
 
       - name: Check invalid SHA256 hashes
         run: |
           # Extract sha256 values and verify they're valid hex (or all zeros for TODO placeholders)
-          hashes=$(grep -oP 'sha256:\s*\K[^\s]+' python/flatpak/io.github.lobotomoe.revenant.yml || true)
+          hashes=$(grep -oP 'sha256:\s*\K[^\s]+' rust/packaging/linux/io.github.lobotomoe.revenant.yml || true)
           for hash in $hashes; do
             if ! echo "$hash" | grep -qP '^[0-9a-f]{64}$'; then
               echo "::error::Invalid SHA256 hash in Flatpak manifest: $hash"

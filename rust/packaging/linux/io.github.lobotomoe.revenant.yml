@@ -1,0 +1,68 @@
+# Flatpak manifest for Revenant (Rust build).
+#
+# STATUS: Deferred (as on the Python side). Flathub submission is planned for a
+# future release. Before submitting, pin `tag`/`commit` to the release, and
+# generate the vendored cargo sources for the network-isolated Flathub build:
+#
+#   python flatpak-cargo-generator.py rust/Cargo.lock -o cargo-sources.json
+#
+# then add the generated entries to the `revenant` module's `sources` (Flathub
+# builds have no network, so cargo must build --offline from vendored crates).
+#
+# Build locally (Linux):
+#   flatpak-builder --user --install --force-clean build-dir \
+#     rust/packaging/linux/io.github.lobotomoe.revenant.yml
+#
+# vs the Python manifest: the whole Tcl/Tk-from-source + tkinter + pip stack is
+# GONE. A single Rust module builds the self-contained binaries against the
+# rust-stable SDK extension. The runtime and finish-args are unchanged.
+
+app-id: io.github.lobotomoe.revenant
+runtime: org.freedesktop.Platform
+runtime-version: "24.08"
+sdk: org.freedesktop.Sdk
+sdk-extensions:
+  - org.freedesktop.Sdk.Extension.rust-stable
+command: revenant-gui
+
+build-options:
+  append-path: /usr/lib/sdk/rust-stable/bin
+  env:
+    CARGO_HOME: /run/build/revenant/cargo
+
+finish-args:
+  # Network access for CoSign SOAP API
+  - --share=network
+  # Display access
+  - --share=ipc
+  - --socket=x11
+  - --socket=fallback-x11
+  - --socket=wayland
+  # File access for opening/saving PDFs
+  - --filesystem=home
+  # D-Bus access for SecretService (keyring)
+  - --talk-name=org.freedesktop.secrets
+
+modules:
+  - name: revenant
+    buildsystem: simple
+    build-commands:
+      # `--offline` once cargo-sources.json is vendored (see header); drop it for
+      # a networked local build.
+      - cargo build --release --manifest-path rust/Cargo.toml
+      - install -Dm755 rust/target/release/revenant -t ${FLATPAK_DEST}/bin
+      - install -Dm755 rust/target/release/revenant-gui -t ${FLATPAK_DEST}/bin
+      - install -Dm644 rust/packaging/linux/io.github.lobotomoe.revenant.desktop
+        ${FLATPAK_DEST}/share/applications/io.github.lobotomoe.revenant.desktop
+      - install -Dm644 rust/packaging/linux/io.github.lobotomoe.revenant.svg
+        ${FLATPAK_DEST}/share/icons/hicolor/scalable/apps/io.github.lobotomoe.revenant.svg
+      - install -Dm644 rust/packaging/linux/io.github.lobotomoe.revenant.metainfo.xml
+        ${FLATPAK_DEST}/share/metainfo/io.github.lobotomoe.revenant.metainfo.xml
+    sources:
+      - type: git
+        url: https://github.com/lobotomoe/revenant.git
+        # Tag and commit are updated at release time to match the git tag.
+        tag: v0.1.0
+        commit: null  # TODO: fill with the release commit before Flathub submission
+      # TODO: append the flatpak-cargo-generator output (cargo-sources.json) here
+      # for offline Flathub builds.

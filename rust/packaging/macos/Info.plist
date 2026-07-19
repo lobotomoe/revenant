@@ -1,0 +1,97 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<!--
+  Info.plist for the Revenant macOS .app bundle (Rust GUI).
+
+  Mirrors the store-approved keys from the Python client's py2app setup
+  (python/setup_mac.py) verbatim -- same bundle id, category, minimum OS,
+  privacy-policy URL, non-exempt-encryption flag, and PDF/.p7s document types --
+  so the Mac App Store record is unchanged. Only the executable name differs
+  (revenant-gui, the self-contained Rust binary; no Python runtime to embed).
+
+  __SHORT_VERSION__ and __BUILD_NUMBER__ are substituted by bundle-app.sh at
+  build time (marketing version from the git tag, build number from CI run).
+-->
+<plist version="1.0">
+<dict>
+	<key>CFBundleDisplayName</key>
+	<string>Revenant</string>
+	<key>CFBundleName</key>
+	<string>Revenant</string>
+	<key>CFBundleIdentifier</key>
+	<string>io.github.lobotomoe.revenant</string>
+	<key>CFBundleExecutable</key>
+	<string>revenant-gui</string>
+	<key>CFBundleIconFile</key>
+	<string>revenant.icns</string>
+	<key>CFBundleShortVersionString</key>
+	<string>__SHORT_VERSION__</string>
+	<key>CFBundleVersion</key>
+	<string>__BUILD_NUMBER__</string>
+	<key>CFBundlePackageType</key>
+	<string>APPL</string>
+	<key>NSHumanReadableCopyright</key>
+	<string>Copyright 2026 Aleksandr Kraiz. Apache License 2.0.</string>
+	<key>NSHighResolutionCapable</key>
+	<true/>
+	<key>LSMinimumSystemVersion</key>
+	<string>12.0</string>
+	<key>LSApplicationCategoryType</key>
+	<string>public.app-category.productivity</string>
+	<key>NSPrivacyPolicyURL</key>
+	<string>https://github.com/lobotomoe/revenant/blob/main/docs/privacy-policy.md</string>
+	<key>ITSAppUsesNonExemptEncryption</key>
+	<false/>
+	<key>CFBundleDocumentTypes</key>
+	<array>
+		<dict>
+			<key>CFBundleTypeName</key>
+			<string>PDF Document</string>
+			<key>CFBundleTypeRole</key>
+			<string>Editor</string>
+			<key>LSItemContentTypes</key>
+			<array>
+				<string>com.adobe.pdf</string>
+			</array>
+			<key>LSHandlerRank</key>
+			<string>Alternate</string>
+		</dict>
+		<dict>
+			<key>CFBundleTypeName</key>
+			<string>PKCS#7 Signature</string>
+			<key>CFBundleTypeRole</key>
+			<string>Viewer</string>
+			<key>LSItemContentTypes</key>
+			<array>
+				<string>io.github.lobotomoe.revenant.p7s</string>
+			</array>
+			<key>LSHandlerRank</key>
+			<string>Alternate</string>
+		</dict>
+	</array>
+	<key>UTExportedTypeDeclarations</key>
+	<array>
+		<dict>
+			<key>UTTypeIdentifier</key>
+			<string>io.github.lobotomoe.revenant.p7s</string>
+			<key>UTTypeConformsTo</key>
+			<array>
+				<string>public.data</string>
+			</array>
+			<key>UTTypeDescription</key>
+			<string>PKCS#7 Detached Signature</string>
+			<key>UTTypeTagSpecification</key>
+			<dict>
+				<key>public.filename-extension</key>
+				<array>
+					<string>p7s</string>
+				</array>
+				<key>public.mime-type</key>
+				<array>
+					<string>application/pkcs7-signature</string>
+				</array>
+			</dict>
+		</dict>
+	</array>
+</dict>
+</plist>
