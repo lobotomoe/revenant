@@ -10,8 +10,9 @@
 //! Trust Service List parser (`pki::tsl`). It lives here, in a neutral module,
 //! so neither depends on the other's internals.
 
+use quick_xml::escape::unescape;
 use quick_xml::events::{BytesStart, Event};
-use quick_xml::Reader;
+use quick_xml::{Reader, XmlVersion};
 
 /// A node in the minimal parsed DOM. Namespace prefixes are stripped from both
 /// element and attribute names.
@@ -43,8 +44,11 @@ impl Node {
         for attr in e.attributes() {
             let attr = attr.map_err(|err| format!("malformed attribute in <{name}>: {err}"))?;
             let key = local_name(attr.key.local_name().as_ref());
+            // XML 1.0 attribute-value normalization (entities resolved, EOLs and
+            // tabs collapsed to spaces) -- the drop-in for quick-xml's former
+            // `unescape_value`, and spec-correct for attribute text.
             let value = attr
-                .unescape_value()
+                .normalized_value(XmlVersion::Implicit1_0)
                 .map_err(|err| format!("cannot unescape attribute '{key}' in <{name}>: {err}"))?;
             attrs.push((key, value.into_owned()));
         }
@@ -110,7 +114,11 @@ pub(crate) fn parse_dom(xml: &str) -> Result<Node, String> {
                 }
             }
             Event::Text(e) => {
-                let text = e.unescape().map_err(|e| e.to_string())?;
+                // quick-xml 0.41 split decoding from entity resolution: decode the
+                // bytes, then resolve predefined entities (&amp; etc.) as the old
+                // `BytesText::unescape` did.
+                let raw = e.decode().map_err(|e| e.to_string())?;
+                let text = unescape(raw.as_ref()).map_err(|e| e.to_string())?;
                 if let Some(top) = stack.last_mut() {
                     top.text.push_str(&text);
                 }
