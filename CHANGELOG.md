@@ -26,6 +26,51 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   text in labels, messages, and input fields is right-aligned automatically
   when a right-to-left locale is active.
 
+### Fixed
+
+- **Rust: signing a PDF that already has a form no longer destroys it.** The
+  incremental update now merges the new signature field into the existing
+  `/AcroForm` (preserving `/Fields`, `/DR`, `/DA`, `/NeedAppearances` and
+  OR-ing `/SigFlags`) instead of replacing it wholesale. Previously, signing a
+  form-bearing PDF orphaned its fields, and re-signing dropped the earlier
+  signature from the form.
+- **Rust: `revenant verify` now recognises genuine signatures as trusted.** It
+  validates detached CMS signatures fully in-crate against the active profile's
+  pinned trust anchors (the same path `check` uses), instead of shelling out to
+  `openssl` with the system trust store — which lacks the EKENG root and
+  reported every valid signature as `INVALID`. The external `openssl`
+  dependency is gone.
+- **Rust: the CMS verifier no longer reports a signature `Valid` when the
+  mandatory `contentType` signed attribute is missing or disagrees with
+  `eContentType`** (RFC 5652 §11.1). It also now verifies the ESS
+  `signingCertificate` / `signingCertificateV2` binding when present (RFC 5035):
+  a signature whose ESSCertID hash names a different certificate than the one
+  that verified is no longer accepted. EKENG CoSign signatures carry the v1
+  form and continue to verify.
+- **Rust: a CMS whose signature could not be *checked* (unusable key,
+  unsupported algorithm OID, DER decode failure) is now reported `Unverifiable`
+  rather than `Invalid`** — the latter wrongly implied the signature was forged.
+- **Rust: the legacy TLS handshake is now bounded by an overall deadline,** so a
+  server that dribbles records (or empty handshake records) can no longer pin a
+  client thread indefinitely past the per-read socket timeout.
+- **Rust: smaller correctness and robustness fixes.**
+  - LTV status no longer claims an OCSP response merely because an Adobe
+    `RevocationInfoArchival` container is present (it may hold only CRLs).
+  - `/Contents` hex extraction now ignores insignificant white space inside the
+    hex string, per ISO 32000-1 §7.3.4.3, so signatures laid out by other tools
+    are read correctly.
+  - The trailer `/ID` is carried into the incremental update as a hex string,
+    preserving binary `/ID` values byte-for-byte instead of mangling them
+    through a lossy UTF-8 conversion.
+  - Signing a document whose catalog is at a non-zero generation now fails with
+    a clear message instead of producing a structurally inconsistent file.
+  - Signing a document large enough that a cross-reference-stream byte offset
+    would exceed the 4-byte xref field now fails loudly instead of silently
+    truncating the offset into a corrupt xref stream.
+  - The legacy TLS client rejects a ServerHello that selects a version other
+    than TLS 1.0, parses IPv6 URL literals correctly, and fails loudly if the
+    socket read/write timeout cannot be set (rather than silently blocking).
+
 ## [2.0.0] - 2026-05-16
 
 ### TypeScript SDK only — Python client is unchanged
