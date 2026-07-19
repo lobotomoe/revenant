@@ -47,6 +47,15 @@ enum Dialog {
     About,
 }
 
+/// A destructive action awaiting confirmation.
+#[derive(Clone, Copy, PartialEq, Eq)]
+enum Confirm {
+    /// Reset all configuration (server, credentials, identity).
+    Disconnect,
+    /// Clear credentials and identity, keeping the server.
+    LogOut,
+}
+
 /// The running GUI application.
 pub(crate) struct RevenantApp {
     // Shared behind an `Arc` so background signing jobs can resolve credentials
@@ -62,6 +71,8 @@ pub(crate) struct RevenantApp {
     login: Option<LoginState>,
     sign_form: SignForm,
     verify: VerifyState,
+    /// A destructive action awaiting the user's confirmation, if any.
+    confirm: Option<Confirm>,
     /// Set to request cancellation of the in-progress batch (checked between
     /// files by the worker).
     batch_cancel: Arc<AtomicBool>,
@@ -70,6 +81,7 @@ pub(crate) struct RevenantApp {
 impl RevenantApp {
     pub(crate) fn new(cc: &eframe::CreationContext<'_>) -> Self {
         crate::fonts::install(&cc.egui_ctx);
+        crate::style::install(&cc.egui_ctx);
         let store = Arc::new(ConfigStore::new());
         let l10n = Localizer::new(&store.language());
         let transport = Arc::new(Transport::new());
@@ -92,6 +104,7 @@ impl RevenantApp {
             login: None,
             sign_form: SignForm::new(default_font),
             verify: VerifyState::new(),
+            confirm: None,
             batch_cancel: Arc::new(AtomicBool::new(false)),
         }
     }
@@ -102,6 +115,8 @@ impl RevenantApp {
             log::error!("failed to persist language '{code}': {err}");
         }
         self.l10n = Localizer::new(code);
+        // Drop any result line frozen in the previous language.
+        self.sign_form.reset_result();
     }
 
     /// Fold completed background jobs back into the UI state.
@@ -315,19 +330,31 @@ impl RevenantApp {
                 .dropped_files
                 .iter()
                 .filter_map(|file| file.path.clone())
-                .filter(|path| is_pdf(path))
                 .collect()
         });
         if dropped.is_empty() {
             return;
         }
         match self.tab {
-            Tab::Sign => self.sign_form.set_files(dropped),
+            Tab::Sign => self.route_sign_drop(dropped),
             Tab::Verify => {
-                if let Some(first) = dropped.first() {
+                if let Some(first) = dropped.iter().find(|path| is_pdf(path)) {
                     self.verify.set_pdf(first);
                 }
             }
+        }
+    }
+
+    /// Route files dropped on the Sign tab by type, not pointer position (macOS
+    /// gives no cursor position during an external drag): an image becomes the
+    /// stamp, PDFs become the input. Both can arrive in one drop.
+    fn route_sign_drop(&mut self, dropped: Vec<PathBuf>) {
+        if let Some(image) = dropped.iter().find(|path| is_image(path)) {
+            self.sign_form.set_image(image);
+        }
+        let pdfs: Vec<PathBuf> = dropped.into_iter().filter(|path| is_pdf(path)).collect();
+        if !pdfs.is_empty() {
+            self.sign_form.set_files(pdfs);
         }
     }
 
@@ -467,8 +494,8 @@ impl RevenantApp {
         }
     }
 
-    fn top_bar(&mut self, ctx: &egui::Context) {
-        egui::TopBottomPanel::top("server_bar").show(ctx, |ui| {
+    fn top_bar(&mut self, ui: &mut egui::Ui) {
+        egui::Panel::top("server_bar").show_inside(ui, |ui| {
             ui.add_space(4.0);
             ui.horizontal(|ui| {
                 ui.heading("Revenant");
@@ -486,9 +513,7 @@ impl RevenantApp {
                         .unwrap_or_default();
                     ui.label(name);
                     if ui.button(self.l10n.t("gui.disconnect")).clicked() {
-                        if let Err(err) = self.store.reset_all() {
-                            log::error!("failed to reset config: {err}");
-                        }
+                        self.confirm = Some(Confirm::Disconnect);
                     }
                 }
             });
@@ -496,8 +521,8 @@ impl RevenantApp {
         });
     }
 
-    fn footer(&mut self, ctx: &egui::Context) {
-        egui::TopBottomPanel::bottom("footer").show(ctx, |ui| {
+    fn footer(&mut self, ui: &mut egui::Ui) {
+        egui::Panel::bottom("footer").show_inside(ui, |ui| {
             ui.add_space(2.0);
             ui.horizontal(|ui| {
                 if ui.button(self.l10n.t("gui.settings")).clicked() {
@@ -511,7 +536,7 @@ impl RevenantApp {
         });
     }
 
-    fn central(&mut self, ctx: &egui::Context) {
+    fn central(&mut self, ui: &mut egui::Ui) {
         // Right-align content for right-to-left locales (e.g. Persian). Full
         // widget mirroring is a later polish step; this matches the previous
         // client's right-aligned RTL treatment.
@@ -525,7 +550,7 @@ impl RevenantApp {
         let mut sign_action = SignAction::None;
         let mut verify_action = VerifyAction::None;
         let mut account_action = AccountAction::None;
-        egui::CentralPanel::default().show(ctx, |ui| {
+        egui::CentralPanel::default().show_inside(ui, |ui| {
             ui.with_layout(egui::Layout::top_down(align), |ui| {
                 ui.horizontal(|ui| {
                     ui.selectable_value(&mut self.tab, Tab::Sign, self.l10n.t("gui.sign"));
@@ -539,13 +564,17 @@ impl RevenantApp {
                     .show(ui, |ui| match self.tab {
                         Tab::Sign => {
                             let layer = self.store.config_layer();
-                            // The account panel only exists once a signer is set up.
-                            if layer == ConfigLayer::FullyConfigured {
-                                account_action = views::account::show(ui, &self.l10n, &self.store);
-                                ui.separator();
-                            }
-                            sign_action =
-                                views::sign::show(ui, &self.l10n, layer, &mut self.sign_form);
+                            // The account panel is rendered inside the sign view
+                            // (its right column) at the fully-configured layer.
+                            let screen = views::sign::show(
+                                ui,
+                                &self.l10n,
+                                layer,
+                                &mut self.sign_form,
+                                &self.store,
+                            );
+                            sign_action = screen.sign;
+                            account_action = screen.account;
                         }
                         Tab::Verify => {
                             verify_action = views::verify::show(ui, &self.l10n, &mut self.verify);
@@ -580,11 +609,7 @@ impl RevenantApp {
     fn apply_account_action(&mut self, action: &AccountAction) {
         match action {
             AccountAction::None => {}
-            AccountAction::LogOut => {
-                if let Err(err) = self.store.logout() {
-                    log::error!("failed to log out: {err}");
-                }
-            }
+            AccountAction::LogOut => self.confirm = Some(Confirm::LogOut),
         }
     }
 
@@ -633,42 +658,113 @@ impl RevenantApp {
             }
         }
     }
+
+    /// Render the pending destructive-action confirmation, if any, and carry it
+    /// out only when the user confirms.
+    fn confirm_dialog(&mut self, ctx: &egui::Context) {
+        let Some(kind) = self.confirm else {
+            return;
+        };
+        let message = self.confirm_message(kind);
+        let confirm_label = match kind {
+            Confirm::Disconnect => self.l10n.t("gui.disconnect").to_owned(),
+            Confirm::LogOut => self.l10n.t("gui.log_out").to_owned(),
+        };
+        let cancel_label = self.l10n.t("gui.cancel").to_owned();
+
+        // `Some(true)` proceeds, `Some(false)` cancels.
+        let mut decision = None;
+        let response = egui::Modal::new(egui::Id::new("confirm_dialog")).show(ctx, |ui| {
+            ui.set_width(360.0);
+            ui.label(message);
+            ui.add_space(12.0);
+            ui.separator();
+            ui.horizontal(|ui| {
+                ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
+                    let confirm =
+                        egui::Button::new(egui::RichText::new(&confirm_label).color(theme::ERROR));
+                    if ui.add(confirm).clicked() {
+                        decision = Some(true);
+                    }
+                    if ui.button(&cancel_label).clicked() {
+                        decision = Some(false);
+                    }
+                });
+            });
+        });
+        if response.should_close() {
+            decision = Some(false);
+        }
+        if let Some(proceed) = decision {
+            self.confirm = None;
+            if proceed {
+                self.run_confirmed(kind);
+            }
+        }
+    }
+
+    /// The confirmation prompt text for a destructive action.
+    fn confirm_message(&self, kind: Confirm) -> String {
+        match kind {
+            Confirm::Disconnect => {
+                let name = self
+                    .store
+                    .active_profile()
+                    .map(|profile| profile.display_name)
+                    .unwrap_or_default();
+                let mut message = self.l10n.tf("gui.disconnect_from_name", &[("name", &name)]);
+                // Disconnecting from a fully-configured profile also wipes the
+                // saved identity, so warn about it.
+                if self.store.config_layer() == ConfigLayer::FullyConfigured {
+                    message.push_str("\n\n");
+                    message.push_str(
+                        self.l10n
+                            .t("gui.this_will_also_remove_your_credentials_and_signer_identity"),
+                    );
+                }
+                message
+            }
+            Confirm::LogOut => self
+                .l10n
+                .t("gui.log_out_server_connection_will_be_preserved")
+                .to_owned(),
+        }
+    }
+
+    /// Execute a confirmed destructive action.
+    fn run_confirmed(&mut self, kind: Confirm) {
+        let result = match kind {
+            Confirm::Disconnect => self.store.reset_all(),
+            Confirm::LogOut => self.store.logout(),
+        };
+        if let Err(err) = result {
+            log::error!("confirmed action failed: {err}");
+        }
+    }
 }
 
 impl eframe::App for RevenantApp {
-    fn update(&mut self, ctx: &egui::Context, _frame: &mut eframe::Frame) {
+    fn ui(&mut self, ui: &mut egui::Ui, _frame: &mut eframe::Frame) {
+        // egui 0.34's UI-first entrypoint hands us the root `Ui`; panels attach
+        // to it via `show_inside`. The context (cheap to clone -- it is an Arc)
+        // still drives input polling and top-level dialogs.
+        let ctx = ui.ctx().clone();
         self.process_worker_results();
-        self.handle_dropped_files(ctx);
-        self.top_bar(ctx);
-        self.footer(ctx);
-        self.central(ctx);
-        self.dialogs(ctx);
-        draw_drop_hint(ctx);
+        self.handle_dropped_files(&ctx);
+        self.top_bar(ui);
+        self.footer(ui);
+        self.central(ui);
+        self.dialogs(&ctx);
+        self.confirm_dialog(&ctx);
     }
-}
-
-/// Highlight the window while a file is dragged over it.
-fn draw_drop_hint(ctx: &egui::Context) {
-    let hovering = ctx.input(|i| !i.raw.hovered_files.is_empty());
-    if !hovering {
-        return;
-    }
-    let screen = ctx.screen_rect();
-    let painter = ctx.layer_painter(egui::LayerId::new(
-        egui::Order::Foreground,
-        egui::Id::new("drop"),
-    ));
-    painter.rect_filled(screen, 0.0, egui::Color32::from_black_alpha(96));
-    painter.rect_stroke(
-        screen.shrink(12.0),
-        12.0,
-        egui::Stroke::new(3.0, theme::OK),
-        egui::StrokeKind::Inside,
-    );
 }
 
 /// Whether a dropped/selected path looks like a PDF (case-insensitive extension).
 fn is_pdf(path: &Path) -> bool {
-    path.extension()
-        .is_some_and(|ext| ext.eq_ignore_ascii_case(PDF_EXTENSION))
+    crate::style::path_has_extension(Some(path), crate::style::PDF_EXTS)
+}
+
+/// Whether a dropped path looks like a supported stamp image.
+fn is_image(path: &Path) -> bool {
+    crate::style::path_has_extension(Some(path), crate::style::IMAGE_EXTS)
 }

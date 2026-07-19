@@ -294,15 +294,24 @@ impl LoginState {
             );
             ui.add_space(4.0);
         }
-        labeled(ui, l10n.t("gui.username_label"), &mut self.username);
-        ui.horizontal(|ui| {
-            ui.label(l10n.t("gui.password_label"));
-            ui.add(
-                egui::TextEdit::singleline(&mut self.password)
-                    .password(!self.show_password)
-                    .desired_width(f32::INFINITY),
-            );
-        });
+        // A grid pins the label column to a fixed width (the wider of the two
+        // labels), so both inputs start at the same x and line up.
+        egui::Grid::new("login_credentials")
+            .num_columns(2)
+            .spacing([8.0, 6.0])
+            .show(ui, |ui| {
+                ui.label(l10n.t("gui.username_label"));
+                ui.add(egui::TextEdit::singleline(&mut self.username).desired_width(f32::INFINITY));
+                ui.end_row();
+
+                ui.label(l10n.t("gui.password_label"));
+                ui.add(
+                    egui::TextEdit::singleline(&mut self.password)
+                        .password(!self.show_password)
+                        .desired_width(f32::INFINITY),
+                );
+                ui.end_row();
+            });
         ui.checkbox(&mut self.show_password, l10n.t("gui.show_password"));
     }
 
@@ -316,9 +325,16 @@ impl LoginState {
                 return LoginAction::None;
             }
             Discovery::Resolved => {
-                ui.colored_label(theme::OK, l10n.t("gui.signer_identity_found_label"));
+                ui.colored_label(
+                    theme::OK,
+                    format!(
+                        "{}  {}",
+                        crate::icons::SUCCESS,
+                        l10n.t("gui.signer_identity_found_label")
+                    ),
+                );
                 if let Some(info) = &self.identity {
-                    identity_summary(ui, l10n, info);
+                    identity_summary(ui, info);
                 }
                 return LoginAction::None;
             }
@@ -355,13 +371,24 @@ impl LoginState {
     fn manual_ui(&mut self, ui: &mut egui::Ui, l10n: &Localizer) {
         ui.label(l10n.t("gui.enter_signer_identity_label"));
         ui.add_space(4.0);
-        labeled(ui, l10n.t("gui.name_required_label"), &mut self.manual.name);
-        labeled(ui, l10n.t("gui.email_label"), &mut self.manual.email);
-        labeled(
-            ui,
-            l10n.t("gui.organization_label"),
-            &mut self.manual.organization,
-        );
+        // Same fixed label column as the credentials step, so the fields align.
+        egui::Grid::new("login_manual_identity")
+            .num_columns(2)
+            .spacing([8.0, 6.0])
+            .show(ui, |ui| {
+                for (label, value) in [
+                    (l10n.t("gui.name_required_label"), &mut self.manual.name),
+                    (l10n.t("gui.email_label"), &mut self.manual.email),
+                    (
+                        l10n.t("gui.organization_label"),
+                        &mut self.manual.organization,
+                    ),
+                ] {
+                    ui.label(label);
+                    ui.add(egui::TextEdit::singleline(value).desired_width(f32::INFINITY));
+                    ui.end_row();
+                }
+            });
     }
 
     fn done_ui(&mut self, ui: &mut egui::Ui, l10n: &Localizer) {
@@ -386,24 +413,17 @@ impl LoginState {
     }
 }
 
-/// A left-aligned label with a full-width single-line text field.
-fn labeled(ui: &mut egui::Ui, label: &str, value: &mut String) {
-    ui.horizontal(|ui| {
-        ui.label(label);
-        ui.add(egui::TextEdit::singleline(value).desired_width(f32::INFINITY));
-    });
-}
-
-/// Render the discovered identity's fields.
-fn identity_summary(ui: &mut egui::Ui, l10n: &Localizer, info: &CertInfo) {
-    let mut row = |label: &str, value: &Option<String>| {
+/// Render the discovered identity's fields, each prefixed with an icon (person,
+/// envelope, building) in place of a text label.
+fn identity_summary(ui: &mut egui::Ui, info: &CertInfo) {
+    let mut row = |icon: &str, value: &Option<String>| {
         if let Some(value) = value {
-            ui.label(format!("{label}: {value}"));
+            ui.label(format!("{icon}  {value}"));
         }
     };
-    row(l10n.t("gui.name"), &info.name);
-    row(l10n.t("gui.email"), &info.email);
-    row(l10n.t("gui.organization"), &info.organization);
+    row(crate::icons::NAME, &info.name);
+    row(crate::icons::EMAIL, &info.email);
+    row(crate::icons::ORG, &info.organization);
 }
 
 pub(crate) fn show(ctx: &egui::Context, l10n: &Localizer, state: &mut LoginState) -> LoginAction {
@@ -439,17 +459,20 @@ pub(crate) fn show(ctx: &egui::Context, l10n: &Localizer, state: &mut LoginState
         ui.separator();
         ui.horizontal(|ui| {
             let back_enabled = state.step != Step::Credentials;
+            let back_label = format!("{}  {}", crate::icons::ARROW_LEFT, l10n.t("gui.back"));
             if ui
-                .add_enabled(back_enabled, egui::Button::new(l10n.t("gui.back")))
+                .add_enabled(back_enabled, egui::Button::new(back_label))
                 .clicked()
             {
                 state.on_back();
             }
             ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
+                let next_label =
+                    format!("{}  {}", state.next_label(l10n), crate::icons::ARROW_RIGHT);
                 if ui
                     .add_enabled(
                         state.next_enabled(),
-                        egui::Button::new(state.next_label(l10n)),
+                        crate::style::primary_button(next_label),
                     )
                     .clicked()
                 {

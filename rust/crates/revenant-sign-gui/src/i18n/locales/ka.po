@@ -589,3 +589,11 @@ msgstr "ბოლო"
 
 msgid "gui.page_first"
 msgstr "პირველი"
+
+#. EN: Drop a PDF here or click to browse
+msgid "gui.drop_pdf_hint"
+msgstr "ჩააგდეთ PDF აქ ან დააწკაპუნეთ ასარჩევად"
+
+#. EN: Drop an image or click (optional)
+msgid "gui.drop_image_hint"
+msgstr "ჩააგდეთ სურათი ან დააწკაპუნეთ (არასავალდებულო)"

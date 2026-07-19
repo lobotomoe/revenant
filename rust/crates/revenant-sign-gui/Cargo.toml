@@ -24,10 +24,13 @@ path = "src/main.rs"
 revenant-sign-core = { path = "../revenant-sign-core", version = "0.1.0" }
 log.workspace = true
 env_logger.workspace = true
-eframe = "0.32.3"
+eframe = "0.34"
 sys-locale = "0.3.2"
 # Native file open/save dialogs on all three platforms (AppKit / Win32 / xdg).
-rfd = "0.15.4"
+rfd = "0.17"
+# Must track eframe's egui minor: 0.12 targets egui 0.34. (egui 0.35 has no
+# egui-phosphor release yet, which is why we cap eframe at 0.34.)
+egui-phosphor = "0.12"
 
 [lints]
 workspace = true

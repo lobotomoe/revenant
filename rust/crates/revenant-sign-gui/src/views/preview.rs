@@ -19,6 +19,8 @@ const MARGIN: f32 = 6.0;
 /// Stamp box size as a fraction of the page.
 const BOX_W_FRAC: f32 = 0.44;
 const BOX_H_FRAC: f32 = 0.13;
+/// Size of the "no visible signature" eye glyph, centered on the page.
+const EYE_ICON_SIZE: f32 = 28.0;
 
 /// Draw the preview thumbnail. When `visible` is false (detached or invisible
 /// signature) the stamp box is replaced with a muted "no visible signature"
@@ -29,7 +31,7 @@ pub(crate) fn signature_preview(
     position: Position,
     visible: bool,
 ) {
-    let (rect, _) = ui.allocate_exact_size(egui::vec2(PAGE_W, PAGE_H), egui::Sense::hover());
+    let (rect, response) = ui.allocate_exact_size(egui::vec2(PAGE_W, PAGE_H), egui::Sense::hover());
     if !ui.is_rect_visible(rect) {
         return;
     }
@@ -43,14 +45,17 @@ pub(crate) fn signature_preview(
     painter.rect_stroke(rect, 3.0, page_stroke, egui::StrokeKind::Inside);
     draw_faux_text(&painter, rect, line_color);
 
+    // No visible mark on the page: show a struck-through eye rather than a text
+    // label (which overflowed the thumbnail), with the wording on hover.
     if !visible {
         painter.text(
             rect.center(),
             egui::Align2::CENTER_CENTER,
-            l10n.t("gui.invisible_signature"),
-            egui::FontId::proportional(9.0),
+            crate::icons::INVISIBLE,
+            egui::FontId::proportional(EYE_ICON_SIZE),
             theme::MUTED,
         );
+        response.on_hover_text(l10n.t("gui.invisible_signature"));
         return;
     }
 

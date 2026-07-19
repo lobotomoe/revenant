@@ -589,3 +589,11 @@ msgstr "Son"
 
 msgid "gui.page_first"
 msgstr "İlk"
+
+#. EN: Drop a PDF here or click to browse
+msgid "gui.drop_pdf_hint"
+msgstr "Bir PDF'yi buraya bırakın veya seçmek için tıklayın"
+
+#. EN: Drop an image or click (optional)
+msgid "gui.drop_image_hint"
+msgstr "Bir görsel bırakın veya tıklayın (isteğe bağlı)"
