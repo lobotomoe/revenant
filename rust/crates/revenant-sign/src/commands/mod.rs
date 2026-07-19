@@ -8,6 +8,7 @@
 mod account;
 mod cert;
 mod check;
+mod report;
 mod setup;
 mod sign;
 mod verify;

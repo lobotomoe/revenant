@@ -23,8 +23,15 @@ const OID_REVOCATION_VALUES: ObjectIdentifier =
 /// Result of an LTV status check on a CMS signature.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct LtvStatus {
+    /// A CRL is embedded directly in the `SignedData.crls` field.
     pub has_crl: bool,
+    /// A standalone OCSP response was found. The Adobe `RevocationInfoArchival`
+    /// container may itself carry OCSP responses, but its contents are not
+    /// itemized here -- an archival container is reported via
+    /// `has_revocation_archival`, so this stays `false` for it.
     pub has_ocsp: bool,
+    /// The Adobe `RevocationInfoArchival` signed attribute is present (it holds
+    /// CRLs and/or OCSP responses; either way the signature is LTV-enabled).
     pub has_revocation_archival: bool,
     pub details: Vec<String>,
 }
@@ -86,7 +93,9 @@ pub fn check_ltv_status(cms_der: &[u8]) -> LtvStatus {
     };
 
     let mut has_crl = false;
-    let mut has_ocsp = false;
+    // We do not currently itemize standalone OCSP responses; the Adobe archival
+    // container (below) is tracked separately and never conflated with OCSP.
+    let has_ocsp = false;
     let mut has_revocation_archival = false;
 
     if let Some(crls) = signed_data.crls.as_ref() {
@@ -107,7 +116,6 @@ pub fn check_ltv_status(cms_der: &[u8]) -> LtvStatus {
         }
         if archival {
             has_revocation_archival = true;
-            has_ocsp = true;
         }
     }
 
@@ -158,8 +166,10 @@ mod tests {
     fn detects_revocation_archival_attribute() {
         let status = check_ltv_status(CMS_WITH_ARCHIVAL);
         assert!(status.has_revocation_archival);
-        assert!(status.has_ocsp);
         assert!(status.ltv_enabled());
+        // The archival container is not itemized, so its mere presence must not
+        // be reported as a standalone OCSP response.
+        assert!(!status.has_ocsp);
         assert!(status
             .details
             .iter()
