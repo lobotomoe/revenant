@@ -45,7 +45,7 @@ fn dispatch(cli: Cli) -> CliResult {
     let app = App::new();
     match command {
         Command::Sign(args) => commands::sign(&app, &args),
-        Command::Verify(args) => commands::verify(&args),
+        Command::Verify(args) => commands::verify(&app, &args),
         Command::Check(args) => commands::check(&app, &args),
         Command::Info(args) => commands::info(&args),
         Command::Cert(args) => commands::cert(&app, &args),

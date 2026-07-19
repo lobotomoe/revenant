@@ -109,11 +109,19 @@ pub fn extract_cms_from_byterange(pdf_bytes: &[u8], len1: usize, off2: usize) ->
     let hex_region = pdf_bytes
         .get(hex_start..hex_end)
         .ok_or_else(|| RevenantError::Pdf("CMS hex region is empty or inverted".to_owned()))?;
-    let hex_str = std::str::from_utf8(hex_region)
-        .map_err(|_| RevenantError::Pdf("CMS hex region is not ASCII".to_owned()))?
-        .trim();
+    let hex_region = std::str::from_utf8(hex_region)
+        .map_err(|_| RevenantError::Pdf("CMS hex region is not ASCII".to_owned()))?;
 
-    extract_der_from_padded_hex(hex_str)
+    // A PDF hexadecimal string may contain white space, which is not significant
+    // (ISO 32000-1 section 7.3.4.3). Strip every whitespace byte -- not just the
+    // ends -- so the ASN.1 length walk sees contiguous hex regardless of how the
+    // producing tool laid out the `/Contents` field.
+    let hex_str: String = hex_region
+        .chars()
+        .filter(|c| !c.is_ascii_whitespace())
+        .collect();
+
+    extract_der_from_padded_hex(&hex_str)
         .map_err(|e| RevenantError::Pdf(format!("Invalid hex in CMS blob: {e}")))
 }
 
@@ -253,6 +261,24 @@ mod tests {
         pdf.push(b'>');
         let off2 = pdf.len(); // '>' is the last byte, at off2-1
         assert_eq!(extract_cms_from_byterange(&pdf, len1, off2).unwrap(), CMS);
+    }
+
+    #[test]
+    fn tolerates_interior_whitespace_in_hex() {
+        // A producer that laid out /Contents with spaces and newlines between
+        // hex digits is still valid PDF; extraction must ignore the whitespace.
+        let spaced = "30 03\n01 02 03";
+        let mut pdf = b"prefix<".to_vec();
+        let head_len = pdf.len();
+        pdf.extend_from_slice(spaced.as_bytes());
+        // Pad the remainder of the reserved field with zeros, then close.
+        pdf.extend_from_slice(b"00000000");
+        pdf.push(b'>');
+        let off2 = pdf.len();
+        assert_eq!(
+            extract_cms_from_byterange(&pdf, head_len, off2).unwrap(),
+            CMS
+        );
     }
 
     #[test]

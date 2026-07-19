@@ -27,10 +27,8 @@ env_logger.workspace = true
 tempfile.workspace = true
 url.workspace = true
 
-# CLI-only: hidden password entry and a bounded wait on the `openssl` subprocess
-# used by `verify` (matching the Python client's detached-signature verification).
+# CLI-only: hidden password entry for the setup wizard.
 rpassword = "7"
-wait-timeout = "0.2"
 
 [lints]
 workspace = true

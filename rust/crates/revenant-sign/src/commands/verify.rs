@@ -1,30 +1,28 @@
 // SPDX-License-Identifier: Apache-2.0
 //! `verify` and `info` — offline signature checking and inspection.
 //!
-//! `verify` checks a detached CMS signature against its PDF by shelling out to
-//! `openssl cms -verify`: this reuses the system trust store for chain
-//! verification and degrades gracefully when OpenSSL is absent. `info` lists the
-//! certificates embedded in a CMS file using the in-crate ASN.1 reader -- no
-//! external tools.
+//! `verify` checks a detached CMS signature against its PDF entirely in-crate:
+//! it verifies the CMS signature and message digest, then validates the signer
+//! chain against the active profile's pinned trust anchors (the same in-crate
+//! path `check` uses for embedded signatures -- no external `openssl`, and the
+//! bundled anchors mean a genuine signature is recognised as trusted). `info`
+//! lists the certificates in a CMS file using the in-crate ASN.1 reader.
 
 use std::fs;
-use std::io::{self, Read};
 use std::path::{Path, PathBuf};
-use std::process::{Command, Stdio};
-use std::time::Duration;
 
-use revenant_sign_core::pki::{format_expiry_summary, summarize_cms_certificates};
-use wait_timeout::ChildExt;
+use revenant_sign_core::api::verify_detached;
+use revenant_sign_core::config::TrustAnchors;
+use revenant_sign_core::pki::{format_expiry_summary, summarize_cms_certificates, TrustStoreCache};
 
+use crate::app::App;
 use crate::cli::{InfoArgs, VerifyArgs};
+use crate::commands::report::{print_result_line, print_signature_details};
 use crate::exit::{CliError, CliResult};
 use crate::output::{default_detached_output_path, file_name};
 
-/// How long to wait for `openssl` before giving up.
-const OPENSSL_TIMEOUT: Duration = Duration::from_secs(15);
-
-/// Verify a detached CMS signature against its PDF via `openssl cms -verify`.
-pub(crate) fn verify(args: &VerifyArgs) -> CliResult {
+/// Verify a detached CMS signature against its PDF, entirely in-crate.
+pub(crate) fn verify(app: &App, args: &VerifyArgs) -> CliResult {
     let pdf_path = Path::new(&args.pdf);
     let sig_path: PathBuf = match &args.signature {
         Some(sig) => PathBuf::from(sig),
@@ -38,78 +36,29 @@ pub(crate) fn verify(args: &VerifyArgs) -> CliResult {
         return Err(CliError::new(format!("{} not found", sig_path.display())));
     }
 
+    let pdf_bytes = fs::read(pdf_path)
+        .map_err(|e| CliError::new(format!("cannot read {}: {e}", pdf_path.display())))?;
+    let cms_der = fs::read(&sig_path)
+        .map_err(|e| CliError::new(format!("cannot read {}: {e}", sig_path.display())))?;
+
     println!(
         "Verifying {} against {}...",
         file_name(pdf_path),
         file_name(&sig_path)
     );
-    println!("  Using system trust store for chain verification");
 
-    run_openssl_verify(pdf_path, &sig_path)
-}
+    // Chain validation uses the active profile's trust anchors (pinned CAs or a
+    // TSL). An unconfigured profile leaves trust indeterminate, but the
+    // signature's cryptographic validity and content digest are still checked.
+    let trust = app
+        .store
+        .active_profile()
+        .map_or(TrustAnchors::None, |p| p.trust);
+    let cache = TrustStoreCache::new();
+    let result = verify_detached(app.transport.as_ref(), &cache, &pdf_bytes, &cms_der, &trust);
 
-/// Spawn `openssl`, wait with a timeout, and interpret the result.
-fn run_openssl_verify(pdf_path: &Path, sig_path: &Path) -> CliResult {
-    // openssl writes the recovered content to stdout; discard it (we only care
-    // about the exit status and the diagnostics on stderr). Discarding rather
-    // than capturing also avoids a pipe-buffer deadlock on large content.
-    let spawn = Command::new("openssl")
-        .arg("cms")
-        .arg("-verify")
-        .arg("-inform")
-        .arg("DER")
-        .arg("-in")
-        .arg(sig_path)
-        .arg("-content")
-        .arg(pdf_path)
-        .arg("-binary")
-        .arg("-purpose")
-        .arg("any")
-        .stdout(Stdio::null())
-        .stderr(Stdio::piped())
-        .spawn();
-
-    let mut child = match spawn {
-        Ok(child) => child,
-        Err(e) if e.kind() == io::ErrorKind::NotFound => {
-            return Err(CliError::new(
-                "openssl not found. Install OpenSSL to verify signatures.",
-            ));
-        }
-        Err(e) => return Err(CliError::new(format!("failed to run openssl: {e}"))),
-    };
-
-    match child.wait_timeout(OPENSSL_TIMEOUT) {
-        Ok(Some(status)) => {
-            let stderr = read_stderr(&mut child);
-            let stderr = stderr.trim();
-            if status.success() {
-                println!("  VALID: Signature verification succeeded.");
-                if stderr.contains("Verification successful") {
-                    println!("  {stderr}");
-                }
-                Ok(())
-            } else {
-                println!("  INVALID: {stderr}");
-                Err(CliError::silent())
-            }
-        }
-        Ok(None) => {
-            let _ = child.kill();
-            let _ = child.wait();
-            Err(CliError::new("openssl timed out after 15 seconds."))
-        }
-        Err(e) => Err(CliError::new(format!("failed to wait for openssl: {e}"))),
-    }
-}
-
-/// Drain the child's stderr pipe to a string (best effort).
-fn read_stderr(child: &mut std::process::Child) -> String {
-    let mut buf = String::new();
-    if let Some(mut stderr) = child.stderr.take() {
-        let _ = stderr.read_to_string(&mut buf);
-    }
-    buf
+    print_signature_details(std::slice::from_ref(&result));
+    print_result_line(std::slice::from_ref(&result))
 }
 
 /// Show the certificates in a CMS signature file.
