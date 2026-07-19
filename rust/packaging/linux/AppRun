@@ -2,6 +2,9 @@
 # AppImage entry point
 SELF=$(readlink -f "$0")
 HERE=${SELF%/*}
-export PATH="${HERE}/usr/bin:${PATH}"
-export LD_LIBRARY_PATH="${HERE}/usr/lib:${LD_LIBRARY_PATH}"
+# Append the existing values only when set, so an unset variable does not leave
+# a trailing colon -- an empty path element means "current directory", which is
+# a library/binary hijacking risk.
+export PATH="${HERE}/usr/bin${PATH:+:${PATH}}"
+export LD_LIBRARY_PATH="${HERE}/usr/lib${LD_LIBRARY_PATH:+:${LD_LIBRARY_PATH}}"
 exec "${HERE}/usr/bin/revenant-gui" "$@"

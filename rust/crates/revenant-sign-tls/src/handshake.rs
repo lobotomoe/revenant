@@ -53,7 +53,9 @@ impl Deadline {
     }
 
     fn is_expired(&self) -> bool {
-        Instant::now() > self.at
+        // A deadline fires once its instant is reached, so a zero-length budget
+        // is expired the moment it is created (not one read later).
+        Instant::now() >= self.at
     }
 
     fn err(&self, conn: &Connection) -> TlsError {
