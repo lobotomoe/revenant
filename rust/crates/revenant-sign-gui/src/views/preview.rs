@@ -64,7 +64,7 @@ pub(crate) fn signature_preview(
     painter.rect_stroke(
         stamp,
         2.0,
-        egui::Stroke::new(1.0, theme::OK),
+        egui::Stroke::new(1.0_f32, theme::OK),
         egui::StrokeKind::Inside,
     );
 }
@@ -75,7 +75,7 @@ fn draw_faux_text(painter: &egui::Painter, page: egui::Rect, color: egui::Color3
     const LINES: u16 = 5;
     const STEP: f32 = 11.0;
     let inner = page.shrink(MARGIN);
-    let stroke = egui::Stroke::new(1.0, color);
+    let stroke = egui::Stroke::new(1.0_f32, color);
     for i in 0..LINES {
         // The last line is shorter, like a trailing paragraph line.
         let width = if i == LINES - 1 { 0.55 } else { 1.0 };

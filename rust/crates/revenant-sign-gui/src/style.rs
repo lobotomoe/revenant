@@ -65,7 +65,7 @@ fn tune(style: &mut egui::Style) {
     let accent = theme::ACCENT;
     style.visuals.selection.bg_fill =
         Color32::from_rgba_unmultiplied(accent.r(), accent.g(), accent.b(), 0x55);
-    style.visuals.selection.stroke = Stroke::new(1.0, accent);
+    style.visuals.selection.stroke = Stroke::new(1.0_f32, accent);
     style.visuals.hyperlink_color = accent;
 }
 
@@ -148,7 +148,7 @@ pub(crate) fn drop_zone(
     let (fill, stroke) = if file_matches {
         (
             Color32::from_rgba_unmultiplied(accent.r(), accent.g(), accent.b(), 0x33),
-            Stroke::new(2.5, accent),
+            Stroke::new(2.5_f32, accent),
         )
     } else if response.hovered() {
         (
