@@ -1,0 +1,112 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  MSIX Package Manifest for Microsoft Store submission (Rust build).
+
+  Build:
+    1. Build binaries:  cargo build --release  (revenant-gui.exe, revenant.exe)
+    2. Pack MSIX:       packaging/windows/build-msix.sh <gui.exe> <cli.exe> <ver>
+
+  Prerequisites:
+    - Windows SDK (makeappx.exe)
+
+  The Version attribute is stamped by build-msix.sh (M.m.p -> M.m.p.0).
+  Microsoft signs the package upon Store publication - no developer certificate needed.
+  Identity (Name/Publisher/exe names) is unchanged from the Python client: the
+  Rust binaries share the same names, so the Store record carries over verbatim.
+
+  Partner Center identity:
+    Store ID: 9NVH62M20DS3
+    Store URL: https://apps.microsoft.com/detail/9NVH62M20DS3
+-->
+<Package
+  xmlns="http://schemas.microsoft.com/appx/manifest/foundation/windows10"
+  xmlns:uap="http://schemas.microsoft.com/appx/manifest/uap/windows10"
+  xmlns:rescap="http://schemas.microsoft.com/appx/manifest/foundation/windows10/restrictedcapabilities"
+  xmlns:desktop="http://schemas.microsoft.com/appx/manifest/desktop/windows10"
+  IgnorableNamespaces="uap rescap desktop">
+
+  <Identity
+    Name="AlexKraiz.RevenantSign"
+    Publisher="CN=75EAF6D2-1668-428D-93DD-CE60A78F2DEB"
+    Version="0.1.0.0"
+    ProcessorArchitecture="x64" />
+
+  <Properties>
+    <DisplayName>Revenant Sign</DisplayName>
+    <PublisherDisplayName>Alex Kraiz</PublisherDisplayName>
+    <Description>Electronic document signing with ARX CoSign</Description>
+    <Logo>Assets\StoreLogo.png</Logo>
+  </Properties>
+
+  <Dependencies>
+    <TargetDeviceFamily
+      Name="Windows.Desktop"
+      MinVersion="10.0.17763.0"
+      MaxVersionTested="10.0.22631.0" />
+  </Dependencies>
+
+  <Resources>
+    <Resource Language="en-us" />
+  </Resources>
+
+  <Applications>
+    <!-- GUI Application -->
+    <Application
+      Id="RevenantGUI"
+      Executable="revenant-gui.exe"
+      EntryPoint="Windows.FullTrustApplication">
+      <uap:VisualElements
+        DisplayName="Revenant Sign"
+        Description="Electronic document signing with ARX CoSign"
+        BackgroundColor="transparent"
+        Square150x150Logo="Assets\Square150x150Logo.png"
+        Square44x44Logo="Assets\Square44x44Logo.png">
+        <uap:DefaultTile
+          Wide310x150Logo="Assets\Wide310x150Logo.png"
+          Square310x310Logo="Assets\Square310x310Logo.png"
+          ShortName="Revenant Sign" />
+      </uap:VisualElements>
+
+      <!-- File type associations -->
+      <Extensions>
+        <uap:Extension Category="windows.fileTypeAssociation">
+          <uap:FileTypeAssociation Name="pdf">
+            <uap:SupportedFileTypes>
+              <uap:FileType>.pdf</uap:FileType>
+            </uap:SupportedFileTypes>
+            <uap:DisplayName>PDF Document</uap:DisplayName>
+          </uap:FileTypeAssociation>
+        </uap:Extension>
+        <uap:Extension Category="windows.fileTypeAssociation">
+          <uap:FileTypeAssociation Name="p7s">
+            <uap:SupportedFileTypes>
+              <uap:FileType>.p7s</uap:FileType>
+            </uap:SupportedFileTypes>
+            <uap:DisplayName>PKCS#7 Detached Signature</uap:DisplayName>
+          </uap:FileTypeAssociation>
+        </uap:Extension>
+      </Extensions>
+    </Application>
+
+    <!-- CLI Application -->
+    <Application
+      Id="RevenantCLI"
+      Executable="revenant.exe"
+      EntryPoint="Windows.FullTrustApplication">
+      <uap:VisualElements
+        DisplayName="Revenant CLI"
+        Description="Revenant command-line interface"
+        BackgroundColor="transparent"
+        Square150x150Logo="Assets\Square150x150Logo.png"
+        Square44x44Logo="Assets\Square44x44Logo.png"
+        />
+    </Application>
+  </Applications>
+
+  <Capabilities>
+    <!-- Internet access for CoSign SOAP API -->
+    <Capability Name="internetClient" />
+    <!-- Full trust for Win32 desktop app -->
+    <rescap:Capability Name="runFullTrust" />
+  </Capabilities>
+</Package>

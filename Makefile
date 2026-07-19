@@ -58,6 +58,19 @@ rs-test: ## Run Rust tests (cargo test)
 rs-build: ## Build Rust workspace (release)
 	cd rust && cargo build --workspace --release
 
+# -- Rust desktop packaging (see rust/packaging/) -----------------------------
+# Per-platform bundling is hand-rolled over the store-approved manifests. Only
+# the macOS targets run on this host; Windows MSIX / Linux AppImage / Snap /
+# Flatpak build in CI (their tools are OS-specific). See rust/packaging/*.
+
+.PHONY: rs-bundle-macos rs-icns
+
+rs-bundle-macos: rs-build ## Assemble Revenant.app from the release binary (macOS)
+	cd rust && packaging/macos/bundle-app.sh target/release/revenant-gui dist
+
+rs-icns: ## Regenerate the macOS app icon (.icns) from the SVG master (macOS)
+	cd rust && packaging/icons/make-icns.sh
+
 # -- Combined ----------------------------------------------------------------
 
 .PHONY: lint typecheck test build check clean

@@ -1,0 +1,102 @@
+# Snap package manifest for Revenant (Rust build).
+#
+# Canonical location: rust/snap/snapcraft.yaml -- run `snapcraft` from the rust/
+# directory (paths below are relative to rust/). The Python snapcraft is
+# preserved, mothballed, under python/snap/.
+#
+# Build locally (Linux):   cd rust && snapcraft
+# Publish:                 snapcraft upload revenant_*.snap --release=stable
+# Prereq:                  sudo snap install snapcraft --classic
+#
+# Not buildable on macOS (snapcraft is Linux-only) -- validated in Linux CI.
+#
+# vs the Python manifest: the `revenant` part switches from the python plugin
+# (which bundled CPython + tkinter) to the rust plugin building the self-contained
+# binaries; the apps, plugs, and gnome extension are unchanged.
+
+name: revenant
+title: Revenant
+summary: Electronic document signing with ARX CoSign
+description: |
+  Cross-platform client for signing PDF documents via the ARX CoSign
+  SOAP API (OASIS DSS standard). Works on macOS, Linux, and Windows
+  without requiring a Windows-only CoSign client.
+
+  Features:
+  - Embedded PDF signatures with visual appearance
+  - Detached CMS/PKCS#7 signatures
+  - Pre-computed SHA-1 hash signing
+  - Automatic signer identity discovery from server or signed PDFs
+  - Secure credential storage via system keychain
+
+grade: stable
+confinement: strict
+base: core24
+license: Apache-2.0
+icon: packaging/linux/io.github.lobotomoe.revenant.png
+adopt-info: revenant
+website: https://github.com/lobotomoe/revenant
+source-code: https://github.com/lobotomoe/revenant
+contact: https://github.com/lobotomoe/revenant/issues
+issues: https://github.com/lobotomoe/revenant/issues
+
+platforms:
+  amd64:
+  arm64:
+
+apps:
+  revenant:
+    command: bin/revenant
+    plugs:
+      - network
+      - home
+    environment:
+      LANG: C.UTF-8
+      LC_ALL: C.UTF-8
+
+  revenant-gui:
+    command: bin/revenant-gui
+    common-id: io.github.lobotomoe.revenant
+    plugs:
+      - network
+      - home
+      - desktop
+      - desktop-legacy
+      - x11
+      - wayland
+      - password-manager-service
+    extensions:
+      - gnome
+    environment:
+      LANG: C.UTF-8
+      LC_ALL: C.UTF-8
+
+parts:
+  revenant:
+    plugin: rust
+    source: .
+    # Build only the two shipped binary crates from the workspace.
+    rust-path:
+      - crates/revenant-sign
+      - crates/revenant-sign-gui
+    parse-info:
+      - packaging/linux/io.github.lobotomoe.revenant.metainfo.xml
+    build-packages:
+      - libdbus-1-dev
+      - pkg-config
+    # Secret Service (keyring) at runtime; GUI/GL libs come from the gnome
+    # extension.
+    stage-packages:
+      - libdbus-1-3
+
+  desktop-integration:
+    plugin: dump
+    source: packaging/linux
+    organize:
+      io.github.lobotomoe.revenant.desktop: share/applications/io.github.lobotomoe.revenant.desktop
+      io.github.lobotomoe.revenant.png: share/icons/hicolor/256x256/apps/io.github.lobotomoe.revenant.png
+      io.github.lobotomoe.revenant.metainfo.xml: share/metainfo/io.github.lobotomoe.revenant.metainfo.xml
+    stage:
+      - share/applications/io.github.lobotomoe.revenant.desktop
+      - share/icons/hicolor/256x256/apps/io.github.lobotomoe.revenant.png
+      - share/metainfo/io.github.lobotomoe.revenant.metainfo.xml
