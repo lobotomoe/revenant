@@ -33,9 +33,12 @@ for exe in "$GUI_EXE" "$CLI_EXE"; do
 	[[ -f "$exe" ]] || { echo "error: binary not found: $exe" >&2; exit 1; }
 done
 
-# MSIX requires a 4-part version; the Store also requires the revision (4th) part
-# to be 0. Map the semver M.m.p to M.m.p.0.
-MSIX_VERSION="${VERSION}.0"
+# MSIX requires a purely numeric 4-part version, and the Store requires the
+# revision (4th) part to be 0. Map the semver M.m.p to M.m.p.0. A prerelease tag
+# (v2.1.0-rc.1) has no MSIX equivalent -- MSIX has no prerelease concept and the
+# suffix is non-numeric -- so strip it: 2.1.0-rc.1 -> 2.1.0.0. (Distinct
+# prereleases would collide, but MSIX/Store prereleases are not a workflow here.)
+MSIX_VERSION="${VERSION%%-*}.0"
 
 rm -rf "$STAGING"
 mkdir -p "$STAGING/Assets"
