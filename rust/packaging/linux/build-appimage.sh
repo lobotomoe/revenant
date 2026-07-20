@@ -33,6 +33,7 @@ APP_ID="io.github.lobotomoe.revenant"
 APPDIR="$OUT_DIR/AppDir"
 rm -rf "$APPDIR"
 mkdir -p "$APPDIR/usr/bin" \
+	"$APPDIR/usr/share/applications" \
 	"$APPDIR/usr/share/icons/hicolor/256x256/apps" \
 	"$APPDIR/usr/share/metainfo"
 
@@ -42,8 +43,12 @@ chmod +x "$APPDIR/usr/bin/revenant-gui"
 cp "$HERE/AppRun" "$APPDIR/AppRun"
 chmod +x "$APPDIR/AppRun"
 
-# Desktop entry (AppDir root, where appimagetool looks for it).
+# Desktop entry: at the AppDir root (where appimagetool reads it) and under
+# usr/share/applications (where appstreamcli resolves the metainfo's
+# `desktop-id` launchable -- without it validation warns desktop-file-not-found
+# and appimagetool aborts).
 cp "$HERE/$APP_ID.desktop" "$APPDIR/$APP_ID.desktop"
+cp "$HERE/$APP_ID.desktop" "$APPDIR/usr/share/applications/$APP_ID.desktop"
 
 # Icon: at the AppDir root, in the hicolor theme, and as the .DirIcon thumbnail.
 cp "$HERE/$APP_ID.png" "$APPDIR/$APP_ID.png"

@@ -3,7 +3,7 @@
   MSIX Package Manifest for Microsoft Store submission (Rust build).
 
   Build:
-    1. Build binaries:  cargo build --release  (revenant-gui.exe, revenant.exe)
+    1. Build binaries:  cargo build (release profile) -> revenant-gui.exe, revenant.exe
     2. Pack MSIX:       packaging/windows/build-msix.sh <gui.exe> <cli.exe> <ver>
 
   Prerequisites:
