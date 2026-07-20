@@ -18,7 +18,7 @@ categories = ["cryptography", "authentication"]
 exclude = ["**/generate_*.py"]
 
 [dependencies]
-revenant-sign-tls = { path = "../revenant-sign-tls", version = "0.1.0" }
+revenant-sign-tls = { path = "../revenant-sign-tls", version = "2.1.0" }
 
 # ASN.1 / X.509 / CMS
 der.workspace = true

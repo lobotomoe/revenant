@@ -21,7 +21,7 @@ path = "src/main.rs"
 # nothing else in the workspace depends on egui, so central pinning would only
 # add noise. egui is used through `eframe::egui` to keep the two in lockstep.
 [dependencies]
-revenant-sign-core = { path = "../revenant-sign-core", version = "0.1.0" }
+revenant-sign-core = { path = "../revenant-sign-core", version = "2.1.0" }
 log.workspace = true
 env_logger.workspace = true
 eframe = "0.34"

@@ -8,7 +8,15 @@ members = [
 ]
 
 [workspace.package]
-version = "0.1.1"
+# The whole workspace releases as one unit, versioned with the Revenant product
+# line (continuing from the Python client's 2.0.0). The library crates
+# (revenant-sign-core / -tls) and the shipped binaries (revenant-sign /
+# revenant-sign-gui) share this number so that `--version`, the GUI About box,
+# and the signer version recorded in each signed PDF (/Prop_Build /REx) all
+# agree with the store listing -- matching the single-version model the Python
+# package already uses. A breaking change to the core library API bumps the
+# major here like any other release.
+version = "2.1.0"
 edition = "2021"
 rust-version = "1.85"
 license = "Apache-2.0"

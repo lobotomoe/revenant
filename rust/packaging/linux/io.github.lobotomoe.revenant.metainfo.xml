@@ -70,6 +70,19 @@
   </branding>
 
   <releases>
+    <release version="2.1.0" date="2026-07-20">
+      <description>
+        <p>
+          Rewritten from the ground up in Rust: self-contained native binaries
+          with no bundled Python runtime, a smaller footprint, and faster start.
+        </p>
+        <ul>
+          <li>Native desktop GUI with a live signature-placement preview</li>
+          <li>Three new interface languages: Turkish, Georgian, and Persian (right-to-left)</li>
+          <li>In-process certificate-chain validation against the profile's pinned trust anchors</li>
+        </ul>
+      </description>
+    </release>
     <release version="1.2.1" date="2026-04-16">
       <description>
         <p>Completed Armenian locale -- 21 untranslated strings fixed.</p>

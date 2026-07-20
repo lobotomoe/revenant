@@ -26,6 +26,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   text in labels, messages, and input fields is right-aligned automatically
   when a right-to-left locale is active.
 
+### Changed
+
+- **The Rust workspace now versions as one unit on the product line (2.1.0),
+  continuing from the Python client rather than restarting at 0.1.x.** The
+  library crates (`revenant-sign-core`, `revenant-sign-tls`) and the shipped
+  binaries (`revenant-sign`, `revenant-sign-gui`) share a single version, so the
+  CLI `--version`, the GUI About box, the store listings, and the signer version
+  recorded in each signed PDF (`/Prop_Build /REx`) all report the same number --
+  matching the single-version model the Python and TypeScript packages use.
+
 ### Fixed
 
 - **Rust: signing a PDF that already has a form no longer destroys it.** The
