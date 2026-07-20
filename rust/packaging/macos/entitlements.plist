@@ -2,10 +2,10 @@
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
 <plist version="1.0">
 <dict>
-    <!-- Required for PyInstaller's bundled Python interpreter -->
-    <key>com.apple.security.cs.allow-unsigned-executable-memory</key>
-    <true/>
-    <key>com.apple.security.cs.disable-library-validation</key>
-    <true/>
+    <!-- Self-contained Rust binary under a hardened runtime: it neither JITs
+         nor loads unsigned libraries, so it needs no code-signing exceptions.
+         (The Python client required allow-unsigned-executable-memory and
+         disable-library-validation for PyInstaller's bundled interpreter; the
+         Rust build does not, and dropping them keeps the runtime fully hardened.) -->
 </dict>
 </plist>
