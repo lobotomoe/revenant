@@ -17,7 +17,8 @@
     <!-- No cs.allow-unsigned-executable-memory / cs.disable-library-validation:
          those were needed only by the Python client's bundled interpreter. The
          self-contained Rust binary needs neither, and omitting them keeps the
-         hardened runtime intact -- disable-library-validation in particular is a
-         common App Store review rejection. -->
+         hardened runtime intact; disable-library-validation in particular is a
+         common App Store review rejection. (No double hyphen in this comment:
+         codesign's AMFI XML parser rejects it, unlike plutil.) -->
 </dict>
 </plist>

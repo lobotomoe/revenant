@@ -4,8 +4,8 @@
   Info.plist for the Revenant macOS .app bundle (Rust GUI).
 
   Mirrors the store-approved keys from the Python client's py2app setup
-  (python/setup_mac.py) verbatim -- same bundle id, category, minimum OS,
-  privacy-policy URL, non-exempt-encryption flag, and PDF/.p7s document types --
+  (python/setup_mac.py) verbatim (same bundle id, category, minimum OS,
+  privacy-policy URL, non-exempt-encryption flag, and PDF/.p7s document types)
   so the Mac App Store record is unchanged. Only the executable name differs
   (revenant-gui, the self-contained Rust binary; no Python runtime to embed).
 

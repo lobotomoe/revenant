@@ -68,5 +68,9 @@ if [[ -z "$MAKEAPPX" ]]; then
 fi
 
 OUTPUT="${OUTPUT:-$(dirname "$STAGING")/RevenantSign.msix}"
-"$MAKEAPPX" pack /d "$STAGING" /p "$OUTPUT" /overwrite
+# git-bash (MSYS) rewrites arguments that look like Unix paths, turning the
+# makeappx flags /d and /p into drive paths ("D:/", "P:/") -- makeappx then
+# rejects them as unknown options. Disable that conversion for this call; the
+# path arguments are relative, so none of them need rewriting.
+MSYS2_ARG_CONV_EXCL='*' MSYS_NO_PATHCONV=1 "$MAKEAPPX" pack /d "$STAGING" /p "$OUTPUT" /overwrite
 echo "packed: $OUTPUT"
