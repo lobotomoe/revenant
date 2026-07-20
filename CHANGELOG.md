@@ -7,6 +7,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [2.1.1] - 2026-07-20
+
+### Fixed
+
+- **macOS: the Dock icon is no longer overridden by a flat square at runtime.**
+  The desktop GUI forwarded its embedded window icon to
+  `NSApplication.setApplicationIconImage`, which replaced the app bundle's
+  rounded `.icns` with a square, full-bleed PNG for as long as the app ran. The
+  runtime window icon is now set only on Windows (taskbar) and Linux (window
+  manager); on macOS the Dock tile comes from the bundle icon.
+
 ## [2.1.0] - 2026-07-20
 
 ### Added
@@ -297,7 +308,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Pyright strict mode type checking with 0 errors
 - 96%+ test coverage (600+ tests)
 
-[Unreleased]: https://github.com/lobotomoe/revenant/compare/v2.1.0...HEAD
+[Unreleased]: https://github.com/lobotomoe/revenant/compare/v2.1.1...HEAD
+[2.1.1]: https://github.com/lobotomoe/revenant/compare/v2.1.0...v2.1.1
 [2.1.0]: https://github.com/lobotomoe/revenant/compare/v2.0.0...v2.1.0
 [2.0.0]: https://github.com/lobotomoe/revenant/compare/v1.2.1...v2.0.0
 [1.2.1]: https://github.com/lobotomoe/revenant/compare/v1.2.0...v1.2.1

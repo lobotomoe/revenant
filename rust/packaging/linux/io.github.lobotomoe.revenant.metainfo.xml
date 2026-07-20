@@ -70,6 +70,15 @@
   </branding>
 
   <releases>
+    <release version="2.1.1" date="2026-07-20">
+      <description>
+        <p>
+          Bug fix for macOS: the Dock icon is no longer replaced by a flat
+          square while the app is running -- the rounded app icon is used
+          throughout.
+        </p>
+      </description>
+    </release>
     <release version="2.1.0" date="2026-07-20">
       <description>
         <p>

@@ -16,7 +16,7 @@ members = [
 # agree with the store listing -- matching the single-version model the Python
 # package already uses. A breaking change to the core library API bumps the
 # major here like any other release.
-version = "2.1.0"
+version = "2.1.1"
 edition = "2021"
 rust-version = "1.85"
 license = "Apache-2.0"

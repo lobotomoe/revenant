@@ -3725,7 +3725,7 @@ checksum = "19b30a45b0cd0bcca8037f3d0dc3421eaf95327a17cad11964fb8179b4fc4832"
 
 [[package]]
 name = "revenant-sign"
-version = "2.1.0"
+version = "2.1.1"
 dependencies = [
  "clap",
  "env_logger",
@@ -3738,7 +3738,7 @@ dependencies = [
 
 [[package]]
 name = "revenant-sign-core"
-version = "2.1.0"
+version = "2.1.1"
 dependencies = [
  "base64",
  "chrono",
@@ -3769,7 +3769,7 @@ dependencies = [
 
 [[package]]
 name = "revenant-sign-gui"
-version = "2.1.0"
+version = "2.1.1"
 dependencies = [
  "ab_glyph",
  "eframe",
@@ -3783,7 +3783,7 @@ dependencies = [
 
 [[package]]
 name = "revenant-sign-tls"
-version = "2.1.0"
+version = "2.1.1"
 dependencies = [
  "const-oid 0.9.6",
  "der",
