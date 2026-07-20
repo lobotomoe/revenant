@@ -654,16 +654,20 @@ jobs:
       - name: Build
         run: pnpm build
 
+      # Trusted publishing (OIDC) needs npm CLI >= 11.5.1; Node 22 ships an older
+      # npm, and pnpm's OIDC path is currently broken (publishes 404). So publish
+      # with the npm CLI directly -- auth comes from the id-token, no NODE_AUTH_TOKEN.
+      - name: Upgrade npm for trusted publishing
+        run: npm install -g npm@latest
+
       - name: Publish
         run: |
           PKG_VERSION="${GITHUB_REF_NAME#v}"
           if npm view "revenant-sign@$PKG_VERSION" version 2>/dev/null; then
             echo "Version $PKG_VERSION already published, skipping"
           else
-            pnpm publish --no-git-checks --access public
+            npm publish --provenance --access public
           fi
-        env:
-          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
 
   publish-npm-prerelease:
     name: Publish to npm (pre-release)
@@ -711,7 +715,9 @@ jobs:
       - name: Build
         run: pnpm build
 
+      # See the stable publish job: OIDC trusted publishing via the npm CLI.
+      - name: Upgrade npm for trusted publishing
+        run: npm install -g npm@latest
+
       - name: Publish
-        run: pnpm publish --no-git-checks --access public --tag next
-        env:
-          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+        run: npm publish --provenance --access public --tag next
