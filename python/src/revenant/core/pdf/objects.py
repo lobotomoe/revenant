@@ -59,6 +59,10 @@ _ANNOT_FLAG_PRINT = 4
 _ANNOT_FLAG_LOCKED = 128
 ANNOT_FLAGS_SIG_WIDGET = _ANNOT_FLAG_PRINT | _ANNOT_FLAG_LOCKED  # 132
 
+# AcroForm /SigFlags bits to set when adding a signature field:
+# SignaturesExist (1) | AppendOnly (2).
+SIG_FLAGS_SIGNED_APPEND = 3
+
 
 # ── PDF string/object helpers ────────────────────────────────────────
 
@@ -184,13 +188,89 @@ def build_page_override(pdf_bytes: bytes, page_obj_num: int, annots_list: str) -
 
 
 def build_catalog_override(pdf_bytes: bytes, root_obj_num: int, annot_obj_num: int) -> str:
-    """Build a raw override of the catalog that adds /AcroForm."""
-    return build_object_override(
-        pdf_bytes,
-        root_obj_num,
-        skip_key="/AcroForm",
-        new_entry=f"  /AcroForm << /Fields [{annot_obj_num} 0 R] /SigFlags 3 >>",
-    )
+    """Build a raw catalog override that installs the signature field into
+    the document's AcroForm, merging with any AcroForm the document already
+    has instead of replacing it.
+
+    A signing tool must not destroy an existing form. Overwriting /AcroForm
+    wholesale orphans every existing field -- and, when the input is already
+    signed (e.g. a server-pre-signed agreement), the prior signature's
+    field -- so a reader reports the earlier form/signature as removed.
+    This preserves the existing /Fields (appending the new one), keeps
+    ancillary keys (/DR, /DA, /NeedAppearances, /CO, ...), and ORs the
+    signatures-exist / append-only bits into /SigFlags.
+
+    With no existing AcroForm it emits the minimal
+    ``<< /Fields [N 0 R] /SigFlags 3 >>``, matching the fresh-form case.
+    """
+    import io
+
+    pikepdf = _require_pikepdf()
+    with pikepdf.open(io.BytesIO(pdf_bytes)) as pdf:
+        catalog = pdf.get_object((root_obj_num, 0))
+        entries: list[str] = []
+        acroform = None
+        for key in list(catalog.keys()):
+            if key == "/AcroForm":
+                acroform = catalog[key]
+                continue
+            entries.append(f"  {key} {_serialize_pikepdf_obj(catalog[key])}")
+        acroform_body = _merged_acroform_body(acroform, annot_obj_num)
+        entries.append(f"  /AcroForm << {acroform_body} >>")
+
+    body = "\n".join(entries)
+    return f"{root_obj_num} 0 obj\n<<\n{body}\n>>\nendobj\n"
+
+
+def _merged_acroform_body(acroform: pikepdf.Object | None, annot_obj_num: int) -> str:
+    """Build the body (between << and >>) of the merged AcroForm dictionary.
+
+    ``acroform`` is the catalog's current /AcroForm value, if any -- an
+    inline dict or an indirect reference, both resolved transparently by
+    pikepdf.
+    """
+    pikepdf = _require_pikepdf()
+    parts: list[str] = []
+    wrote_fields = False
+    wrote_sigflags = False
+    if acroform is not None and isinstance(acroform, pikepdf.Dictionary):
+        for key in list(acroform.keys()):
+            if key == "/Fields":
+                parts.append(_merged_fields_entry(acroform[key], annot_obj_num))
+                wrote_fields = True
+            elif key == "/SigFlags":
+                # A malformed (non-numeric) /SigFlags is treated as 0,
+                # matching the Rust core: the bits we require are set
+                # either way.
+                try:
+                    existing_flags = int(acroform[key])
+                except (TypeError, ValueError):
+                    existing_flags = 0
+                parts.append(f"/SigFlags {existing_flags | SIG_FLAGS_SIGNED_APPEND}")
+                wrote_sigflags = True
+            else:
+                parts.append(f"{key} {_serialize_pikepdf_obj(acroform[key])}")
+    if not wrote_fields:
+        parts.append(f"/Fields [{annot_obj_num} 0 R]")
+    if not wrote_sigflags:
+        parts.append(f"/SigFlags {SIG_FLAGS_SIGNED_APPEND}")
+    return " ".join(parts)
+
+
+def _merged_fields_entry(fields_value: pikepdf.Object, annot_obj_num: int) -> str:
+    """Build ``/Fields [ <existing...> <new> 0 R ]``, preserving the existing
+    field references.
+
+    Those objects live in the original bytes, untouched by the incremental
+    update, so referencing them by number stays valid.
+    """
+    pikepdf = _require_pikepdf()
+    refs: list[str] = []
+    if isinstance(fields_value, pikepdf.Array):
+        # pikepdf Array supports len() and indexing; its stubs lack __iter__
+        refs.extend(_serialize_pikepdf_obj(fields_value[i]) for i in range(len(fields_value)))
+    refs.append(f"{annot_obj_num} 0 R")
+    return "/Fields [" + " ".join(refs) + "]"
 
 
 # ── Object number allocation ────────────────────────────────────────

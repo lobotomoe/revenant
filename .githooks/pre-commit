@@ -36,8 +36,13 @@ if [ -n "$PY_CHANGED" ]; then
     FAILED=1
   fi
 
-  if ! (cd python/scripts && python check_translations.py); then
-    printf "${RED}[pre-commit]${NC} i18n translation check failed (run: cd python/scripts && python check_translations.py)\n"
+  if [ -x python/.venv/bin/python ]; then
+    PY_BIN="$(pwd)/python/.venv/bin/python"
+  else
+    PY_BIN=python3
+  fi
+  if ! (cd python/scripts && "$PY_BIN" check_translations.py); then
+    printf "${RED}[pre-commit]${NC} i18n translation check failed (run: cd python/scripts && $PY_BIN check_translations.py)\n"
     FAILED=1
   fi
 fi

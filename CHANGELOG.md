@@ -7,6 +7,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+
+- **Python/TypeScript: signing a PDF that already has a form no longer
+  destroys it.** The incremental update now merges the new signature field
+  into the existing `/AcroForm` (preserving `/Fields`, `/DR`, `/DA`,
+  `/NeedAppearances` and OR-ing `/SigFlags`) instead of replacing it
+  wholesale -- the same fix the Rust port received in 2.1.0. Previously,
+  signing a form-bearing PDF orphaned its fields, and counter-signing a
+  server-pre-signed document (e.g. a tax-portal registration agreement)
+  dropped the server's signature field from the form, so validators reported
+  the document as tampered.
+
 ## [2.1.1] - 2026-07-20
 
 ### Fixed

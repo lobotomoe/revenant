@@ -11,7 +11,8 @@
  * Position/geometry helpers are in position.ts.
  */
 
-import { PDFDict, PDFDocument, PDFRef } from "pdf-lib";
+import type { PDFContext, PDFObject } from "pdf-lib";
+import { PDFArray, PDFDict, PDFDocument, PDFNumber, PDFRef } from "pdf-lib";
 
 import { PDFError } from "../../errors.js";
 import { logger } from "../../logger.js";
@@ -53,6 +54,12 @@ export const BYTERANGE_PLACEHOLDER_BYTES = new TextEncoder().encode(BYTERANGE_PL
 const ANNOT_FLAG_PRINT = 4;
 const ANNOT_FLAG_LOCKED = 128;
 export const ANNOT_FLAGS_SIG_WIDGET = ANNOT_FLAG_PRINT | ANNOT_FLAG_LOCKED;
+
+/**
+ * AcroForm /SigFlags bits to set when adding a signature field:
+ * SignaturesExist (1) | AppendOnly (2).
+ */
+const SIG_FLAGS_SIGNED_APPEND = 3;
 
 // -- PDF string/object helpers ------------------------------------------------
 
@@ -163,19 +170,118 @@ export async function buildPageOverride(
 }
 
 /**
- * Build a raw override of the catalog that adds /AcroForm.
+ * Build a raw catalog override that installs the signature field into the
+ * document's AcroForm, merging with any AcroForm the document already has
+ * instead of replacing it.
+ *
+ * A signing tool must not destroy an existing form. Overwriting /AcroForm
+ * wholesale orphans every existing field -- and, when the input is already
+ * signed (e.g. a server-pre-signed agreement), the prior signature's field --
+ * so a reader reports the earlier form/signature as removed. This preserves
+ * the existing /Fields (appending the new one), keeps ancillary keys
+ * (/DR, /DA, /NeedAppearances, /CO, ...), and ORs the signatures-exist /
+ * append-only bits into /SigFlags.
+ *
+ * With no existing AcroForm it emits the minimal
+ * `<< /Fields [N 0 R] /SigFlags 3 >>`, matching the fresh-form case.
  */
 export async function buildCatalogOverride(
   pdfBytes: Uint8Array,
   rootObjNum: number,
   annotObjNum: number,
 ): Promise<string> {
-  return buildObjectOverride(
-    pdfBytes,
-    rootObjNum,
-    "/AcroForm",
-    `  /AcroForm << /Fields [${annotObjNum} 0 R] /SigFlags 3 >>`,
-  );
+  const pdfDoc = await PDFDocument.load(pdfBytes, {
+    updateMetadata: false,
+  });
+  const context = pdfDoc.context;
+  const ref = PDFRef.of(rootObjNum, 0);
+  const catalog = context.lookup(ref);
+
+  if (!(catalog instanceof PDFDict)) {
+    throw new PDFError(
+      `Object ${rootObjNum} is not a dictionary (got ${catalog?.constructor.name ?? "null"})`,
+    );
+  }
+
+  const entries: string[] = [];
+  let existingAcroform: PDFObject | undefined;
+  for (const [key, value] of catalog.entries()) {
+    if (key.toString() === "/AcroForm") {
+      existingAcroform = value;
+      continue;
+    }
+    entries.push(`  ${key.toString()} ${serializePdfObject(value)}`);
+  }
+
+  const acroformBody = buildMergedAcroformBody(context, existingAcroform, annotObjNum);
+  entries.push(`  /AcroForm << ${acroformBody} >>`);
+
+  const body = entries.join("\n");
+  return `${rootObjNum} 0 obj\n<<\n${body}\n>>\nendobj\n`;
+}
+
+/**
+ * Build the body (between << and >>) of the merged AcroForm dictionary.
+ *
+ * `existing` is the catalog's current /AcroForm value, if any -- an inline
+ * dict or an indirect reference, both resolved via context.lookup().
+ */
+function buildMergedAcroformBody(
+  context: PDFContext,
+  existing: PDFObject | undefined,
+  annotObjNum: number,
+): string {
+  const existingDict = existing === undefined ? undefined : context.lookup(existing);
+
+  const parts: string[] = [];
+  let wroteFields = false;
+  let wroteSigFlags = false;
+  if (existingDict instanceof PDFDict) {
+    for (const [key, value] of existingDict.entries()) {
+      const keyName = key.toString();
+      if (keyName === "/Fields") {
+        parts.push(buildMergedFieldsEntry(context, value, annotObjNum));
+        wroteFields = true;
+      } else if (keyName === "/SigFlags") {
+        // A malformed (non-numeric) /SigFlags is treated as 0, matching the
+        // Rust core: the bits we require are set either way.
+        const resolved = context.lookup(value);
+        const existingFlags = resolved instanceof PDFNumber ? resolved.asNumber() : 0;
+        parts.push(`/SigFlags ${existingFlags | SIG_FLAGS_SIGNED_APPEND}`);
+        wroteSigFlags = true;
+      } else {
+        parts.push(`${keyName} ${serializePdfObject(value)}`);
+      }
+    }
+  }
+  if (!wroteFields) {
+    parts.push(`/Fields [${annotObjNum} 0 R]`);
+  }
+  if (!wroteSigFlags) {
+    parts.push(`/SigFlags ${SIG_FLAGS_SIGNED_APPEND}`);
+  }
+  return parts.join(" ");
+}
+
+/**
+ * Build `/Fields [ <existing...> <new> 0 R ]`, preserving the existing field
+ * references. Those objects live in the original bytes, untouched by the
+ * incremental update, so referencing them by number stays valid.
+ */
+function buildMergedFieldsEntry(
+  context: PDFContext,
+  fieldsValue: PDFObject,
+  annotObjNum: number,
+): string {
+  const resolved = context.lookup(fieldsValue);
+  const refs: string[] = [];
+  if (resolved instanceof PDFArray) {
+    for (const elem of resolved.asArray()) {
+      refs.push(serializePdfObject(elem));
+    }
+  }
+  refs.push(`${annotObjNum} 0 R`);
+  return `/Fields [${refs.join(" ")}]`;
 }
 
 // -- Object number allocation -------------------------------------------------

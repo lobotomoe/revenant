@@ -40,6 +40,7 @@ from revenant.core.pdf.incremental import (
 from revenant.core.pdf.objects import (
     CMS_RESERVED_SIZE,
     _serialize_pikepdf_obj,
+    build_catalog_override,
     build_object_override,
 )
 from revenant.errors import PDFError, RevenantError
@@ -307,6 +308,101 @@ def _make_blank_pdf(page_size=(612, 792), num_pages=1):
     buf = io.BytesIO()
     pdf.save(buf)
     return buf.getvalue()
+
+
+def _make_pdf_with_acroform() -> tuple[bytes, int, int]:
+    """Helper: a PDF whose catalog carries an AcroForm with one existing
+    signature field named "Server Sign" -- the shape of a server-pre-signed
+    agreement (e.g. the tax portal's onlineAdminReg PDFs).
+
+    Returns (pdf_bytes, existing_field_obj_num, root_obj_num).
+    """
+    import io
+
+    import pikepdf
+
+    pdf = pikepdf.Pdf.new()
+    pdf.add_blank_page(page_size=(612, 792))
+    field = pdf.make_indirect(
+        pikepdf.Dictionary(
+            Type=pikepdf.Name("/Annot"),
+            Subtype=pikepdf.Name("/Widget"),
+            FT=pikepdf.Name("/Sig"),
+            T=pikepdf.String("Server Sign"),
+            Rect=pikepdf.Array([0, 0, 100, 20]),
+        )
+    )
+    pdf.pages[0].Annots = pikepdf.Array([field])
+    pdf.Root.AcroForm = pdf.make_indirect(
+        pikepdf.Dictionary(
+            Fields=pikepdf.Array([field]),
+            SigFlags=1,
+            NeedAppearances=True,
+        )
+    )
+    buf = io.BytesIO()
+    pdf.save(buf)
+    pdf_bytes = buf.getvalue()
+
+    # Re-open to discover post-save object numbers (qpdf may renumber).
+    with pikepdf.open(io.BytesIO(pdf_bytes)) as saved:
+        field_num, _gen = saved.Root.AcroForm.Fields[0].objgen
+    root_num, _gen = find_root_obj_num(pdf_bytes)
+    return pdf_bytes, field_num, root_num
+
+
+# ── build_catalog_override ──────────────────────────────────────────
+
+
+def test_build_catalog_override_creates_acroform_when_absent():
+    """No existing form: the minimal field-only AcroForm, byte-identical to
+    the pre-merge behavior, so plain-document signing is unchanged."""
+    pdf_bytes = _make_blank_pdf()
+    root_num, _gen = find_root_obj_num(pdf_bytes)
+    raw = build_catalog_override(pdf_bytes, root_num, 99)
+    assert f"{root_num} 0 obj" in raw
+    assert "/AcroForm << /Fields [99 0 R] /SigFlags 3 >>" in raw
+
+
+def test_build_catalog_override_merges_existing_acroform():
+    """Regression for the form-destroying bug: signing a PDF that already
+    has an AcroForm must keep the existing fields and merge, not replace."""
+    pdf_bytes, field_num, root_num = _make_pdf_with_acroform()
+    raw = build_catalog_override(pdf_bytes, root_num, 99)
+    # Existing field preserved, new field appended after it.
+    assert f"/Fields [{field_num} 0 R 99 0 R]" in raw
+    # SigFlags 1 (SignaturesExist) OR-ed with append-only -> 3.
+    assert "/SigFlags 3" in raw
+    # Ancillary AcroForm keys carried forward, not dropped.
+    assert "/NeedAppearances true" in raw
+
+
+def test_prepare_keeps_presigned_field():
+    """Re-signing a pre-signed document must not orphan the existing
+    signature field, or validators report the prior signature as removed."""
+    import io
+
+    import pikepdf
+
+    from revenant.core.pdf import prepare_pdf_with_sig_field
+
+    pdf_bytes, field_num, _root_num = _make_pdf_with_acroform()
+    prepared, _hex_start, _hex_len = prepare_pdf_with_sig_field(
+        pdf_bytes, page=0, position="bottom-right", reason="Test", name="Test User"
+    )
+
+    # True incremental update: original bytes preserved exactly, so the
+    # prior signature's ByteRange still covers unchanged bytes.
+    assert prepared[: len(pdf_bytes)] == pdf_bytes
+
+    # The final document state must present BOTH fields.
+    with pikepdf.open(io.BytesIO(prepared)) as pdf:
+        acroform = pdf.Root.AcroForm
+        fields = acroform.Fields
+        assert len(fields) == 2
+        assert fields[0].objgen == (field_num, 0)
+        assert str(fields[0].T) == "Server Sign"
+        assert int(acroform.SigFlags) == 3
 
 
 def test_prepare_and_verify_roundtrip():

@@ -8,7 +8,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 
 import * as asn1js from "asn1js";
-import { PDFDocument, PDFName, PDFRef, PDFString } from "pdf-lib";
+import { PDFArray, PDFDict, PDFDocument, PDFName, PDFNumber, PDFRef, PDFString } from "pdf-lib";
 import * as pkijs from "pkijs";
 import { describe, expect, it } from "vitest";
 
@@ -515,15 +515,57 @@ describe("buildPageOverride", () => {
   });
 });
 
+/**
+ * A PDF whose catalog carries an AcroForm (indirect ref) with one existing
+ * signature field named "Server Sign" -- the shape of a server-pre-signed
+ * agreement (e.g. the tax portal's onlineAdminReg PDFs).
+ */
+async function createPdfWithAcroform(): Promise<{ bytes: Uint8Array; fieldNum: number }> {
+  const pdfDoc = await PDFDocument.create();
+  const page = pdfDoc.addPage([612, 792]);
+  const context = pdfDoc.context;
+  const fieldDict = context.obj({
+    Type: "Annot",
+    Subtype: "Widget",
+    FT: "Sig",
+    T: PDFString.of("Server Sign"),
+    Rect: [0, 0, 100, 20],
+  });
+  const fieldRef = context.register(fieldDict);
+  page.node.set(PDFName.of("Annots"), context.obj([fieldRef]));
+  const acroformDict = context.obj({
+    Fields: [fieldRef],
+    SigFlags: 1,
+    NeedAppearances: true,
+  });
+  const acroformRef = context.register(acroformDict);
+  pdfDoc.catalog.set(PDFName.of("AcroForm"), acroformRef);
+  const bytes = await pdfDoc.save();
+  return { bytes: new Uint8Array(bytes), fieldNum: fieldRef.objectNumber };
+}
+
 describe("buildCatalogOverride", () => {
-  it("builds catalog override with AcroForm", async () => {
+  it("creates a minimal AcroForm when the document has none", async () => {
     const pdfBytes = await createValidPdf();
     const rootInfo = findRootObjNum(pdfBytes);
     const result = await buildCatalogOverride(pdfBytes, rootInfo.objNum, 50);
     expect(result).toContain(`${rootInfo.objNum} 0 obj`);
-    expect(result).toContain("/AcroForm");
-    expect(result).toContain("50 0 R");
+    expect(result).toContain("/AcroForm << /Fields [50 0 R] /SigFlags 3 >>");
+  });
+
+  it("merges an existing AcroForm instead of replacing it", async () => {
+    // Regression for the form-destroying bug: signing a PDF that already has
+    // an AcroForm must keep the existing fields and merge, not replace.
+    const { bytes, fieldNum } = await createPdfWithAcroform();
+    const rootInfo = findRootObjNum(bytes);
+    const result = await buildCatalogOverride(bytes, rootInfo.objNum, 99);
+
+    // Existing field preserved, new field appended after it.
+    expect(result).toContain(`/Fields [${fieldNum} 0 R 99 0 R]`);
+    // SigFlags 1 (SignaturesExist) OR-ed with append-only -> 3.
     expect(result).toContain("/SigFlags 3");
+    // Ancillary AcroForm keys carried forward, not dropped.
+    expect(result).toContain("/NeedAppearances true");
   });
 });
 
@@ -1443,6 +1485,47 @@ describe("preparePdfWithSigField", () => {
     expect(text).toContain("/ByteRange [");
     expect(text).toContain("/Type /Sig");
     expect(text).toContain("/SubFilter /adbe.pkcs7.detached");
+  });
+
+  it("keeps the existing signature field when re-signing a pre-signed document", async () => {
+    // A server-pre-signed agreement carries a filled signature field in its
+    // AcroForm; adding ours must not orphan it, or validators report the
+    // server signature as removed.
+    const { bytes, fieldNum } = await createPdfWithAcroform();
+    const prepared = await preparePdfWithSigField(bytes, { visible: false });
+
+    // True incremental update: original bytes preserved exactly, so the
+    // prior signature's ByteRange still covers unchanged bytes.
+    expect(prepared.pdf.slice(0, bytes.length)).toEqual(bytes);
+
+    // The final document state must present BOTH fields.
+    const reloaded = await PDFDocument.load(prepared.pdf, { updateMetadata: false });
+    const acroform = reloaded.catalog.lookup(PDFName.of("AcroForm"));
+    if (!(acroform instanceof PDFDict)) {
+      throw new Error(`Final /AcroForm is not a dictionary: ${String(acroform)}`);
+    }
+    const fields = acroform.lookup(PDFName.of("Fields"));
+    if (!(fields instanceof PDFArray)) {
+      throw new Error(`Final /Fields is not an array: ${String(fields)}`);
+    }
+    expect(fields.size()).toBe(2);
+
+    const firstField = reloaded.context.lookup(fields.get(0));
+    if (!(firstField instanceof PDFDict)) {
+      throw new Error("First field did not resolve to a dictionary");
+    }
+    const firstFieldName = firstField.lookup(PDFName.of("T"));
+    if (!(firstFieldName instanceof PDFString)) {
+      throw new Error("First field has no /T string");
+    }
+    expect(firstFieldName.decodeText()).toBe("Server Sign");
+    expect(fields.get(0)).toEqual(PDFRef.of(fieldNum, 0));
+
+    const sigFlags = acroform.lookup(PDFName.of("SigFlags"));
+    if (!(sigFlags instanceof PDFNumber)) {
+      throw new Error("Final /SigFlags is not a number");
+    }
+    expect(sigFlags.asNumber()).toBe(3);
   });
 });
 
