@@ -9,4 +9,4 @@ pyinstaller>=6.0,<7
 py2app>=0.28,<1
 keyring>=21.0,<26
 # Python 3.13+ removed setuptools from stdlib; py2app needs it
-setuptools>=64
+setuptools>=83.0.0
