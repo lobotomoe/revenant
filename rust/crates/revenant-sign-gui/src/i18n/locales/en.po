@@ -35,9 +35,6 @@ msgstr "Author: Aleksandr Kraiz"
 msgid "gui.back"
 msgstr "Back"
 
-msgid "gui.browse_ellipsis"
-msgstr "Browse..."
-
 msgid "gui.cancel"
 msgstr "Cancel"
 
@@ -265,12 +262,6 @@ msgstr "Organization"
 
 msgid "gui.organization_label"
 msgstr "Organization:"
-
-msgid "gui.output_opt_label"
-msgstr "Save to:"
-
-msgid "gui.output_path_must_be_absolute_use_browse_to_select_a_location"
-msgstr "Output path must be absolute.\nUse 'Browse...' to select a location."
 
 msgid "gui.page_label"
 msgstr "Page:"

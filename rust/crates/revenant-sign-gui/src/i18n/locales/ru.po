@@ -44,10 +44,6 @@ msgstr "Автор: Aleksandr Kraiz"
 msgid "gui.back"
 msgstr "Назад"
 
-#. EN: Browse...
-msgid "gui.browse_ellipsis"
-msgstr "Обзор..."
-
 #. EN: Cancel
 msgid "gui.cancel"
 msgstr "Отмена"
@@ -352,14 +348,6 @@ msgstr "Организация"
 #. EN: Organization:
 msgid "gui.organization_label"
 msgstr "Организация:"
-
-#. EN: Save to:
-msgid "gui.output_opt_label"
-msgstr "Куда сохранить:"
-
-#. EN: Output path must be absolute.\nUse 'Browse...' to select a location.
-msgid "gui.output_path_must_be_absolute_use_browse_to_select_a_location"
-msgstr "Путь должен быть абсолютным.\nНажмите «Обзор...» для выбора."
 
 #. EN: Page:
 msgid "gui.page_label"
