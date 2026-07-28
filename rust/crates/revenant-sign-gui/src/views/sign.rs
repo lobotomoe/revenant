@@ -56,8 +56,6 @@ pub(crate) enum SignAction {
     BrowsePdf,
     /// Open a native picker to choose a stamp image.
     BrowseImage,
-    /// Open a native save dialog for the output path.
-    BrowseOutput,
     /// Start signing the current form (single file or batch).
     Sign,
     /// Cancel an in-progress batch after the current file.
@@ -93,9 +91,6 @@ struct BatchProgress {
 pub(crate) struct SignForm {
     pdf_path: String,
     image_path: String,
-    output_path: String,
-    /// Whether the user set the output path by hand; if not, it auto-derives.
-    output_edited: bool,
     mode: Mode,
     position: Position,
     page: PageSpec,
@@ -116,8 +111,6 @@ impl SignForm {
         Self {
             pdf_path: String::new(),
             image_path: String::new(),
-            output_path: String::new(),
-            output_edited: false,
             mode: Mode::Embedded,
             position: Position::BottomRight,
             page: PageSpec::Last,
@@ -131,11 +124,10 @@ impl SignForm {
         }
     }
 
-    /// Set the input PDF (from the picker or a drop) and refresh the auto output.
+    /// Set the input PDF (from the picker or a drop).
     pub(crate) fn set_pdf(&mut self, path: &Path) {
         self.pdf_path = path.to_string_lossy().into_owned();
         self.status = SignStatus::Idle;
-        self.refresh_auto_output();
     }
 
     /// Load one or more files: a single file uses the single-file field; several
@@ -193,11 +185,6 @@ impl SignForm {
         self.image_path = path.to_string_lossy().into_owned();
     }
 
-    pub(crate) fn set_output(&mut self, path: &Path) {
-        self.output_path = path.to_string_lossy().into_owned();
-        self.output_edited = true;
-    }
-
     pub(crate) fn pdf_path(&self) -> &str {
         self.pdf_path.trim()
     }
@@ -206,27 +193,8 @@ impl SignForm {
         self.mode == Mode::Detached
     }
 
-    /// The output path to write to. An explicit entry is normalized so a bare or
-    /// relative name lands next to the input PDF with the right extension; an
-    /// empty entry falls back to the derived default. `None` until a PDF is set.
-    pub(crate) fn resolved_output(&self) -> Option<PathBuf> {
-        let pdf = self.pdf_path.trim();
-        if pdf.is_empty() {
-            return None;
-        }
-        let input = Path::new(pdf);
-        let explicit = self.output_path.trim();
-        if explicit.is_empty() {
-            return Some(default_output(input, self.is_detached()));
-        }
-        Some(normalize_output(
-            Path::new(explicit),
-            input,
-            self.is_detached(),
-        ))
-    }
-
-    /// The default output path for the current PDF and mode, for the save dialog.
+    /// The default output path for the current PDF and mode: the name and folder
+    /// the save dialog opens with. `None` until a PDF is set.
     pub(crate) fn default_output(&self) -> Option<PathBuf> {
         let pdf = self.pdf_path.trim();
         (!pdf.is_empty()).then(|| default_output(Path::new(pdf), self.is_detached()))
@@ -267,20 +235,6 @@ impl SignForm {
         }
     }
 
-    fn refresh_auto_output(&mut self) {
-        if self.output_edited {
-            return;
-        }
-        let pdf = self.pdf_path.trim();
-        self.output_path = if pdf.is_empty() {
-            String::new()
-        } else {
-            default_output(Path::new(pdf), self.is_detached())
-                .to_string_lossy()
-                .into_owned()
-        };
-    }
-
     /// The fully-configured signing screen: input + image on top, then two
     /// columns (settings left, signer card right), then a large centered Sign
     /// button and status line.
@@ -308,8 +262,7 @@ impl SignForm {
         if full_width >= TWO_COLUMN_MIN_WIDTH {
             ui.columns(2, |cols| {
                 if let [left, right] = cols {
-                    let settings = self.settings_column(left, l10n);
-                    merge(&mut action, settings);
+                    self.settings_column(left, l10n);
                     // Signer card, then the placement preview fills the space
                     // beneath it -- balancing the columns without overflow.
                     account_action = account::show(right, l10n, store);
@@ -318,8 +271,7 @@ impl SignForm {
                 }
             });
         } else {
-            let settings = self.settings_column(ui, l10n);
-            merge(&mut action, settings);
+            self.settings_column(ui, l10n);
             ui.add_space(10.0);
             account_action = account::show(ui, l10n, store);
             ui.add_space(10.0);
@@ -405,19 +357,14 @@ impl SignForm {
         crate::style::zone_basename(&self.pdf_path)
     }
 
-    /// The left column: mode, appearance controls with a live preview, and the
-    /// output path.
-    fn settings_column(&mut self, ui: &mut egui::Ui, l10n: &Localizer) -> SignAction {
-        let mut action = SignAction::None;
-
-        let prev_mode = self.mode;
+    /// The left column: mode and appearance controls with a live preview. The
+    /// output location is chosen through the save dialog at sign time, so there
+    /// is no path field here.
+    fn settings_column(&mut self, ui: &mut egui::Ui, l10n: &Localizer) {
         ui.horizontal(|ui| {
             ui.selectable_value(&mut self.mode, Mode::Embedded, l10n.t("gui.embedded"));
             ui.selectable_value(&mut self.mode, Mode::Detached, l10n.t("gui.detached_p7s"));
         });
-        if self.mode != prev_mode {
-            self.refresh_auto_output();
-        }
 
         let detached = self.is_detached();
         let appearance_enabled = self.appearance_enabled();
@@ -440,39 +387,6 @@ impl SignForm {
                 ui.add(crate::style::text_edit(&mut self.reason).desired_width(f32::INFINITY));
             });
         });
-
-        // Output path (auto-derived per file in batch mode, so hidden there).
-        if !self.is_batch() {
-            ui.horizontal(|ui| {
-                ui.label(l10n.t("gui.output_opt_label"));
-                // Pin Browse to the right so it stays visible; the text field
-                // fills the space between the label and the button.
-                ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
-                    if ui.button(l10n.t("gui.browse_ellipsis")).clicked() {
-                        action = SignAction::BrowseOutput;
-                    }
-                    if ui
-                        .add(
-                            crate::style::text_edit(&mut self.output_path)
-                                .desired_width(f32::INFINITY),
-                        )
-                        .changed()
-                    {
-                        self.output_edited = true;
-                    }
-                });
-            });
-            // Show exactly where the file will be written, so a bare or relative
-            // name is never a mystery.
-            if let Some(resolved) = self.resolved_output() {
-                ui.label(
-                    egui::RichText::new(format!("{}  {}", crate::icons::SAVE, resolved.display()))
-                        .small()
-                        .color(theme::MUTED),
-                );
-            }
-        }
-        action
     }
 
     /// The large centered Sign button. Its label and gating follow the mode
@@ -677,38 +591,6 @@ pub(crate) fn default_output(pdf: &Path, detached: bool) -> PathBuf {
     }
 }
 
-/// Turn a user-entered output path into a concrete target. A relative or bare
-/// name (e.g. `contract`) resolves against the input PDF's directory rather than
-/// the process's working directory -- which, for a GUI launched from a bundle,
-/// is unpredictable -- and a missing or mismatched extension is corrected to
-/// `.pdf` (embedded) or `.p7s` (detached). This keeps a typed name from silently
-/// landing who-knows-where with no extension.
-fn normalize_output(entered: &Path, input_pdf: &Path, detached: bool) -> PathBuf {
-    let anchored = if entered.is_absolute() {
-        entered.to_path_buf()
-    } else {
-        input_pdf
-            .parent()
-            .unwrap_or_else(|| Path::new("."))
-            .join(entered)
-    };
-    ensure_extension(anchored, detached)
-}
-
-/// Give a bare name the extension the signing mode requires (`.pdf` embedded,
-/// `.p7s` detached). An extension the user typed is respected as-is -- we only
-/// fill in the blank, never override an explicit choice.
-fn ensure_extension(path: PathBuf, detached: bool) -> PathBuf {
-    if path.extension().is_some() {
-        return path;
-    }
-    let wanted = if detached { "p7s" } else { "pdf" };
-    let mut name = path.into_os_string();
-    name.push(".");
-    name.push(wanted);
-    PathBuf::from(name)
-}
-
 fn position_label(l10n: &Localizer, position: Position) -> &str {
     match position {
         Position::BottomRight => l10n.t("gui.pos_bottom_right"),
@@ -816,67 +698,27 @@ mod tests {
     }
 
     #[test]
-    fn set_pdf_auto_derives_output() {
+    fn set_pdf_derives_default_output() {
         let mut form = SignForm::new("noto-sans".to_owned());
         form.set_pdf(Path::new("/tmp/a.pdf"));
         assert_eq!(
-            form.resolved_output(),
+            form.default_output(),
             Some(PathBuf::from("/tmp/a_signed.pdf"))
         );
     }
 
     #[test]
-    fn switching_to_detached_updates_auto_output() {
+    fn detached_mode_changes_default_output_extension() {
         let mut form = SignForm::new("noto-sans".to_owned());
         form.set_pdf(Path::new("/tmp/a.pdf"));
         form.mode = Mode::Detached;
-        form.refresh_auto_output();
-        assert_eq!(
-            form.resolved_output(),
-            Some(PathBuf::from("/tmp/a.pdf.p7s"))
-        );
+        assert_eq!(form.default_output(), Some(PathBuf::from("/tmp/a.pdf.p7s")));
     }
 
     #[test]
-    fn manual_output_survives_mode_switch() {
-        let mut form = SignForm::new("noto-sans".to_owned());
-        form.set_pdf(Path::new("/tmp/a.pdf"));
-        form.set_output(Path::new("/custom/out.pdf"));
-        form.mode = Mode::Detached;
-        form.refresh_auto_output();
-        assert_eq!(
-            form.resolved_output(),
-            Some(PathBuf::from("/custom/out.pdf"))
-        );
-    }
-
-    #[test]
-    fn bare_output_name_resolves_next_to_input_with_extension() {
-        let mut form = SignForm::new("noto-sans".to_owned());
-        form.set_pdf(Path::new("/docs/passport.pdf"));
-        form.set_output(Path::new("contract"));
-        // Relative bare name -> input's directory, plus the embedded extension.
-        assert_eq!(
-            form.resolved_output(),
-            Some(PathBuf::from("/docs/contract.pdf"))
-        );
-        // Detached mode gives it the .p7s extension instead.
-        form.mode = Mode::Detached;
-        assert_eq!(
-            form.resolved_output(),
-            Some(PathBuf::from("/docs/contract.p7s"))
-        );
-    }
-
-    #[test]
-    fn typed_extension_is_respected() {
-        let mut form = SignForm::new("noto-sans".to_owned());
-        form.set_pdf(Path::new("/docs/passport.pdf"));
-        form.set_output(Path::new("signed.pdf"));
-        assert_eq!(
-            form.resolved_output(),
-            Some(PathBuf::from("/docs/signed.pdf"))
-        );
+    fn default_output_is_none_without_a_pdf() {
+        let form = SignForm::new("noto-sans".to_owned());
+        assert_eq!(form.default_output(), None);
     }
 
     #[test]

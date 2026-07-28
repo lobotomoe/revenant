@@ -81,6 +81,9 @@ pub(crate) struct BatchContext<'a> {
     pub(crate) transport: &'a Arc<Transport>,
     pub(crate) detached: bool,
     pub(crate) options: &'a EmbeddedSignatureOptions,
+    /// User-selected folder every signed file is written into. Its selection is
+    /// what grants write access under the macOS sandbox.
+    pub(crate) output_dir: &'a Path,
     /// Localized message for the "no saved credentials" case.
     pub(crate) no_credentials_message: &'a str,
 }
@@ -124,7 +127,16 @@ pub(crate) fn batch_sign(
             failed += 1;
             continue;
         };
-        let output = views::sign::default_output(path, ctx.detached);
+        // Write the signed file into the chosen folder, keeping the derived
+        // name (`foo_signed.pdf`). A path with no file name can't be signed.
+        let Some(output_name) = views::sign::default_output(path, ctx.detached)
+            .file_name()
+            .map(|name| ctx.output_dir.join(name))
+        else {
+            failed += 1;
+            continue;
+        };
+        let output = output_name;
         let result = if ctx.detached {
             api::sign_detached(
                 ctx.store,

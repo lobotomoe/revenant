@@ -306,7 +306,11 @@ impl RevenantApp {
         }
     }
 
-    fn browse_output(&mut self) {
+    /// Native Save dialog for the signed output, pre-filled with the default
+    /// name and the input's folder. Returns the chosen path, or `None` if the
+    /// user cancels. On the macOS sandbox this panel is also what authorizes the
+    /// write (a powerbox grant); a path the user never picked here is denied.
+    fn prompt_output_path(&self) -> Option<PathBuf> {
         let mut dialog = rfd::FileDialog::new();
         if let Some(default) = self.sign_form.default_output() {
             if let Some(name) = default.file_name() {
@@ -316,9 +320,7 @@ impl RevenantApp {
                 dialog = dialog.set_directory(dir);
             }
         }
-        if let Some(path) = dialog.save_file() {
-            self.sign_form.set_output(&path);
-        }
+        dialog.save_file()
     }
 
     /// Accept PDFs dropped anywhere on the window (the drag-and-drop entry point
@@ -365,7 +367,9 @@ impl RevenantApp {
             self.sign_form.on_signed_failed(message);
             return;
         }
-        let Some(output) = self.sign_form.resolved_output() else {
+        // The Save dialog both picks the destination and, under the macOS
+        // sandbox, grants write access to it. Cancelling aborts the sign.
+        let Some(output) = self.prompt_output_path() else {
             return;
         };
         let pdf_path = PathBuf::from(self.sign_form.pdf_path());
@@ -415,6 +419,11 @@ impl RevenantApp {
         if files.is_empty() {
             return;
         }
+        // A single folder grant covers every write the batch makes; the sandbox
+        // blocks writing next to each input otherwise. Cancelling aborts.
+        let Some(output_dir) = rfd::FileDialog::new().pick_folder() else {
+            return;
+        };
         let detached = self.sign_form.is_detached();
         let options = self.sign_form.embedded_options();
         let no_creds = self
@@ -432,6 +441,7 @@ impl RevenantApp {
                 transport: &transport,
                 detached,
                 options: &options,
+                output_dir: &output_dir,
                 no_credentials_message: &no_creds,
             };
             jobs::batch_sign(emit, &ctx, &files, &cancel);
@@ -594,7 +604,6 @@ impl RevenantApp {
             SignAction::Login => self.open_login(),
             SignAction::BrowsePdf => self.browse_pdf(),
             SignAction::BrowseImage => self.browse_image(),
-            SignAction::BrowseOutput => self.browse_output(),
             SignAction::Sign => {
                 if self.sign_form.is_batch() {
                     self.start_batch();
