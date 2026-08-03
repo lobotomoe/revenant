@@ -50,7 +50,7 @@ subtle = "2"
 # type. The der-0.8 family would force a `cms` pre-release, unacceptable for a
 # signing tool. See the Phase 4 notes in the port-status memory.
 der = "0.7"
-spki = "0.7"
+spki = "0.8"
 const-oid = "0.9"
 x509-cert = "0.2"
 cms = "0.2"
