@@ -3755,7 +3755,7 @@ dependencies = [
  "regex",
  "revenant-sign-tls",
  "serde_json",
- "sha1",
+ "sha1 0.11.0",
  "sha2 0.10.9",
  "spki",
  "tempfile",
@@ -3793,7 +3793,7 @@ dependencies = [
  "rand 0.8.7",
  "rc4",
  "rsa",
- "sha1",
+ "sha1 0.11.0",
  "spki",
  "subtle",
  "thiserror 2.0.19",
@@ -4158,6 +4158,17 @@ dependencies = [
  "cfg-if",
  "cpufeatures 0.2.17",
  "digest 0.10.7",
+]
+
+[[package]]
+name = "sha1"
+version = "0.11.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "aacc4cc499359472b4abe1bf11d0b12e688af9a805fa5e3016f9a386dc2d0214"
+dependencies = [
+ "cfg-if",
+ "cpufeatures 0.3.0",
+ "digest 0.11.3",
 ]
 
 [[package]]
@@ -5733,7 +5744,7 @@ dependencies = [
  "p384",
  "p521",
  "rsa",
- "sha1",
+ "sha1 0.10.7",
  "sha2 0.10.9",
  "signature",
  "spki",
@@ -5826,7 +5837,7 @@ dependencies = [
  "rand 0.8.7",
  "serde",
  "serde_repr",
- "sha1",
+ "sha1 0.10.7",
  "static_assertions",
  "tracing",
  "uds_windows",
