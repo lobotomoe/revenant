@@ -70,6 +70,23 @@
   </branding>
 
   <releases>
+    <release version="2.1.2" date="2026-08-03">
+      <description>
+        <p>
+          Fixes a macOS sandbox write failure: the GUI now resolves output
+          paths via native Save/Open dialogs (Powerbox) on every sign
+          operation, granting the app sandbox write permission. Previously,
+          auto-derived paths like <tt>Downloads/file_signed.pdf</tt> triggered
+          <tt>Operation not permitted (os error 1)</tt>.
+        </p>
+        <p>
+          The separate output path text field and <q>Browse...</q> button are
+          removed -- the destination is chosen directly from the native dialog
+          when clicking <q>Sign PDF</q> (single file) or selecting a folder
+          (batch mode).
+        </p>
+      </description>
+    </release>
     <release version="2.1.1" date="2026-07-20">
       <description>
         <p>

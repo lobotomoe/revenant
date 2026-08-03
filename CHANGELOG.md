@@ -7,6 +7,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [2.1.2] - 2026-08-03
+
+### Fixed
+
+- **macOS: sandbox write failure on auto-substituted output paths.** The GUI now resolves the output file/folder via native macOS Save/Open dialogs (Powerbox) on every sign operation, granting the app sandbox write permission. Previously, auto-derived paths like `Downloads/file_signed.pdf` triggered `Operation not permitted (os error 1)`.
+
+### Changed
+
+- **GUI: removed the separate output path text field and "Browse..." button.** The destination is now chosen directly from the native dialog when clicking "Sign PDF" (single file) or selecting a folder (batch mode).
+
+## [2.1.1] - 2026-07-20
+
 ### Fixed
 
 - **Python/TypeScript: signing a PDF that already has a form no longer
@@ -18,10 +30,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   server-pre-signed document (e.g. a tax-portal registration agreement)
   dropped the server's signature field from the form, so validators reported
   the document as tampered.
-
-## [2.1.1] - 2026-07-20
-
-### Fixed
 
 - **macOS: the Dock icon is no longer overridden by a flat square at runtime.**
   The desktop GUI forwarded its embedded window icon to
