@@ -1,6 +1,8 @@
 // SPDX-License-Identifier: Apache-2.0
 /** Cryptographic verification of CMS SignerInfo signatures. */
 
+import { createHash } from "node:crypto";
+
 import * as asn1js from "asn1js";
 import * as pkijs from "pkijs";
 
@@ -11,6 +13,8 @@ import { resolveHashAlgo } from "./cms-info.js";
 const OID_SIGNED_DATA = "1.2.840.113549.1.7.2";
 const OID_CONTENT_TYPE = "1.2.840.113549.1.9.3";
 const OID_MESSAGE_DIGEST = "1.2.840.113549.1.9.4";
+const OID_SIGNING_CERTIFICATE = "1.2.840.113549.1.9.16.2.12";
+const OID_SIGNING_CERTIFICATE_V2 = "1.2.840.113549.1.9.16.2.47";
 
 const STANDARD_DIGEST_OIDS: ReadonlyMap<string, string> = new Map([
   ["SHA-1", "1.3.14.3.2.26"],
@@ -77,6 +81,87 @@ function validateSignedAttributes(
   return null;
 }
 
+interface EssCertHash {
+  algorithm: string;
+  value: Uint8Array;
+}
+
+type SigningCertificateBinding = "absent" | "match" | "mismatch" | "unparsable";
+
+function bytesEqual(a: Uint8Array, b: Uint8Array): boolean {
+  if (a.length !== b.length) return false;
+  for (let i = 0; i < a.length; i++) {
+    if (a[i] !== b[i]) return false;
+  }
+  return true;
+}
+
+function parseEssCertHash(value: asn1js.BaseBlock, isV2: boolean): EssCertHash | null {
+  if (!(value instanceof asn1js.Sequence)) return null;
+  const certs = value.valueBlock.value[0];
+  if (!(certs instanceof asn1js.Sequence)) return null;
+  const firstCertId = certs.valueBlock.value[0];
+  if (!(firstCertId instanceof asn1js.Sequence)) return null;
+
+  const fields = firstCertId.valueBlock.value;
+  let algorithm = "SHA-1";
+  let hashIndex = 0;
+  if (isV2) {
+    algorithm = "SHA-256";
+    const optionalAlgorithm = fields[0];
+    if (optionalAlgorithm instanceof asn1js.Sequence) {
+      const algorithmIdentifier = new pkijs.AlgorithmIdentifier({ schema: optionalAlgorithm });
+      const resolved = resolveHashAlgo(algorithmIdentifier.algorithmId);
+      if (!resolved) return null;
+      algorithm = resolved;
+      hashIndex = 1;
+    }
+  }
+
+  const certHash = fields[hashIndex];
+  const expectedLength = DIGEST_LENGTHS.get(algorithm);
+  if (
+    !(certHash instanceof asn1js.OctetString) ||
+    expectedLength === undefined ||
+    certHash.valueBlock.valueHexView.byteLength !== expectedLength
+  ) {
+    return null;
+  }
+  return {
+    algorithm,
+    value: new Uint8Array(certHash.valueBlock.valueHexView),
+  };
+}
+
+function signingCertificateBinding(
+  signerInfo: pkijs.SignerInfo,
+  signerCertificate: pkijs.Certificate,
+): SigningCertificateBinding {
+  const bindingAttrs = (signerInfo.signedAttrs?.attributes ?? []).filter(
+    (attribute) =>
+      attribute.type === OID_SIGNING_CERTIFICATE || attribute.type === OID_SIGNING_CERTIFICATE_V2,
+  );
+  if (bindingAttrs.length === 0) return "absent";
+  if (bindingAttrs.length !== 1 || bindingAttrs[0]?.values.length !== 1) {
+    return "unparsable";
+  }
+
+  try {
+    const bindingAttr = bindingAttrs[0];
+    const bindingValue = bindingAttr?.values[0];
+    if (!bindingAttr || !bindingValue) return "unparsable";
+    const parsed = parseEssCertHash(bindingValue, bindingAttr.type === OID_SIGNING_CERTIFICATE_V2);
+    if (!parsed) return "unparsable";
+
+    const certificateDer = new Uint8Array(signerCertificate.toSchema().toBER(false));
+    const nodeAlgorithm = parsed.algorithm.toLowerCase().replace("-", "");
+    const actualHash = new Uint8Array(createHash(nodeAlgorithm).update(certificateDer).digest());
+    return bytesEqual(actualHash, parsed.value) ? "match" : "mismatch";
+  } catch {
+    return "unparsable";
+  }
+}
+
 /**
  * Verify the first CMS signer's signature with its embedded certificate.
  *
@@ -101,7 +186,8 @@ export async function verifySignerSignature(
     const signedData = new pkijs.SignedData({ schema: contentInfo.content });
     const signerInfo = signedData.signerInfos[0];
     if (!signerInfo) return unverifiable("no SignerInfo present");
-    if (findSignerCertificate(signedData, signerInfo) === null) {
+    const signerCertificate = findSignerCertificate(signedData, signerInfo);
+    if (signerCertificate === null) {
       return unverifiable("signer certificate not embedded or ambiguous");
     }
 
@@ -123,12 +209,21 @@ export async function verifySignerSignature(
       checkChain: false,
       data: toArrayBuffer(data),
     });
-    return verified
-      ? { valid: true, detail: "Signature OK -- signer signature verifies" }
-      : {
-          valid: false,
-          detail: "Signature INVALID -- does not verify against the signer certificate",
-        };
+    if (!verified) {
+      return {
+        valid: false,
+        detail: "Signature INVALID -- does not verify against the signer certificate",
+      };
+    }
+
+    const binding = signingCertificateBinding(signerInfo, signerCertificate);
+    if (binding === "mismatch") {
+      return unverifiable("signingCertificate attribute names a different certificate");
+    }
+    if (binding === "unparsable") {
+      return unverifiable("signingCertificate attribute could not be parsed");
+    }
+    return { valid: true, detail: "Signature OK -- signer signature verifies" };
   } catch (error) {
     if (error instanceof pkijs.SignedDataVerifyError && error.signatureVerified === false) {
       return {

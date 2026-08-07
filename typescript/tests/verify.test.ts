@@ -6,7 +6,7 @@
  * full verify.ts code paths.
  */
 
-import { createHash } from "node:crypto";
+import { createHash, generateKeyPairSync, sign } from "node:crypto";
 import { readFileSync } from "node:fs";
 
 import * as asn1js from "asn1js";
@@ -167,7 +167,196 @@ function corruptPdfForPdfLib(signedPdf: Uint8Array): Uint8Array {
 const OID_SIGNED_DATA = "1.2.840.113549.1.7.2";
 const OID_DATA = "1.2.840.113549.1.7.1";
 const OID_SHA1 = "1.3.14.3.2.26";
+const OID_SHA256 = "2.16.840.1.101.3.4.2.1";
+const OID_SHA384 = "2.16.840.1.101.3.4.2.2";
+const OID_RSA = "1.2.840.113549.1.1.1";
+const OID_SHA256_RSA = "1.2.840.113549.1.1.11";
+const OID_CONTENT_TYPE = "1.2.840.113549.1.9.3";
 const OID_MESSAGE_DIGEST = "1.2.840.113549.1.9.4";
+const OID_SIGNING_CERTIFICATE = "1.2.840.113549.1.9.16.2.12";
+const OID_SIGNING_CERTIFICATE_V2 = "1.2.840.113549.1.9.16.2.47";
+
+type EssVersion = "v1" | "v2";
+
+function exactArrayBuffer(bytes: Uint8Array): ArrayBuffer {
+  return new Uint8Array(bytes).buffer;
+}
+
+function algorithmIdentifierSchema(oid: string, includeNull = true): asn1js.Sequence {
+  return new asn1js.Sequence({
+    value: [
+      new asn1js.ObjectIdentifier({ value: oid }),
+      ...(includeNull ? [new asn1js.Null()] : []),
+    ],
+  });
+}
+
+function distinguishedName(commonName: string): asn1js.Sequence {
+  return new asn1js.Sequence({
+    value: [
+      new asn1js.Set({
+        value: [
+          new asn1js.Sequence({
+            value: [
+              new asn1js.ObjectIdentifier({ value: "2.5.4.3" }),
+              new asn1js.Utf8String({ value: commonName }),
+            ],
+          }),
+        ],
+      }),
+    ],
+  });
+}
+
+function buildEssTestCertificate(subject: string, spkiDer: Uint8Array): pkijs.Certificate {
+  const subjectPublicKeyInfo = asn1js.fromBER(exactArrayBuffer(spkiDer));
+  if (subjectPublicKeyInfo.offset === -1) throw new Error("Test SPKI did not parse");
+
+  const tbsCertificate = new asn1js.Sequence({
+    value: [
+      new asn1js.Constructed({
+        idBlock: { tagClass: 3, tagNumber: 0 },
+        value: [new asn1js.Integer({ value: 2 })],
+      }),
+      new asn1js.Integer({ value: 7 }),
+      algorithmIdentifierSchema(OID_SHA256_RSA),
+      distinguishedName("Copied Issuer"),
+      new asn1js.Sequence({
+        value: [
+          new asn1js.UTCTime({ valueDate: new Date("2020-01-01T00:00:00Z") }),
+          new asn1js.UTCTime({ valueDate: new Date("2049-01-01T00:00:00Z") }),
+        ],
+      }),
+      distinguishedName(subject),
+      subjectPublicKeyInfo.result,
+    ],
+  });
+  const certificate = new asn1js.Sequence({
+    value: [
+      tbsCertificate,
+      algorithmIdentifierSchema(OID_SHA256_RSA),
+      new asn1js.BitString({ valueHex: new ArrayBuffer(256) }),
+    ],
+  });
+  const parsed = asn1js.fromBER(certificate.toBER(false));
+  if (parsed.offset === -1) throw new Error("Test certificate did not parse");
+  return new pkijs.Certificate({ schema: parsed.result });
+}
+
+function buildEssAttribute(
+  certificateDer: Uint8Array,
+  version: EssVersion,
+  v2Hash: "sha384" | null,
+  malformed: boolean,
+): pkijs.Attribute {
+  const oid = version === "v1" ? OID_SIGNING_CERTIFICATE : OID_SIGNING_CERTIFICATE_V2;
+  if (malformed) {
+    return new pkijs.Attribute({
+      type: oid,
+      values: [
+        new asn1js.OctetString({ valueHex: exactArrayBuffer(new TextEncoder().encode("bad")) }),
+      ],
+    });
+  }
+
+  const hashName = version === "v1" ? "sha1" : (v2Hash ?? "sha256");
+  const certHash = new Uint8Array(createHash(hashName).update(certificateDer).digest());
+  const certIdFields: asn1js.BaseBlock[] = [];
+  if (version === "v2" && v2Hash === "sha384") {
+    certIdFields.push(algorithmIdentifierSchema(OID_SHA384, false));
+  }
+  certIdFields.push(new asn1js.OctetString({ valueHex: exactArrayBuffer(certHash) }));
+
+  return new pkijs.Attribute({
+    type: oid,
+    values: [
+      new asn1js.Sequence({
+        value: [
+          new asn1js.Sequence({
+            value: [new asn1js.Sequence({ value: certIdFields })],
+          }),
+        ],
+      }),
+    ],
+  });
+}
+
+function replaceEmbeddedCertificate(
+  cmsDer: Uint8Array,
+  certificate: pkijs.Certificate,
+): Uint8Array {
+  const parsed = asn1js.fromBER(exactArrayBuffer(cmsDer));
+  const contentInfo = new pkijs.ContentInfo({ schema: parsed.result });
+  const signedData = new pkijs.SignedData({ schema: contentInfo.content });
+  signedData.certificates = [certificate];
+  contentInfo.content = signedData.toSchema(true);
+  return new Uint8Array(contentInfo.toSchema().toBER(false));
+}
+
+function buildEssBoundCms(
+  version: EssVersion,
+  options: { v2Hash?: "sha384"; malformed?: boolean } = {},
+): { data: Uint8Array; cms: Uint8Array; substitutedCms: Uint8Array } {
+  const { privateKey, publicKey } = generateKeyPairSync("rsa", { modulusLength: 2048 });
+  const spkiDer = new Uint8Array(publicKey.export({ type: "spki", format: "der" }));
+  const certificate = buildEssTestCertificate("Original Signer", spkiDer);
+  const replacement = buildEssTestCertificate("Substituted Identity", spkiDer);
+  const certificateDer = new Uint8Array(certificate.toSchema().toBER(false));
+  const data = new TextEncoder().encode("ESS-bound detached document");
+  const messageDigest = new Uint8Array(createHash("sha256").update(data).digest());
+  const signedAttrs = new pkijs.SignedAndUnsignedAttributes({
+    type: 0,
+    attributes: [
+      new pkijs.Attribute({
+        type: OID_CONTENT_TYPE,
+        values: [new asn1js.ObjectIdentifier({ value: OID_DATA })],
+      }),
+      new pkijs.Attribute({
+        type: OID_MESSAGE_DIGEST,
+        values: [new asn1js.OctetString({ valueHex: exactArrayBuffer(messageDigest) })],
+      }),
+      buildEssAttribute(
+        certificateDer,
+        version,
+        options.v2Hash ?? null,
+        options.malformed ?? false,
+      ),
+    ],
+  });
+  const signedAttrsDer = new Uint8Array(signedAttrs.toSchema().toBER(false));
+  if (signedAttrsDer[0] !== 0xa0) throw new Error("Unexpected signedAttrs tag");
+  signedAttrsDer[0] = 0x31;
+  const signature = sign("sha256", signedAttrsDer, privateKey);
+
+  const signerInfo = new pkijs.SignerInfo({
+    version: 1,
+    sid: new pkijs.IssuerAndSerialNumber({
+      issuer: certificate.issuer,
+      serialNumber: certificate.serialNumber,
+    }),
+    digestAlgorithm: new pkijs.AlgorithmIdentifier({ algorithmId: OID_SHA256 }),
+    signedAttrs,
+    signatureAlgorithm: new pkijs.AlgorithmIdentifier({ algorithmId: OID_RSA }),
+    signature: new asn1js.OctetString({ valueHex: exactArrayBuffer(signature) }),
+  });
+  const signedData = new pkijs.SignedData({
+    version: 1,
+    digestAlgorithms: [new pkijs.AlgorithmIdentifier({ algorithmId: OID_SHA256 })],
+    encapContentInfo: new pkijs.EncapsulatedContentInfo({ eContentType: OID_DATA }),
+    certificates: [certificate],
+    signerInfos: [signerInfo],
+  });
+  const contentInfo = new pkijs.ContentInfo({
+    contentType: OID_SIGNED_DATA,
+    content: signedData.toSchema(true),
+  });
+  const cms = new Uint8Array(contentInfo.toSchema().toBER(false));
+  return {
+    data,
+    cms,
+    substitutedCms: replaceEmbeddedCertificate(cms, replacement),
+  };
+}
 
 /**
  * Build a minimal but structurally valid CMS/PKCS#7 SignedData blob
@@ -1136,6 +1325,47 @@ describe("detached verification with real CMS digest", () => {
     expect(result.signatureValid).toBe(true);
     expect(result.valid).toBe(true);
     expect(result.details).toContain("Signature OK -- signer signature verifies");
+  });
+
+  for (const [version, v2Hash] of [
+    ["v1", null],
+    ["v2", null],
+    ["v2", "sha384"],
+  ] as const) {
+    it(`accepts a matching ESS ${version}${v2Hash ? ` with ${v2Hash}` : ""} binding`, async () => {
+      const fixture = buildEssBoundCms(version, v2Hash ? { v2Hash } : {});
+      const result = await verifyDetachedSignature(fixture.data, fixture.cms);
+
+      expect(result.signatureValid).toBe(true);
+      expect(result.valid).toBe(true);
+    });
+  }
+
+  for (const version of ["v1", "v2"] as const) {
+    it(`rejects ESS ${version} certificate substitution with the same key and sid`, async () => {
+      const fixture = buildEssBoundCms(version);
+      const result = await verifyDetachedSignature(fixture.data, fixture.substitutedCms);
+
+      expect(result.hashOk).toBe(true);
+      expect(result.signatureValid).toBeNull();
+      expect(result.valid).toBe(false);
+      expect(result.signer?.name).toBe("Substituted Identity");
+      expect(result.details).toContain(
+        "Signature not verified (signingCertificate attribute names a different certificate)",
+      );
+    });
+  }
+
+  it("fails closed for a malformed ESS certificate binding", async () => {
+    const fixture = buildEssBoundCms("v1", { malformed: true });
+    const result = await verifyDetachedSignature(fixture.data, fixture.cms);
+
+    expect(result.hashOk).toBe(true);
+    expect(result.signatureValid).toBeNull();
+    expect(result.valid).toBe(false);
+    expect(result.details).toContain(
+      "Signature not verified (signingCertificate attribute could not be parsed)",
+    );
   });
 
   it("reports the certificate named by SignerInfo in a multi-certificate CMS", async () => {
