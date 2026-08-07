@@ -11,10 +11,14 @@ the CMS cannot be verified.
 
 from __future__ import annotations
 
+import hmac
 import logging
 from dataclasses import dataclass
+from typing import ClassVar
 
+from asn1crypto import algos as asn1_algos
 from asn1crypto import cms as asn1_cms
+from asn1crypto import core as asn1_core
 from cryptography import x509
 from cryptography.exceptions import InvalidSignature
 from cryptography.hazmat.primitives import hashes
@@ -28,6 +32,8 @@ _logger = logging.getLogger(__name__)
 _OID_SIGNED_DATA = "1.2.840.113549.1.7.2"
 _OID_CONTENT_TYPE = "1.2.840.113549.1.9.3"
 _OID_MESSAGE_DIGEST = "1.2.840.113549.1.9.4"
+_OID_SIGNING_CERTIFICATE = "1.2.840.113549.1.9.16.2.12"
+_OID_SIGNING_CERTIFICATE_V2 = "1.2.840.113549.1.9.16.2.47"
 
 _RSA_SIGNATURE_OIDS = {
     "1.2.840.113549.1.1.1",  # rsaEncryption (hash is in digestAlgorithm)
@@ -43,6 +49,47 @@ _HASH_ALGORITHMS: dict[str, type[hashes.HashAlgorithm]] = {
     "sha384": hashes.SHA384,
     "sha512": hashes.SHA512,
 }
+
+
+class _ESSCertID(asn1_core.Sequence):
+    _fields: ClassVar[list[object]] = [
+        ("cert_hash", asn1_core.OctetString),
+        ("issuer_serial", asn1_core.Any, {"optional": True}),
+    ]
+
+
+class _ESSCertIDs(asn1_core.SequenceOf):
+    _child_spec = _ESSCertID
+
+
+class _SigningCertificate(asn1_core.Sequence):
+    _fields: ClassVar[list[object]] = [
+        ("certs", _ESSCertIDs),
+        ("policies", asn1_core.Any, {"optional": True}),
+    ]
+
+
+class _ESSCertIDv2(asn1_core.Sequence):
+    _fields: ClassVar[list[object]] = [
+        (
+            "hash_algorithm",
+            asn1_algos.DigestAlgorithm,
+            {"default": {"algorithm": "sha256"}},
+        ),
+        ("cert_hash", asn1_core.OctetString),
+        ("issuer_serial", asn1_core.Any, {"optional": True}),
+    ]
+
+
+class _ESSCertIDsV2(asn1_core.SequenceOf):
+    _child_spec = _ESSCertIDv2
+
+
+class _SigningCertificateV2(asn1_core.Sequence):
+    _fields: ClassVar[list[object]] = [
+        ("certs", _ESSCertIDsV2),
+        ("policies", asn1_core.Any, {"optional": True}),
+    ]
 
 
 @dataclass(frozen=True)
@@ -125,6 +172,61 @@ def _signed_attributes_der(signer_info: asn1_cms.SignerInfo) -> bytes | None:
     return bytes(encoded)
 
 
+def _signing_certificate_binding_error(
+    signer_info: asn1_cms.SignerInfo,
+    signer_cert_der: bytes,
+) -> str | None:
+    """Validate an optional ESS certificate binding against the signer cert."""
+    signed_attrs = signer_info["signed_attrs"]
+    binding_attrs = [
+        attr
+        for attr in signed_attrs
+        if attr["type"].dotted in {_OID_SIGNING_CERTIFICATE, _OID_SIGNING_CERTIFICATE_V2}
+    ]
+    if not binding_attrs:
+        return None
+    if len(binding_attrs) != 1 or len(binding_attrs[0]["values"]) != 1:
+        return "signingCertificate attribute could not be parsed"
+
+    binding_attr = binding_attrs[0]
+    is_v2 = binding_attr["type"].dotted == _OID_SIGNING_CERTIFICATE_V2
+    try:
+        value_der = binding_attr["values"][0].dump()
+        if is_v2:
+            parsed = _SigningCertificateV2.load(value_der, strict=True)
+            if not parsed["certs"]:
+                return "signingCertificate attribute could not be parsed"
+            cert_id = parsed["certs"][0]
+            algorithm_id = cert_id["hash_algorithm"]["algorithm"]
+            algorithm_name = resolve_hash_algo(algorithm_id.native)
+            if algorithm_name is None:
+                algorithm_name = resolve_hash_algo(algorithm_id.dotted)
+            hash_type = _HASH_ALGORITHMS.get(algorithm_name) if algorithm_name else None
+            if hash_type is None:
+                return "signingCertificate attribute could not be parsed"
+            hash_algorithm = hash_type()
+        else:
+            parsed = _SigningCertificate.load(value_der, strict=True)
+            if not parsed["certs"]:
+                return "signingCertificate attribute could not be parsed"
+            cert_id = parsed["certs"][0]
+            # RFC 2634 fixes ESSCertID v1 to SHA-1; this is an identifier hash,
+            # not a signature or collision-resistance security decision.
+            hash_algorithm = hashes.SHA1()  # noqa: S303
+
+        expected_hash = cert_id["cert_hash"].native
+        if not isinstance(expected_hash, bytes):
+            return "signingCertificate attribute could not be parsed"
+    except Exception:
+        return "signingCertificate attribute could not be parsed"
+
+    digest = hashes.Hash(hash_algorithm)
+    digest.update(signer_cert_der)
+    if not hmac.compare_digest(digest.finalize(), expected_hash):
+        return "signingCertificate attribute names a different certificate"
+    return None
+
+
 def verify_signer_signature(cms_der: bytes) -> SignatureVerification:
     """Verify the first CMS signer's RSA PKCS#1 v1.5 signature.
 
@@ -163,7 +265,8 @@ def verify_signer_signature(cms_der: bytes) -> SignatureVerification:
         if signed_attrs_der is None:
             return _unverifiable("cannot encode signed attributes")
 
-        certificate = x509.load_der_x509_certificate(signer_cert.dump())
+        signer_cert_der = signer_cert.dump()
+        certificate = x509.load_der_x509_certificate(signer_cert_der)
         public_key = certificate.public_key()
         if not isinstance(public_key, rsa.RSAPublicKey):
             return _unverifiable("signer public key is not RSA")
@@ -174,6 +277,10 @@ def verify_signer_signature(cms_der: bytes) -> SignatureVerification:
             padding.PKCS1v15(),
             digest_algorithm,
         )
+
+        binding_error = _signing_certificate_binding_error(signer_info, signer_cert_der)
+        if binding_error is not None:
+            return _unverifiable(binding_error)
     except InvalidSignature:
         return SignatureVerification(valid=False)
     except Exception:

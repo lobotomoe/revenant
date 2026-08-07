@@ -13,7 +13,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   signature, not only the container structure and signed digest.** Unsupported,
   malformed, or unverifiable signatures fail closed. Signer identity and
   optional trust-chain validation now select the certificate named by
-  `SignerInfo.sid` instead of relying on certificate `SET OF` order.
+  `SignerInfo.sid` instead of relying on certificate `SET OF` order, and an ESS
+  `signingCertificate`/`signingCertificateV2` attribute binds that identity to
+  the exact embedded certificate.
 
 ## [2.1.2] - 2026-08-03
 
