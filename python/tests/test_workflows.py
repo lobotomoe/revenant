@@ -14,8 +14,6 @@ from revenant.ui.workflows import (
     sign_one_embedded,
 )
 
-from .conftest import FAKE_CMS
-
 if TYPE_CHECKING:
     from revenant.core.pdf import VerificationResult
 
@@ -61,10 +59,10 @@ def test_classify_unexpected_error():
 # ── sign_one_embedded tests ──────────────────────────────────────
 
 
-def test_sign_embedded_happy_path(valid_pdf_bytes, mock_transport, tmp_path):
+def test_sign_embedded_happy_path(valid_pdf_bytes, mock_transport, cms_signer, tmp_path):
     """Valid PDF should produce ok=True with output file."""
     output = tmp_path / "signed.pdf"
-    mock_transport.sign_data = Mock(return_value=FAKE_CMS)
+    mock_transport.sign_data = Mock(side_effect=cms_signer)
 
     with (
         patch("revenant.ui.workflows.register_active_profile_tls"),
@@ -163,10 +161,12 @@ def test_sign_embedded_revenant_error(tmp_path):
     assert result.error_message is not None
 
 
-def test_sign_embedded_permission_error_on_write(valid_pdf_bytes, mock_transport, tmp_path):
+def test_sign_embedded_permission_error_on_write(
+    valid_pdf_bytes, mock_transport, cms_signer, tmp_path
+):
     """PermissionError during atomic_write should produce failure."""
     output = tmp_path / "signed.pdf"
-    mock_transport.sign_data = Mock(return_value=FAKE_CMS)
+    mock_transport.sign_data = Mock(side_effect=cms_signer)
 
     with (
         patch("revenant.ui.workflows.register_active_profile_tls"),
@@ -189,10 +189,10 @@ def test_sign_embedded_permission_error_on_write(valid_pdf_bytes, mock_transport
     assert "Permission denied" in (result.error_message or "")
 
 
-def test_sign_embedded_registers_tls(valid_pdf_bytes, mock_transport, tmp_path):
+def test_sign_embedded_registers_tls(valid_pdf_bytes, mock_transport, cms_signer, tmp_path):
     """Workflow should call register_active_profile_tls."""
     output = tmp_path / "signed.pdf"
-    mock_transport.sign_data = Mock(return_value=FAKE_CMS)
+    mock_transport.sign_data = Mock(side_effect=cms_signer)
 
     with (
         patch("revenant.ui.workflows.register_active_profile_tls") as mock_tls,

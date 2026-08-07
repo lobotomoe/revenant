@@ -6,12 +6,13 @@ How we verify that embedded PDF signatures are correctly constructed.
 
 After inserting the CMS into the PDF, the tool automatically verifies the result:
 
-1. **Structure check** — re-reads the PDF, finds the last `/ByteRange`, extracts chunk1 + chunk2 (the signed data) and the CMS hex from `/Contents`
-2. **Hash check** — computes SHA-1 of the extracted ByteRange data and compares with the hash originally sent to CoSign. Mismatch = corruption during incremental update construction
-3. **CMS sanity** -- checks blob is non-empty and starts with ASN.1 SEQUENCE tag (0x30)
-4. **PDF readability** -- opens the final PDF with pikepdf (Python) or pdf-lib (TypeScript) to confirm it's structurally valid
+1. **Structure check** — re-reads the PDF, finds the last `/ByteRange`, extracts chunk1 + chunk2 (the signed data) and the CMS hex from `/Contents`.
+2. **Signed-digest check** — reads the digest algorithm and mandatory `messageDigest` signed attribute from CMS, hashes the ByteRange data, and compares the two. The SHA-1 value originally sent to CoSign is an additional post-sign check when available; it never replaces the signed CMS digest.
+3. **Signer-signature check** — verifies the RSA PKCS#1 v1.5 signature over the DER-encoded signed attributes with the certificate identified by `SignerInfo.sid`. Missing, ambiguous, malformed, or unsupported values fail closed.
+4. **Signer and trust check** — extracts the signer identity and, when configured, starts chain validation from the same `SignerInfo.sid` certificate. CMS certificate order is never used to identify the signer.
+5. **PDF readability** — opens the final PDF with pikepdf (Python) or pdf-lib (TypeScript) to report structural problems.
 
-If any check fails, the signed PDF is **not saved** and an error is raised.
+If a core structure, signed-digest, or signer-signature check fails, a newly signed PDF is **not saved** and an error is raised. Trust-chain status remains a separate result because a cryptographically authentic signature may use a certificate outside the configured TSL.
 
 ## Why not `openssl cms -verify`?
 
@@ -39,28 +40,30 @@ The error comes from `CMS_SignerInfo_verify_content` — openssl cannot determin
 
 ### Our approach
 
-Since we control both the hash computation (before signing) and the hash extraction (after signing), we can verify directly:
+Revenant resolves CoSign's non-standard digest OID to its standard hash and then performs both required checks directly:
 
 ```python
 # Python
-br_hash = compute_byterange_hash(prepared_pdf, hex_start, hex_len)
-signed_data, cms_der = extract_signature_data(signed_pdf)
-actual_hash = hashlib.sha1(signed_data).digest()
-assert actual_hash == br_hash
+result = verify_embedded_signature(signed_pdf, expected_hash=hash_sent_to_cosign)
+assert result["hash_ok"]
+assert result["signature_valid"] is True
+assert result["valid"]
 ```
 
 ```typescript
 // TypeScript
-const brHash = computeByterangeHash(preparedPdf, hexStart, hexLen);
-const { signedData, cmsDer } = extractSignatureData(signedPdf);
-const actualHash = createHash("sha1").update(signedData).digest();
-// compare brHash === actualHash
+const result = await verifyEmbeddedSignature(signedPdf, hashSentToCosign);
+if (!result.hashOk || result.signatureValid !== true || !result.valid) {
+  throw new Error("signature verification failed");
+}
 ```
 
-This catches all corruption scenarios:
+This catches integrity and authenticity failures, including:
 - ByteRange offsets are wrong -> hash mismatch
 - CMS inserted at wrong position -> hash mismatch
 - Original PDF bytes corrupted during incremental update -> hash mismatch
+- A fabricated or modified signature with a matching `messageDigest` -> signer-signature failure
+- An unrelated certificate placed first in the CMS certificate set -> ignored; the `SignerInfo.sid` certificate is used
 - Object serialization errors (e.g. `None` vs `null`) -> PDF readability check fails
 
 ### Note on pyhanko
@@ -74,7 +77,7 @@ Since v1.1, revenant can validate the signer's certificate chain against a Trust
 ### How it works
 
 1. **TSL fetch** -- downloads and caches the country's Trust Service List XML (ETSI TS 119 612). The TSL lists all trusted CA certificates.
-2. **Chain building** -- extracts certificates from the CMS SignedData, builds a chain from leaf to root using SKI/AKI matching. Missing intermediates are fetched via AIA URLs.
+2. **Chain building** -- selects the leaf named by `SignerInfo.sid`, then builds a chain using SKI/AKI matching. Missing intermediates are fetched via AIA URLs.
 3. **Anchor matching** -- checks if the chain terminates at a CA listed in the TSL.
 4. **Cryptographic verification** -- validates the chain using `cryptography.x509.verification` (Python) or `pkijs.CertificateChainValidationEngine` (TypeScript).
 
@@ -86,7 +89,7 @@ Since v1.1, revenant can validate the signer's certificate chain against a Trust
 | `untrusted` | Valid signature, but the root CA is not in the TSL. |
 | `unknown` | Chain validation was not attempted (no TSL URL configured). |
 
-The `valid` field remains unchanged -- it reflects hash integrity and CMS structure only. Trust is reported separately via `chain_valid`, `trust_anchor`, and `trust_status`.
+The `valid` field requires valid structure, a matching signed `messageDigest`, and a cryptographically verified signer signature. Trust is reported separately via `chain_valid`, `trust_anchor`, and `trust_status`.
 
 ### TSL configuration
 
@@ -133,6 +136,7 @@ Checking signed.pdf (275.0 KB)...
   CMS: valid ASN.1 structure
   Signer: Aleksandr Kraiz 3105951040
   Hash OK -- SHA-1 matches CMS messageDigest: 9488fb8869c8...
+  Signature OK -- signer signature verifies
   LTV: Not LTV enabled
   Chain: signer cert: Common Name: Aleksandr Kraiz 3105951040
   Chain: no trusted CA found (operator: EKENG CJSC)
@@ -141,7 +145,7 @@ Checking signed.pdf (275.0 KB)...
   RESULT: Signature VALID
 ```
 
-Without the expected hash, `check` verifies structure, CMS format, PDF readability, and (if a TSL is configured) certificate chain trust. It cannot detect content tampering (since it doesn't know the original hash), but it confirms the PDF is well-formed, the signature field is structurally correct, and reports the trust status.
+The original pre-sign hash is not required for standalone verification: the signed CMS `messageDigest` binds the signature to the PDF ByteRange, and the signer signature authenticates that attribute. The optional expected hash provides an additional post-sign consistency check. If a TSL is configured, `check` also reports certificate-chain trust separately.
 
 ## ByteRange layout
 

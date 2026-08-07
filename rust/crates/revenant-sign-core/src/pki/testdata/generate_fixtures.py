@@ -259,10 +259,9 @@ def main() -> None:
     write("leaf_root2.der", to_der(leaf_root2))
     write("no_aki.der", to_der(no_aki))
 
-    # CMS blobs. The single-signer blob keeps the leaf as certs[0] (a SET OF is
-    # DER-sorted, so with extra certs the first is not necessarily the signer --
-    # matching the Python client's behavior; only single-cert blobs are relied
-    # on for leaf-first extraction).
+    # CMS blobs. A SET OF is DER-sorted, so with extra certs the first is not
+    # necessarily the signer. The chain fixture deliberately catches clients
+    # that incorrectly rely on certificate order instead of SignerInfo.sid.
     write("cms_leaf_direct.der", build_cms(leaf_direct, leaf_direct_key))
     write("cms_leaf_root2.der", build_cms(leaf_root2, leaf_root2_key))
     write("cms_chain3.der", build_cms(leaf, leaf_key, [inter, root]))

@@ -28,6 +28,7 @@ from asn1crypto import x509 as asn1_x509
 
 from ..constants import SHA1_DIGEST_SIZE
 from ..errors import AuthError, CertificateError, RevenantError
+from .cms_certificates import find_signer_certificate
 from .pdf import BYTERANGE_PATTERN, extract_cms_from_byterange_match
 
 if TYPE_CHECKING:
@@ -88,6 +89,8 @@ def extract_cert_info_from_cms(cms_der: bytes) -> dict[str, str | None]:
 
     Uses ``asn1crypto`` for lenient PKCS#7 parsing — handles certificates
     with BMPString-encoded DN fields (e.g. EKENG's CA uses BMPString for CN/O).
+    The certificate is selected by the first ``SignerInfo.sid``; certificate
+    order is not meaningful in the CMS ``SET OF``.
 
     Args:
         cms_der: Raw DER-encoded CMS/PKCS#7 bytes.
@@ -109,7 +112,9 @@ def extract_cert_info_from_cms(cms_der: bytes) -> dict[str, str | None]:
     if not certs:
         raise CertificateError("No certificate subject found in CMS blob.")
 
-    cert = certs[0].chosen
+    cert = find_signer_certificate(signed_data)
+    if cert is None:
+        raise CertificateError("No unique certificate matches the first CMS SignerInfo.")
     return _extract_info_from_cert_object(cert)
 
 

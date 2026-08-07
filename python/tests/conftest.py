@@ -22,6 +22,20 @@ def mock_transport():
 
 
 @pytest.fixture
+def cms_signer():
+    """Return a test-only signer that produces genuine CMS for arbitrary data."""
+    from ._cert_factory import build_cms_with_certs, make_leaf, make_root_ca
+
+    root_cert, root_key = make_root_ca()
+    leaf_cert, leaf_key = make_leaf(root_cert, root_key)
+
+    def sign(data: bytes, *_args: object) -> bytes:
+        return build_cms_with_certs(leaf_cert, leaf_key, data=data)
+
+    return sign
+
+
+@pytest.fixture
 def valid_pdf_bytes():
     """Create a minimal valid PDF using pikepdf."""
     import io

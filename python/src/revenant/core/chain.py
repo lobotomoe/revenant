@@ -17,6 +17,7 @@ if TYPE_CHECKING:
     import datetime
 
 from ..constants import MAX_AIA_FETCHES
+from .cms_certificates import find_signer_certificate, x509_certificates
 from .tsl import TrustStore, get_trust_store
 
 _logger = logging.getLogger(__name__)
@@ -44,17 +45,15 @@ def _extract_all_certs_from_cms(cms_der: bytes) -> list[object]:
 
     ci = asn1_cms.ContentInfo.load(cms_der)
     signed_data = ci["content"]
-    certs_set = signed_data["certificates"]
+    return list(x509_certificates(signed_data))
 
-    if certs_set is None:
-        return []
 
-    result = []
-    for i in range(len(certs_set)):
-        choice = certs_set[i]
-        if choice.name == "certificate":
-            result.append(choice.chosen)
-    return result
+def _extract_signer_cert_from_cms(cms_der: bytes) -> object | None:
+    """Extract the certificate identified by the first ``SignerInfo.sid``."""
+    from asn1crypto import cms as asn1_cms
+
+    ci = asn1_cms.ContentInfo.load(cms_der)
+    return find_signer_certificate(ci["content"])
 
 
 def _get_ski(cert: object) -> bytes | None:
@@ -300,7 +299,18 @@ def validate_chain(
             details=["Chain: no certificates in CMS"],
         )
 
-    leaf = cms_certs[0]
+    try:
+        leaf = _extract_signer_cert_from_cms(cms_der)
+    except Exception:
+        _logger.debug("Failed to select CMS signer certificate", exc_info=True)
+        leaf = None
+    if leaf is None:
+        return ChainResult(
+            chain_valid=None,
+            trust_anchor=None,
+            chain_depth=0,
+            details=["Chain: no unique certificate matches SignerInfo"],
+        )
     details.append(f"Chain: signer cert: {_get_subject_dn(leaf)}")
 
     # Build the pool: CMS certs + trust anchor certs
