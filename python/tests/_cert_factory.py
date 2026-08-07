@@ -202,4 +202,7 @@ def build_cms_with_certs(
         for cert in chain_certs:
             builder = builder.add_certificate(cert)
 
-    return builder.sign(serialization.Encoding.DER, [pkcs7.PKCS7Options.Binary])
+    return builder.sign(
+        serialization.Encoding.DER,
+        [pkcs7.PKCS7Options.Binary, pkcs7.PKCS7Options.DetachedSignature],
+    )

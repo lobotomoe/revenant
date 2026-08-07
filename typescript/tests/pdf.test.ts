@@ -2267,8 +2267,8 @@ describe("inspectCmsBlob (structured CMS)", () => {
     const signerInfo = new pkijs.SignerInfo({
       version: 1,
       sid: new pkijs.IssuerAndSerialNumber({
-        issuer: new pkijs.RelativeDistinguishedNames(),
-        serialNumber: new asn1js.Integer({ value: 1 }),
+        issuer: cert.issuer,
+        serialNumber: cert.serialNumber,
       }),
       digestAlgorithm: new pkijs.AlgorithmIdentifier({ algorithmId: OID_SHA1 }),
       signedAttrs: new pkijs.SignedAndUnsignedAttributes({

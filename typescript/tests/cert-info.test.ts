@@ -124,6 +124,7 @@ function buildCmsWithCert(
   email?: string,
   org?: string,
 ): Uint8Array {
+  const cert = buildTestCertificate(signerName, email, org);
   const digestOctetString = new asn1js.OctetString({
     valueHex: messageDigest.buffer.slice(
       messageDigest.byteOffset,
@@ -139,8 +140,8 @@ function buildCmsWithCert(
   const signerInfo = new pkijs.SignerInfo({
     version: 1,
     sid: new pkijs.IssuerAndSerialNumber({
-      issuer: new pkijs.RelativeDistinguishedNames(),
-      serialNumber: new asn1js.Integer({ value: 1 }),
+      issuer: cert.issuer,
+      serialNumber: cert.serialNumber,
     }),
     digestAlgorithm: new pkijs.AlgorithmIdentifier({
       algorithmId: OID_SHA1,
@@ -154,8 +155,6 @@ function buildCmsWithCert(
     }),
     signature: new asn1js.OctetString({ valueHex: new ArrayBuffer(128) }),
   });
-
-  const cert = buildTestCertificate(signerName, email, org);
 
   const signedData = new pkijs.SignedData({
     version: 1,
@@ -239,9 +238,9 @@ describe("extractCertInfoFromCms", () => {
     expect(info.notAfter).toMatch(/^\d{4}-01-01T00:00:00\.000Z$/);
   });
 
-  it("throws CertificateError when first CMS cert is not an X.509 certificate", () => {
-    // Build a CMS where the first entry in the certificates set is an
-    // OtherCertificateFormat rather than a pkijs.Certificate.
+  it("throws when no X.509 certificate matches SignerInfo", () => {
+    // Build a CMS whose certificate set contains only an unrelated
+    // OtherCertificateFormat value.
     const dummyDigest = new Uint8Array(20);
 
     const digestOctetString = new asn1js.OctetString({
@@ -296,7 +295,7 @@ describe("extractCertInfoFromCms", () => {
 
     expect(() => extractCertInfoFromCms(cmsDer)).toThrow(CertificateError);
     expect(() => extractCertInfoFromCms(cmsDer)).toThrow(
-      /First certificate in CMS blob is not an X\.509 certificate/,
+      /No unique certificate matches the first CMS SignerInfo/,
     );
   });
 });

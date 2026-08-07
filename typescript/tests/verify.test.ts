@@ -7,6 +7,7 @@
  */
 
 import { createHash } from "node:crypto";
+import { readFileSync } from "node:fs";
 
 import * as asn1js from "asn1js";
 import * as pkijs from "pkijs";
@@ -22,6 +23,24 @@ import {
 } from "../src/core/pdf/index.js";
 import { PDFError } from "../src/errors.js";
 import { createValidPdf, FAKE_CMS } from "./conftest.js";
+
+const VALID_CMS = new Uint8Array(
+  readFileSync(
+    new URL(
+      "../../rust/crates/revenant-sign-core/src/pki/testdata/cms_leaf_direct.der",
+      import.meta.url,
+    ),
+  ),
+);
+const CHAIN_CMS = new Uint8Array(
+  readFileSync(
+    new URL(
+      "../../rust/crates/revenant-sign-core/src/pki/testdata/cms_chain3.der",
+      import.meta.url,
+    ),
+  ),
+);
+const VALID_CMS_DATA = new TextEncoder().encode("test data");
 
 // -- Helpers ------------------------------------------------------------------
 
@@ -57,6 +76,73 @@ function buildBadTagCms(): Uint8Array {
   blob[0] = 0xff;
   blob.fill(0xab, 1);
   return blob;
+}
+
+/** Flip one byte in SignerInfo.signature while preserving a well-formed CMS. */
+function forgeCmsSignature(cmsDer: Uint8Array): Uint8Array {
+  const input = cmsDer.buffer.slice(cmsDer.byteOffset, cmsDer.byteOffset + cmsDer.byteLength);
+  const parsed = asn1js.fromBER(input);
+  const contentInfo = new pkijs.ContentInfo({ schema: parsed.result });
+  const signedData = new pkijs.SignedData({ schema: contentInfo.content });
+  const signerInfo = signedData.signerInfos[0];
+  if (!signerInfo || signerInfo.signature.valueBlock.valueHexView.length === 0) {
+    throw new Error("Test fixture has no CMS signature bytes");
+  }
+  signerInfo.signature.valueBlock.valueHexView[0] ^= 0x01;
+  contentInfo.content = signedData.toSchema(true);
+  return new Uint8Array(contentInfo.toSchema().toBER(false));
+}
+
+/** Re-encode a CMS with CoSign's combined RSA OID in digestAlgorithm. */
+function withDigestAlgorithm(cmsDer: Uint8Array, algorithmId: string): Uint8Array {
+  const input = cmsDer.buffer.slice(cmsDer.byteOffset, cmsDer.byteOffset + cmsDer.byteLength);
+  const parsed = asn1js.fromBER(input);
+  const contentInfo = new pkijs.ContentInfo({ schema: parsed.result });
+  const signedData = new pkijs.SignedData({ schema: contentInfo.content });
+  const signerInfo = signedData.signerInfos[0];
+  if (!signerInfo) throw new Error("Test fixture has no CMS SignerInfo");
+  signerInfo.digestAlgorithm.algorithmId = algorithmId;
+  contentInfo.content = signedData.toSchema(true);
+  return new Uint8Array(contentInfo.toSchema().toBER(false));
+}
+
+/** Re-encode a CMS with the requested SignerInfo signatureAlgorithm. */
+function withSignatureAlgorithm(cmsDer: Uint8Array, algorithmId: string): Uint8Array {
+  const input = cmsDer.buffer.slice(cmsDer.byteOffset, cmsDer.byteOffset + cmsDer.byteLength);
+  const parsed = asn1js.fromBER(input);
+  const contentInfo = new pkijs.ContentInfo({ schema: parsed.result });
+  const signedData = new pkijs.SignedData({ schema: contentInfo.content });
+  const signerInfo = signedData.signerInfos[0];
+  if (!signerInfo) throw new Error("Test fixture has no CMS SignerInfo");
+  signerInfo.signatureAlgorithm.algorithmId = algorithmId;
+  contentInfo.content = signedData.toSchema(true);
+  return new Uint8Array(contentInfo.toSchema().toBER(false));
+}
+
+/** Re-encode a CMS without one signed attribute. */
+function withoutSignedAttribute(cmsDer: Uint8Array, oid: string): Uint8Array {
+  const input = cmsDer.buffer.slice(cmsDer.byteOffset, cmsDer.byteOffset + cmsDer.byteLength);
+  const parsed = asn1js.fromBER(input);
+  const contentInfo = new pkijs.ContentInfo({ schema: parsed.result });
+  const signedData = new pkijs.SignedData({ schema: contentInfo.content });
+  const signerInfo = signedData.signerInfos[0];
+  if (!signerInfo?.signedAttrs) throw new Error("Test fixture has no CMS signed attributes");
+  signerInfo.signedAttrs.attributes = signerInfo.signedAttrs.attributes.filter(
+    (attribute) => attribute.type !== oid,
+  );
+  contentInfo.content = signedData.toSchema(true);
+  return new Uint8Array(contentInfo.toSchema().toBER(false));
+}
+
+/** Re-encode a CMS without embedded certificates. */
+function withoutCertificates(cmsDer: Uint8Array): Uint8Array {
+  const input = cmsDer.buffer.slice(cmsDer.byteOffset, cmsDer.byteOffset + cmsDer.byteLength);
+  const parsed = asn1js.fromBER(input);
+  const contentInfo = new pkijs.ContentInfo({ schema: parsed.result });
+  const signedData = new pkijs.SignedData({ schema: contentInfo.content });
+  signedData.certificates = [];
+  contentInfo.content = signedData.toSchema(true);
+  return new Uint8Array(contentInfo.toSchema().toBER(false));
 }
 
 /**
@@ -242,6 +328,7 @@ function buildTestCertificate(cn: string): pkijs.Certificate {
  * This allows testing the signer name extraction path.
  */
 function buildCmsWithDigestAndCert(messageDigest: Uint8Array, signerName: string): Uint8Array {
+  const cert = buildTestCertificate(signerName);
   const digestOctetString = new asn1js.OctetString({
     valueHex: messageDigest.buffer.slice(
       messageDigest.byteOffset,
@@ -257,8 +344,8 @@ function buildCmsWithDigestAndCert(messageDigest: Uint8Array, signerName: string
   const signerInfo = new pkijs.SignerInfo({
     version: 1,
     sid: new pkijs.IssuerAndSerialNumber({
-      issuer: new pkijs.RelativeDistinguishedNames(),
-      serialNumber: new asn1js.Integer({ value: 1 }),
+      issuer: cert.issuer,
+      serialNumber: cert.serialNumber,
     }),
     digestAlgorithm: new pkijs.AlgorithmIdentifier({
       algorithmId: OID_SHA1,
@@ -272,8 +359,6 @@ function buildCmsWithDigestAndCert(messageDigest: Uint8Array, signerName: string
     }),
     signature: new asn1js.OctetString({ valueHex: new ArrayBuffer(128) }),
   });
-
-  const cert = buildTestCertificate(signerName);
 
   const signedData = new pkijs.SignedData({
     version: 1,
@@ -357,19 +442,21 @@ describe("verifyEmbeddedSignature", () => {
 
   // -- expectedHash path (post-sign verification) --
 
-  it("returns hashOk=true when expectedHash matches ByteRange SHA-1", async () => {
+  it("does not let expectedHash replace the CMS messageDigest check", async () => {
     const { signedPdf, byterangeHash } = await createSignedPdf();
     const result = await verifyEmbeddedSignature(signedPdf, byterangeHash);
 
     expect(result.structureOk).toBe(true);
-    expect(result.hashOk).toBe(true);
-    expect(result.valid).toBe(true);
+    expect(result.hashOk).toBe(false);
+    expect(result.signatureValid).toBeNull();
+    expect(result.valid).toBe(false);
 
     const hashDetail = result.details.find((d) => d.includes("Hash OK"));
     expect(hashDetail).toBeDefined();
     if (hashDetail !== undefined) {
       expect(hashDetail).toContain("SHA-1 matches expected");
     }
+    expect(result.details).toContain("CMS messageDigest unavailable -- cannot verify hash");
   });
 
   it("returns hashOk=false when expectedHash does not match", async () => {
@@ -397,9 +484,11 @@ describe("verifyEmbeddedSignature", () => {
     const recomputedHash = computeByterangeHash(signedPdf, hexStart, hexLen);
     expect(Buffer.from(recomputedHash).equals(Buffer.from(byterangeHash))).toBe(true);
 
-    // And verify succeeds
+    // The ByteRange digest is intact, but a placeholder CMS is not authentic.
     const result = await verifyEmbeddedSignature(signedPdf, recomputedHash);
-    expect(result.valid).toBe(true);
+    expect(result.hashOk).toBe(false);
+    expect(result.signatureValid).toBeNull();
+    expect(result.valid).toBe(false);
   });
 
   // -- Standalone verification (no expectedHash) --
@@ -479,9 +568,7 @@ describe("verifyEmbeddedSignature", () => {
     const result = await verifyEmbeddedSignature(signedPdf);
 
     expect(result.structureOk).toBe(true);
-    const hashDetail = result.details.find(
-      (d) => d.includes("SHA-1") && d.includes("cannot verify"),
-    );
+    const hashDetail = result.details.find((d) => d.includes("messageDigest unavailable"));
     expect(hashDetail).toBeDefined();
   });
 
@@ -694,7 +781,7 @@ describe("verifyDetachedSignature", () => {
     const result = await verifyDetachedSignature(data, FAKE_CMS);
 
     // extractDigestInfo returns null for FAKE_CMS, so we get the fallback message
-    const detail = result.details.find((d) => d.includes("Could not extract digest info"));
+    const detail = result.details.find((d) => d.includes("messageDigest unavailable"));
     expect(detail).toBeDefined();
   });
 
@@ -704,7 +791,7 @@ describe("verifyDetachedSignature", () => {
     expect(result.signer).toBeNull();
   });
 
-  it("valid field is always structureOk AND hashOk", async () => {
+  it("valid requires structure, CMS digest, and signer signature", async () => {
     const data = new TextEncoder().encode("test data");
 
     // Case 1: structure bad, hash bad
@@ -765,7 +852,7 @@ describe("toNodeCryptoName via hash verification", () => {
 
     // Manually compute what we expect
     const result = await verifyEmbeddedSignature(signedPdf, byterangeHash);
-    expect(result.hashOk).toBe(true);
+    expect(result.hashOk).toBe(false);
 
     const hashDetail = result.details.find((d) => d.includes("SHA-1"));
     expect(hashDetail).toBeDefined();
@@ -777,10 +864,11 @@ describe("toNodeCryptoName via hash verification", () => {
 // =============================================================================
 
 describe("bytesEqual via hash comparison", () => {
-  it("detects equal hashes", async () => {
+  it("reports a matching expected hash even when CMS digest is unavailable", async () => {
     const { signedPdf, byterangeHash } = await createSignedPdf();
     const result = await verifyEmbeddedSignature(signedPdf, byterangeHash);
-    expect(result.hashOk).toBe(true);
+    expect(result.hashOk).toBe(false);
+    expect(result.details.some((d) => d.includes("SHA-1 matches expected"))).toBe(true);
   });
 
   it("detects different-length hashes as mismatch", async () => {
@@ -815,16 +903,36 @@ describe("full round-trip verification", () => {
     // Insert FAKE_CMS
     const signed = insertCms(prepared.pdf, prepared.hexStart, prepared.hexLen, FAKE_CMS);
 
-    // Verify with expected hash -- should succeed because ByteRange excludes hex content
+    // The external oracle matches, but FAKE_CMS has no signed messageDigest.
     const result = await verifyEmbeddedSignature(signed, expectedHash);
     expect(result.structureOk).toBe(true);
-    expect(result.hashOk).toBe(true);
-    expect(result.valid).toBe(true);
+    expect(result.hashOk).toBe(false);
+    expect(result.signatureValid).toBeNull();
+    expect(result.valid).toBe(false);
 
     // Verify details contain expected messages
     expect(result.details.some((d) => d.includes("ByteRange OK"))).toBe(true);
     expect(result.details.some((d) => d.includes("Hash OK"))).toBe(true);
     expect(result.details.some((d) => d.includes("pdf-lib"))).toBe(true);
+  });
+
+  it("expectedHash cannot hide a different signed messageDigest", async () => {
+    const pdfBytes = await createValidPdf();
+    const prepared = await preparePdfWithSigField(pdfBytes, { visible: false });
+    const expectedHash = computeByterangeHash(prepared.pdf, prepared.hexStart, prepared.hexLen);
+    const signed = insertCms(prepared.pdf, prepared.hexStart, prepared.hexLen, VALID_CMS);
+
+    const result = await verifyEmbeddedSignature(signed, expectedHash);
+    expect(result.structureOk).toBe(true);
+    expect(result.hashOk).toBe(false);
+    expect(result.signatureValid).toBe(true);
+    expect(result.valid).toBe(false);
+    expect(result.details.some((detail) => detail.includes("SHA-1 matches expected"))).toBe(true);
+    expect(
+      result.details.some(
+        (detail) => detail.includes("CMS messageDigest") && detail.includes("MISMATCH"),
+      ),
+    ).toBe(true);
   });
 
   it("ByteRange hash is stable regardless of CMS content", async () => {
@@ -886,10 +994,11 @@ describe("full round-trip verification", () => {
     const secondHash = computeByterangeHash(second.pdf, second.hexStart, second.hexLen);
     const doubleSigned = insertCms(second.pdf, second.hexStart, second.hexLen, FAKE_CMS);
 
-    // verifyEmbeddedSignature with the SECOND hash should succeed (it checks last)
+    // The second oracle matches the last ByteRange, but cannot replace a CMS digest.
     const resultWithSecondHash = await verifyEmbeddedSignature(doubleSigned, secondHash);
-    expect(resultWithSecondHash.hashOk).toBe(true);
-    expect(resultWithSecondHash.valid).toBe(true);
+    expect(resultWithSecondHash.hashOk).toBe(false);
+    expect(resultWithSecondHash.signatureValid).toBeNull();
+    expect(resultWithSecondHash.valid).toBe(false);
 
     // verifyEmbeddedSignature with the FIRST hash should fail (it doesn't match last)
     const resultWithFirstHash = await verifyEmbeddedSignature(doubleSigned, firstHash);
@@ -914,12 +1023,11 @@ describe("embedded verification with CMS edge cases", () => {
     expect(result.hashOk).toBe(false);
     expect(result.valid).toBe(false);
 
-    // Should include "CMS is suspect" since structure is bad and no digestInfo
-    const suspectDetail = result.details.find((d) => d.includes("CMS is suspect"));
+    const suspectDetail = result.details.find((d) => d.includes("messageDigest unavailable"));
     expect(suspectDetail).toBeDefined();
   });
 
-  it("tiny CMS with expectedHash still verifies hash correctly", async () => {
+  it("matching expectedHash cannot make a tiny CMS hash-valid", async () => {
     const pdfBytes = await createValidPdf();
     const prepared = await preparePdfWithSigField(pdfBytes, { visible: false });
     const expectedHash = computeByterangeHash(prepared.pdf, prepared.hexStart, prepared.hexLen);
@@ -929,8 +1037,8 @@ describe("embedded verification with CMS edge cases", () => {
     const result = await verifyEmbeddedSignature(signed, expectedHash);
     // Structure is bad (CMS too small)
     expect(result.structureOk).toBe(false);
-    // But hash should still match since expectedHash path is independent
-    expect(result.hashOk).toBe(true);
+    // The oracle matches, but CMS has no signed messageDigest.
+    expect(result.hashOk).toBe(false);
     // Overall invalid because structure is bad
     expect(result.valid).toBe(false);
   });
@@ -975,7 +1083,8 @@ describe("embedded verification with real CMS digest", () => {
     const result = await verifyEmbeddedSignature(signed);
     expect(result.structureOk).toBe(true);
     expect(result.hashOk).toBe(true);
-    expect(result.valid).toBe(true);
+    expect(result.signatureValid).toBeNull();
+    expect(result.valid).toBe(false);
 
     const hashDetail = result.details.find(
       (d) => d.includes("Hash OK") && d.includes("SHA-1") && d.includes("CMS messageDigest"),
@@ -1019,6 +1128,79 @@ describe("embedded verification with real CMS digest", () => {
 });
 
 describe("detached verification with real CMS digest", () => {
+  it("accepts a genuine CMS signature", async () => {
+    const result = await verifyDetachedSignature(VALID_CMS_DATA, VALID_CMS);
+
+    expect(result.structureOk).toBe(true);
+    expect(result.hashOk).toBe(true);
+    expect(result.signatureValid).toBe(true);
+    expect(result.valid).toBe(true);
+    expect(result.details).toContain("Signature OK -- signer signature verifies");
+  });
+
+  it("reports the certificate named by SignerInfo in a multi-certificate CMS", async () => {
+    const result = await verifyDetachedSignature(VALID_CMS_DATA, CHAIN_CMS);
+
+    expect(result.valid).toBe(true);
+    expect(result.signatureValid).toBe(true);
+    expect(result.signer?.name).toBe("Test Signer");
+  });
+
+  it("accepts CoSign's combined RSA OID in digestAlgorithm", async () => {
+    const cms = withDigestAlgorithm(VALID_CMS, "1.2.840.113549.1.1.11");
+    const result = await verifyDetachedSignature(VALID_CMS_DATA, cms);
+
+    expect(result.hashOk).toBe(true);
+    expect(result.signatureValid).toBe(true);
+    expect(result.valid).toBe(true);
+  });
+
+  it("accepts CoSign's combined digest OID with bare RSA signatureAlgorithm", async () => {
+    const combinedDigest = withDigestAlgorithm(VALID_CMS, "1.2.840.113549.1.1.11");
+    const cms = withSignatureAlgorithm(combinedDigest, "1.2.840.113549.1.1.1");
+    const result = await verifyDetachedSignature(VALID_CMS_DATA, cms);
+
+    expect(result.hashOk).toBe(true);
+    expect(result.signatureValid).toBe(true);
+    expect(result.valid).toBe(true);
+  });
+
+  it("rejects a forged signature even when messageDigest still matches", async () => {
+    const forgedCms = forgeCmsSignature(VALID_CMS);
+    const result = await verifyDetachedSignature(VALID_CMS_DATA, forgedCms);
+
+    expect(result.structureOk).toBe(true);
+    expect(result.hashOk).toBe(true);
+    expect(result.signatureValid).toBe(false);
+    expect(result.valid).toBe(false);
+    expect(result.details).toContain(
+      "Signature INVALID -- does not verify against the signer certificate",
+    );
+  });
+
+  it("fails closed when the mandatory contentType attribute is missing", async () => {
+    const cms = withoutSignedAttribute(VALID_CMS, "1.2.840.113549.1.9.3");
+    const result = await verifyDetachedSignature(VALID_CMS_DATA, cms);
+
+    expect(result.hashOk).toBe(true);
+    expect(result.signatureValid).toBeNull();
+    expect(result.valid).toBe(false);
+    expect(result.details).toContain(
+      "Signature not verified (contentType attribute missing or duplicated)",
+    );
+  });
+
+  it("fails closed when the signer certificate is not embedded", async () => {
+    const result = await verifyDetachedSignature(VALID_CMS_DATA, withoutCertificates(VALID_CMS));
+
+    expect(result.hashOk).toBe(true);
+    expect(result.signatureValid).toBeNull();
+    expect(result.valid).toBe(false);
+    expect(result.details).toContain(
+      "Signature not verified (signer certificate not embedded or ambiguous)",
+    );
+  });
+
   it("returns hashOk=true when data hash matches CMS messageDigest", async () => {
     const data = new TextEncoder().encode("test data for detached signature");
     const dataHash = new Uint8Array(createHash("sha1").update(data).digest());
@@ -1028,7 +1210,8 @@ describe("detached verification with real CMS digest", () => {
 
     expect(result.structureOk).toBe(true);
     expect(result.hashOk).toBe(true);
-    expect(result.valid).toBe(true);
+    expect(result.signatureValid).toBeNull();
+    expect(result.valid).toBe(false);
 
     const hashDetail = result.details.find(
       (d) => d.includes("Hash OK") && d.includes("CMS messageDigest"),
@@ -1086,7 +1269,8 @@ describe("verifyAllEmbeddedSignatures with real CMS digest", () => {
     if (first !== undefined) {
       expect(first.structureOk).toBe(true);
       expect(first.hashOk).toBe(true);
-      expect(first.valid).toBe(true);
+      expect(first.signatureValid).toBeNull();
+      expect(first.valid).toBe(false);
     }
   });
 });
@@ -1107,7 +1291,8 @@ describe("signer name extraction via embedded verification", () => {
     const result = await verifyEmbeddedSignature(signed);
     expect(result.structureOk).toBe(true);
     expect(result.hashOk).toBe(true);
-    expect(result.valid).toBe(true);
+    expect(result.signatureValid).toBeNull();
+    expect(result.valid).toBe(false);
 
     // Should have signer info
     expect(result.signer).not.toBeNull();
@@ -1132,7 +1317,8 @@ describe("signer name extraction via embedded verification", () => {
 
     expect(result.structureOk).toBe(true);
     expect(result.hashOk).toBe(true);
-    expect(result.valid).toBe(true);
+    expect(result.signatureValid).toBeNull();
+    expect(result.valid).toBe(false);
 
     expect(result.signer).not.toBeNull();
     if (result.signer !== null) {

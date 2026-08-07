@@ -94,7 +94,7 @@ def test_sign_pdf_embedded_non_pdf(mock_transport):
         sign_pdf_embedded(b"not a pdf", mock_transport, "user", "pass", 120)
 
 
-def test_sign_pdf_embedded_happy_path(mock_transport):
+def test_sign_pdf_embedded_happy_path(mock_transport, cms_signer):
     """Full embedded signing pipeline with mocked SOAP."""
     import io
 
@@ -110,14 +110,12 @@ def test_sign_pdf_embedded_happy_path(mock_transport):
     pdf_bytes = buf.getvalue()
 
     # The pipeline: prepare -> sign_data -> insert_cms -> verify
-    # We mock sign_data (which calls SOAP) and return a CMS that will pass verification
+    # We mock sign_data (which calls SOAP) and return a genuine test CMS.
     # sign_data is called internally by sign_pdf_embedded
 
     # We need to let prepare_pdf_with_sig_field run for real (needs pikepdf),
     # then mock the SOAP call. sign_pdf_embedded calls sign_data internally.
-    fake_cms = FAKE_CMS  # ~1792 bytes
-
-    mock_transport.sign_data = Mock(return_value=fake_cms)
+    mock_transport.sign_data = Mock(side_effect=cms_signer)
     result = sign_pdf_embedded(
         pdf_bytes,
         mock_transport,
@@ -134,7 +132,7 @@ def test_sign_pdf_embedded_happy_path(mock_transport):
     assert len(result) > len(pdf_bytes)
 
 
-def test_sign_pdf_embedded_with_fields(mock_transport):
+def test_sign_pdf_embedded_with_fields(mock_transport, cms_signer):
     """Embedded signing with custom fields exercises adaptive sizing."""
     import io
 
@@ -148,9 +146,7 @@ def test_sign_pdf_embedded_with_fields(mock_transport):
     pdf.save(buf)
     pdf_bytes = buf.getvalue()
 
-    fake_cms = FAKE_CMS
-
-    mock_transport.sign_data = Mock(return_value=fake_cms)
+    mock_transport.sign_data = Mock(side_effect=cms_signer)
     result = sign_pdf_embedded(
         pdf_bytes,
         mock_transport,
@@ -204,7 +200,7 @@ def test_sign_pdf_embedded_verification_failure(mock_transport):
         )
 
 
-def test_sign_pdf_embedded_with_font(mock_transport):
+def test_sign_pdf_embedded_with_font(mock_transport, cms_signer):
     """Embedded signing with explicit font should produce valid PDF."""
     import io
 
@@ -218,9 +214,7 @@ def test_sign_pdf_embedded_with_font(mock_transport):
     pdf.save(buf)
     pdf_bytes = buf.getvalue()
 
-    fake_cms = FAKE_CMS
-
-    mock_transport.sign_data = Mock(return_value=fake_cms)
+    mock_transport.sign_data = Mock(side_effect=cms_signer)
     result = sign_pdf_embedded(
         pdf_bytes,
         mock_transport,
@@ -237,7 +231,7 @@ def test_sign_pdf_embedded_with_font(mock_transport):
     assert b"/GHEAGrapalat" in result
 
 
-def test_sign_pdf_embedded_invisible(mock_transport):
+def test_sign_pdf_embedded_invisible(mock_transport, cms_signer):
     """Invisible embedded signing pipeline with mocked SOAP."""
     import io
 
@@ -251,9 +245,7 @@ def test_sign_pdf_embedded_invisible(mock_transport):
     pdf.save(buf)
     pdf_bytes = buf.getvalue()
 
-    fake_cms = FAKE_CMS
-
-    mock_transport.sign_data = Mock(return_value=fake_cms)
+    mock_transport.sign_data = Mock(side_effect=cms_signer)
     result = sign_pdf_embedded(
         pdf_bytes,
         mock_transport,

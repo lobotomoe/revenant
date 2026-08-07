@@ -47,16 +47,30 @@ def _make_mock_signed_data(cn=None, email=None, org=None):
 
     cert = MagicMock()
     cert.subject = subject
+    cert.key_identifier = b"mock-signer-key-id"
 
     cert_choice = MagicMock()
     cert_choice.chosen = cert
+    cert_choice.name = "certificate"
 
     certs = MagicMock()
+    certs.native = {"certificate": True}
     certs.__len__ = lambda self: 1
     certs.__getitem__ = lambda self, i: cert_choice
+    certs.__iter__ = lambda self: iter([cert_choice])
+
+    sid = MagicMock()
+    sid.name = "subject_key_identifier"
+    sid.chosen.native = b"mock-signer-key-id"
+    signer_info = MagicMock()
+    signer_info.__getitem__ = lambda self, k: sid if k == "sid" else None
+    signer_infos = [signer_info]
 
     signed_data = MagicMock()
-    signed_data.__getitem__ = lambda self, k: certs if k == "certificates" else None
+    signed_data.__getitem__ = lambda self, k: {
+        "certificates": certs,
+        "signer_infos": signer_infos,
+    }.get(k)
 
     content_info = MagicMock()
     content_info.__getitem__ = lambda self, k: signed_data if k == "content" else None

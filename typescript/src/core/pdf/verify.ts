@@ -2,8 +2,8 @@
 /**
  * Post-sign verification of embedded PDF signatures.
  *
- * Extracts ByteRange data and CMS blobs, verifies hash consistency,
- * and checks structural validity. Supports multi-signature PDFs.
+ * Extracts ByteRange data and CMS blobs, verifies hash consistency and the CMS
+ * signer signature, and checks structural validity. Supports multi-signature PDFs.
  */
 
 import { createHash } from "node:crypto";
@@ -19,6 +19,7 @@ import {
   findByteRanges,
 } from "./cms-extraction.js";
 import { extractDigestInfo, extractSignerInfo, type SignerInfo } from "./cms-info.js";
+import { verifySignerSignature } from "./cms-signature.js";
 
 // -- Types --------------------------------------------------------------------
 
@@ -27,8 +28,10 @@ export interface VerificationResult {
   valid: boolean;
   /** ByteRange and CMS structure valid. */
   structureOk: boolean;
-  /** Hash matches expected value. */
+  /** CMS digest matches data (and the optional expected hash matches). */
   hashOk: boolean;
+  /** Cryptographic signer signature result (null = verification unavailable). */
+  signatureValid: boolean | null;
   /** Contains embedded revocation data. */
   ltvEnabled: boolean;
   /** Human-readable messages. */
@@ -57,6 +60,51 @@ function bytesEqual(a: Uint8Array, b: Uint8Array): boolean {
     if (a[i] !== b[i]) return false;
   }
   return true;
+}
+
+function verifyHash(
+  data: Uint8Array,
+  cmsDer: Uint8Array,
+  details: string[],
+  dataLabel: string,
+  expectedHash: Uint8Array | null = null,
+): boolean {
+  let expectedOk = true;
+  if (expectedHash !== null) {
+    const actualSha1 = new Uint8Array(createHash("sha1").update(data).digest());
+    expectedOk = bytesEqual(actualSha1, expectedHash);
+    if (expectedOk) {
+      details.push(`Hash OK -- SHA-1 matches expected: ${bytesToHex(actualSha1)}`);
+    } else {
+      details.push(
+        `Hash MISMATCH!\n` +
+          `  ${dataLabel} SHA-1: ${bytesToHex(actualSha1)}\n` +
+          `  Expected:        ${bytesToHex(expectedHash)}`,
+      );
+    }
+  }
+
+  const digestInfo = extractDigestInfo(cmsDer);
+  if (digestInfo === null) {
+    details.push("CMS messageDigest unavailable -- cannot verify hash");
+    return false;
+  }
+
+  const algoNode = toNodeCryptoName(digestInfo.algorithm);
+  const actualDigest = new Uint8Array(createHash(algoNode).update(data).digest());
+  const cmsDigestOk = bytesEqual(actualDigest, digestInfo.digest);
+  if (cmsDigestOk) {
+    details.push(
+      `Hash OK -- ${digestInfo.algorithm} matches CMS messageDigest: ${bytesToHex(actualDigest)}`,
+    );
+  } else {
+    details.push(
+      `Hash MISMATCH!\n` +
+        `  ${dataLabel} ${digestInfo.algorithm}:   ${bytesToHex(actualDigest)}\n` +
+        `  CMS messageDigest:  ${bytesToHex(digestInfo.digest)}`,
+    );
+  }
+  return expectedOk && cmsDigestOk;
 }
 
 // -- Core verification --------------------------------------------------------
@@ -88,6 +136,7 @@ async function verifySignatureMatch(
       valid: false,
       structureOk: false,
       hashOk: false,
+      signatureValid: null,
       ltvEnabled: false,
       details: [`Structure error: ${msg}`],
       signer: null,
@@ -115,59 +164,19 @@ async function verifySignatureMatch(
   }
 
   // 4. Hash verification
-  let hashOk = false;
+  const hashOk = verifyHash(signedData, cmsDer, details, "ByteRange", expectedHash);
 
-  if (expectedHash !== null) {
-    // Post-sign path: we know the exact SHA-1 hash sent to CoSign
-    const actualHash = new Uint8Array(createHash("sha1").update(signedData).digest());
-    if (bytesEqual(actualHash, expectedHash)) {
-      hashOk = true;
-      details.push(`Hash OK -- SHA-1 matches expected: ${bytesToHex(actualHash)}`);
-    } else {
-      details.push(
-        `Hash MISMATCH!\n` +
-          `  ByteRange SHA-1: ${bytesToHex(actualHash)}\n` +
-          `  Expected:        ${bytesToHex(expectedHash)}`,
-      );
-    }
-  } else {
-    // Standalone verification: determine algorithm from CMS
-    const digestInfo = extractDigestInfo(cmsDer);
-    if (digestInfo !== null) {
-      const algoNode = toNodeCryptoName(digestInfo.algorithm);
-      const algoUpper = digestInfo.algorithm;
-      const actualHash = new Uint8Array(createHash(algoNode).update(signedData).digest());
-      if (bytesEqual(actualHash, digestInfo.digest)) {
-        hashOk = true;
-        details.push(
-          `Hash OK -- ${algoUpper} matches CMS messageDigest: ${bytesToHex(actualHash)}`,
-        );
-      } else {
-        details.push(
-          `Hash MISMATCH!\n` +
-            `  ByteRange ${algoUpper}:   ${bytesToHex(actualHash)}\n` +
-            `  CMS messageDigest:  ${bytesToHex(digestInfo.digest)}`,
-        );
-      }
-    } else if (cmsDer.length >= MIN_CMS_SIZE && cmsDer[0] === ASN1_SEQUENCE_TAG) {
-      // Non-standard CMS -- hash cannot be verified without a reference value.
-      const actualHash = new Uint8Array(createHash("sha1").update(signedData).digest());
-      details.push(
-        `Hash computed -- SHA-1: ${bytesToHex(actualHash)} ` +
-          "(CMS digest info not available -- cannot verify)",
-      );
-    } else {
-      details.push("Hash: cannot verify without expected hash and CMS is suspect");
-    }
-  }
+  // 5. Cryptographic signature verification
+  const signature = await verifySignerSignature(cmsDer, signedData);
+  details.push(signature.detail);
 
-  // 5. LTV status
+  // 6. LTV status
   const { checkLtvStatus } = await import("./ltv.js");
   const ltv = checkLtvStatus(cmsDer);
   const ltvLabel = ltv.ltvEnabled ? "LTV enabled" : "Not LTV enabled";
   details.push(`LTV: ${ltvLabel}`);
 
-  // 6. Chain validation (optional, best-effort)
+  // 7. Chain validation (optional, best-effort)
   let chainValid: boolean | null = null;
   let trustAnchor: string | null = null;
   let trustStatus: string | null = "unknown";
@@ -186,11 +195,12 @@ async function verifySignatureMatch(
     }
   }
 
-  const valid = structureOk && hashOk;
+  const valid = structureOk && hashOk && signature.valid === true;
   return {
     valid,
     structureOk,
     hashOk,
+    signatureValid: signature.valid,
     ltvEnabled: ltv.ltvEnabled,
     details,
     signer,
@@ -205,8 +215,8 @@ async function verifySignatureMatch(
 /**
  * Verify the last embedded PDF signature.
  *
- * Checks structure (ByteRange, CMS), hash (auto-detected algorithm or
- * expected SHA-1), and performs a pdf-lib structural check.
+ * Checks structure (ByteRange, CMS), the signed CMS digest, an optional
+ * expected SHA-1, the signer signature, and performs a pdf-lib structural check.
  *
  * Never raises on verification failure -- returns valid=false with details.
  */
@@ -221,6 +231,7 @@ export async function verifyEmbeddedSignature(
       valid: false,
       structureOk: false,
       hashOk: false,
+      signatureValid: null,
       ltvEnabled: false,
       details: ["Structure error: No /ByteRange found in PDF -- not a signed PDF?"],
       signer: null,
@@ -236,6 +247,7 @@ export async function verifyEmbeddedSignature(
       valid: false,
       structureOk: false,
       hashOk: false,
+      signatureValid: null,
       ltvEnabled: false,
       details: ["Structure error: No /ByteRange found in PDF -- not a signed PDF?"],
       signer: null,
@@ -304,8 +316,8 @@ export async function verifyAllEmbeddedSignatures(
 /**
  * Verify a detached CMS/PKCS#7 signature against original data.
  *
- * Extracts the digest algorithm and messageDigest from the CMS blob,
- * computes the hash of the original data, and compares.
+ * Extracts the digest algorithm and messageDigest from the CMS blob, compares
+ * it with the original data, and verifies the signer signature.
  */
 export async function verifyDetachedSignature(
   dataBytes: Uint8Array,
@@ -333,25 +345,11 @@ export async function verifyDetachedSignature(
   }
 
   // Hash verification
-  let hashOk = false;
-  const digestInfo = extractDigestInfo(cmsDer);
-  if (digestInfo !== null) {
-    const algoNode = toNodeCryptoName(digestInfo.algorithm);
-    const algoUpper = digestInfo.algorithm;
-    const actualHash = new Uint8Array(createHash(algoNode).update(dataBytes).digest());
-    if (bytesEqual(actualHash, digestInfo.digest)) {
-      hashOk = true;
-      details.push(`Hash OK -- ${algoUpper} matches CMS messageDigest: ${bytesToHex(actualHash)}`);
-    } else {
-      details.push(
-        `Hash MISMATCH!\n` +
-          `  Data ${algoUpper}:        ${bytesToHex(actualHash)}\n` +
-          `  CMS messageDigest:  ${bytesToHex(digestInfo.digest)}`,
-      );
-    }
-  } else {
-    details.push("Could not extract digest info -- hash verification unavailable");
-  }
+  const hashOk = verifyHash(dataBytes, cmsDer, details, "Data");
+
+  // Cryptographic signature verification
+  const signature = await verifySignerSignature(cmsDer, dataBytes);
+  details.push(signature.detail);
 
   // LTV status
   const { checkLtvStatus } = await import("./ltv.js");
@@ -378,11 +376,12 @@ export async function verifyDetachedSignature(
     }
   }
 
-  const valid = structureOk && hashOk;
+  const valid = structureOk && hashOk && signature.valid === true;
   return {
     valid,
     structureOk,
     hashOk,
+    signatureValid: signature.valid,
     ltvEnabled: ltv.ltvEnabled,
     details,
     signer,

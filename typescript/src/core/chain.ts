@@ -13,6 +13,7 @@ import { MAX_AIA_FETCHES } from "../constants.js";
 import { httpGet } from "../network/transport.js";
 import { toArrayBuffer } from "../utils.js";
 import { getOidName } from "./cert-info.js";
+import { findSignerCertificate, x509Certificates } from "./cms-certificates.js";
 import { getTrustStore, type TrustStore } from "./tsl.js";
 
 // -- Types --------------------------------------------------------------------
@@ -33,15 +34,16 @@ function extractAllCertsFromCms(cmsDer: Uint8Array): pkijs.Certificate[] {
   const contentInfo = new pkijs.ContentInfo({ schema: asn1.result });
   const signedData = new pkijs.SignedData({ schema: contentInfo.content });
 
-  if (!signedData.certificates) return [];
+  return x509Certificates(signedData);
+}
 
-  const certs: pkijs.Certificate[] = [];
-  for (const cert of signedData.certificates) {
-    if (cert instanceof pkijs.Certificate) {
-      certs.push(cert);
-    }
-  }
-  return certs;
+function extractSignerCertFromCms(cmsDer: Uint8Array): pkijs.Certificate | null {
+  const asn1 = asn1js.fromBER(toArrayBuffer(cmsDer));
+  if (asn1.offset === -1) return null;
+
+  const contentInfo = new pkijs.ContentInfo({ schema: asn1.result });
+  const signedData = new pkijs.SignedData({ schema: contentInfo.content });
+  return findSignerCertificate(signedData);
 }
 
 // -- Certificate helpers ------------------------------------------------------
@@ -242,13 +244,18 @@ export async function validateChain(
     };
   }
 
-  const leaf = cmsCerts[0];
-  if (leaf === undefined) {
+  let leaf: pkijs.Certificate | null;
+  try {
+    leaf = extractSignerCertFromCms(cmsDer);
+  } catch {
+    leaf = null;
+  }
+  if (leaf === null) {
     return {
       chainValid: null,
       trustAnchor: null,
       chainDepth: 0,
-      details: ["Chain: no certificates in CMS"],
+      details: ["Chain: no unique certificate matches SignerInfo"],
     };
   }
   details.push(`Chain: signer cert: ${getSubjectDn(leaf)}`);

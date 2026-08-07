@@ -15,6 +15,7 @@ import { AuthError, CertificateError, RevenantError } from "../errors.js";
 import { logger } from "../logger.js";
 import type { SigningTransport } from "../network/protocol.js";
 import { toArrayBuffer } from "../utils.js";
+import { findSignerCertificate } from "./cms-certificates.js";
 import { extractCmsFromByterangeMatch, findByteRanges } from "./pdf/cms-extraction.js";
 
 // OIDs for common subject fields
@@ -139,6 +140,7 @@ function parseCertificate(certDer: Uint8Array): pkijs.Certificate {
 
 /**
  * Extract signer certificate info from a CMS/PKCS#7 DER blob.
+ * The certificate is selected by SignerInfo.sid, never SET OF order.
  */
 export function extractCertInfoFromCms(cmsDer: Uint8Array): CertInfo {
   let signedData: pkijs.SignedData;
@@ -159,9 +161,9 @@ export function extractCertInfoFromCms(cmsDer: Uint8Array): CertInfo {
     throw new CertificateError("No certificate subject found in CMS blob.");
   }
 
-  const cert = certs[0];
-  if (cert === undefined || !(cert instanceof pkijs.Certificate)) {
-    throw new CertificateError("First certificate in CMS blob is not an X.509 certificate.");
+  const cert = findSignerCertificate(signedData);
+  if (cert === null) {
+    throw new CertificateError("No unique certificate matches the first CMS SignerInfo.");
   }
 
   return extractInfoFromCertObject(cert);

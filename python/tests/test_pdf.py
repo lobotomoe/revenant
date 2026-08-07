@@ -432,8 +432,9 @@ def test_prepare_and_verify_roundtrip():
     # Verify structure
     result = verify_embedded_signature(signed_pdf, expected_hash=br_hash)
     assert result["structure_ok"] is True
-    assert result["hash_ok"] is True
-    assert result["valid"] is True
+    assert result["hash_ok"] is False
+    assert result["signature_valid"] is None
+    assert result["valid"] is False
 
 
 def test_prepare_with_all_presets():
@@ -669,8 +670,8 @@ def test_extract_byterange_beyond_eof():
 # ── verify_embedded_signature — hash branches ────────────────────────
 
 
-def test_verify_hash_match():
-    """When expected_hash matches, hash_ok should be True."""
+def test_expected_hash_match_does_not_replace_cms_digest():
+    """A matching post-sign oracle cannot replace the CMS messageDigest check."""
     fake_cms = b"\x30\x82\x00\xfc" + b"\xab" * 252
     cms_hex = fake_cms.hex()
     padded = cms_hex + "0" * (512 - len(cms_hex))
@@ -683,8 +684,9 @@ def test_verify_hash_match():
     expected = hashlib.sha1(signed_data).digest()
 
     result = verify_embedded_signature(pdf, expected_hash=expected)
-    assert result["hash_ok"] is True
+    assert result["hash_ok"] is False
     assert any("Hash OK" in d for d in result["details"])
+    assert any("messageDigest" in d and "unavailable" in d for d in result["details"])
 
 
 def test_verify_hash_mismatch():
@@ -711,7 +713,7 @@ def test_verify_no_expected_hash_consistent():
     # A fake CMS has no extractable digest info, so hash_ok must be False --
     # we cannot verify a hash without a reference value to compare against.
     assert result["hash_ok"] is False
-    assert any("cannot verify" in d or "Hash computed" in d for d in result["details"])
+    assert any("hash verification unavailable" in d for d in result["details"])
 
 
 # ── _serialize_pikepdf_obj — edge cases ───────────────────────────────
@@ -993,7 +995,7 @@ def test_verify_no_expected_hash_bad_cms_structure():
 
 
 def test_prepare_roundtrip_armenian_fields():
-    """Round-trip with Armenian text should use embedded font and pass verification."""
+    """Round-trip with Armenian text should preserve the PDF and embedded font."""
     from revenant.core.pdf import prepare_pdf_with_sig_field
 
     pdf_bytes = _make_blank_pdf()
@@ -1028,8 +1030,9 @@ def test_prepare_roundtrip_armenian_fields():
 
     result = verify_embedded_signature(signed_pdf, expected_hash=br_hash)
     assert result["structure_ok"] is True
-    assert result["hash_ok"] is True
-    assert result["valid"] is True
+    assert result["hash_ok"] is False
+    assert result["signature_valid"] is None
+    assert result["valid"] is False
 
 
 # ── Multi-font round-trip ──────────────────────────────────────────────
@@ -1066,8 +1069,9 @@ def test_prepare_roundtrip_ghea_grapalat():
 
     result = verify_embedded_signature(signed_pdf, expected_hash=br_hash)
     assert result["structure_ok"] is True
-    assert result["hash_ok"] is True
-    assert result["valid"] is True
+    assert result["hash_ok"] is False
+    assert result["signature_valid"] is None
+    assert result["valid"] is False
 
 
 def test_prepare_noto_sans_explicit():
@@ -1151,8 +1155,9 @@ def test_prepare_invisible_signature():
 
     result = verify_embedded_signature(signed_pdf, expected_hash=br_hash)
     assert result["structure_ok"] is True
-    assert result["hash_ok"] is True
-    assert result["valid"] is True
+    assert result["hash_ok"] is False
+    assert result["signature_valid"] is None
+    assert result["valid"] is False
 
 
 def test_prepare_invisible_smaller_than_visible():
@@ -1434,8 +1439,9 @@ def test_prepare_xref_stream_pdf_roundtrip():
 
     result = verify_embedded_signature(signed_pdf, expected_hash=br_hash)
     assert result["structure_ok"] is True
-    assert result["hash_ok"] is True
-    assert result["valid"] is True
+    assert result["hash_ok"] is False
+    assert result["signature_valid"] is None
+    assert result["valid"] is False
 
 
 def test_prepare_xref_stream_pdf_invisible():
@@ -1507,7 +1513,8 @@ def test_prepare_rotated_page(rotation):
     signed_pdf = insert_cms(prepared, hex_start, hex_len, fake_cms)
     br_hash = compute_byterange_hash(prepared, hex_start, hex_len)
     result = verify_embedded_signature(signed_pdf, expected_hash=br_hash)
-    assert result["valid"] is True
+    assert result["signature_valid"] is None
+    assert result["valid"] is False
 
 
 @pytest.mark.parametrize(
@@ -1571,7 +1578,8 @@ def test_prepare_various_page_sizes(page_size):
     signed_pdf = insert_cms(prepared, hex_start, hex_len, fake_cms)
     br_hash = compute_byterange_hash(prepared, hex_start, hex_len)
     result = verify_embedded_signature(signed_pdf, expected_hash=br_hash)
-    assert result["valid"] is True
+    assert result["signature_valid"] is None
+    assert result["valid"] is False
 
 
 # ── CropBox vs MediaBox ──────────────────────────────────────────────
@@ -1623,7 +1631,8 @@ def test_prepare_pdf_with_cropbox():
     signed_pdf = insert_cms(prepared, hex_start, hex_len, fake_cms)
     br_hash = compute_byterange_hash(prepared, hex_start, hex_len)
     result = verify_embedded_signature(signed_pdf, expected_hash=br_hash)
-    assert result["valid"] is True
+    assert result["signature_valid"] is None
+    assert result["valid"] is False
 
 
 # ── Inherited MediaBox from Pages tree ───────────────────────────────
@@ -1661,7 +1670,8 @@ def test_prepare_inherited_mediabox():
     signed_pdf = insert_cms(prepared, hex_start, hex_len, fake_cms)
     br_hash = compute_byterange_hash(prepared, hex_start, hex_len)
     result = verify_embedded_signature(signed_pdf, expected_hash=br_hash)
-    assert result["valid"] is True
+    assert result["signature_valid"] is None
+    assert result["valid"] is False
 
 
 # ── Existing AcroForm and re-signing ─────────────────────────────────
@@ -1710,7 +1720,8 @@ def test_prepare_pdf_with_existing_acroform():
     signed_pdf = insert_cms(prepared, hex_start, hex_len, fake_cms)
     br_hash = compute_byterange_hash(prepared, hex_start, hex_len)
     result = verify_embedded_signature(signed_pdf, expected_hash=br_hash)
-    assert result["valid"] is True
+    assert result["signature_valid"] is None
+    assert result["valid"] is False
 
 
 def test_re_sign_already_signed_pdf():
@@ -1741,7 +1752,8 @@ def test_re_sign_already_signed_pdf():
     # The last signature should verify against its own hash
     br_hash2 = compute_byterange_hash(prepared2, hex_start2, hex_len2)
     result = verify_embedded_signature(signed2, expected_hash=br_hash2)
-    assert result["valid"] is True
+    assert result["signature_valid"] is None
+    assert result["valid"] is False
 
 
 # ── Many existing annotations ────────────────────────────────────────
@@ -1823,7 +1835,8 @@ def test_prepare_100_page_pdf():
     signed_pdf = insert_cms(prepared, hex_start, hex_len, fake_cms)
     br_hash = compute_byterange_hash(prepared, hex_start, hex_len)
     result = verify_embedded_signature(signed_pdf, expected_hash=br_hash)
-    assert result["valid"] is True
+    assert result["signature_valid"] is None
+    assert result["valid"] is False
 
 
 # ── Object streams ───────────────────────────────────────────────────
@@ -1853,7 +1866,8 @@ def test_prepare_object_stream_pdf_roundtrip():
     signed_pdf = insert_cms(prepared, hex_start, hex_len, fake_cms)
     br_hash = compute_byterange_hash(prepared, hex_start, hex_len)
     result = verify_embedded_signature(signed_pdf, expected_hash=br_hash)
-    assert result["valid"] is True
+    assert result["signature_valid"] is None
+    assert result["valid"] is False
 
 
 # ── pdf_string serialization edge cases ──────────────────────────────
@@ -1941,7 +1955,8 @@ def test_prepare_pdf_with_text_content():
     signed_pdf = insert_cms(prepared, hex_start, hex_len, fake_cms)
     br_hash = compute_byterange_hash(prepared, hex_start, hex_len)
     result = verify_embedded_signature(signed_pdf, expected_hash=br_hash)
-    assert result["valid"] is True
+    assert result["signature_valid"] is None
+    assert result["valid"] is False
 
 
 # ── Edge case tests: ByteRange validation ───────────────────────────
@@ -2227,13 +2242,14 @@ def test_verify_with_real_cms_digest_mismatch():
 
 
 def test_verify_detached_hash_match():
-    """Detached verification should succeed when hash matches CMS messageDigest."""
+    """A matching digest alone must not make an unsigned CMS valid."""
     data = b"Hello, this is the original data"
     real_digest = hashlib.sha256(data).digest()
     cms_der = _build_cms_with_sha256_digest(real_digest)
 
     result = verify_detached_signature(data, cms_der)
-    assert result["valid"] is True
+    assert result["signature_valid"] is None
+    assert result["valid"] is False
     assert result["hash_ok"] is True
     assert result["structure_ok"] is True
     assert any("Hash OK" in d for d in result["details"])
@@ -2276,7 +2292,8 @@ def test_verify_detached_has_signer_info():
     result = verify_detached_signature(data, cms_der)
     # Our test CMS has CN=Test in the issuer, but no certificate section
     # so signer may or may not be extracted depending on CMS structure
-    assert result["valid"] is True
+    assert result["signature_valid"] is None
+    assert result["valid"] is False
 
 
 # ── inspect_cms_blob ──────────────────────────────────────────────

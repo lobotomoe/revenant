@@ -643,6 +643,40 @@ def test_validate_chain_trusted(root_ca, trust_store_from_root):
     assert result.chain_depth >= 2
 
 
+def test_validate_chain_selects_leaf_by_signer_identifier():
+    """Certificate SET ordering must not change which chain is validated."""
+    from revenant.core.chain import validate_chain
+
+    testdata = (
+        Path(__file__).resolve().parents[2] / "rust/crates/revenant-sign-core/src/pki/testdata"
+    )
+    root_der = (testdata / "root.der").read_bytes()
+    cms_der = (testdata / "cms_chain3.der").read_bytes()
+    anchor = TrustAnchor(
+        subject_name="CN=Test Root CA",
+        service_name="TestRootCA",
+        service_type="CA/QC",
+        status="granted",
+        cert_der=root_der,
+    )
+    store = TrustStore(
+        anchors=(anchor,),
+        ca_anchors=(anchor,),
+        scheme_operator="Test",
+        tsl_url="https://example.com",
+        fetched_at=time.monotonic(),
+    )
+
+    result = validate_chain(cms_der, store)
+    # Chain engines may reject this synthetic fixture for policy reasons; the
+    # regression target is selecting and building from the actual signer leaf.
+    assert result.chain_valid is not False
+    assert result.trust_anchor == "TestRootCA"
+    assert result.chain_depth == 3
+    assert any("Test Signer" in detail for detail in result.details)
+    assert not any("signer cert: Common Name: Test Root CA" in detail for detail in result.details)
+
+
 def test_validate_chain_untrusted():
     from revenant.core.chain import validate_chain
 

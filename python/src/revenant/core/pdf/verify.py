@@ -2,8 +2,8 @@
 """
 Post-sign verification of embedded PDF signatures.
 
-Extracts ByteRange data and CMS blobs, verifies hash consistency,
-and checks structural validity.  Supports multi-signature PDFs.
+Extracts ByteRange data and CMS blobs, verifies hash consistency and the CMS
+signer signature, and checks structural validity. Supports multi-signature PDFs.
 """
 
 from __future__ import annotations
@@ -22,6 +22,7 @@ from .cms_extraction import (
     extract_signature_data_from_match,
 )
 from .cms_info import extract_digest_info, extract_signer_info
+from .cms_signature import verify_signer_signature
 
 _logger = logging.getLogger(__name__)
 
@@ -31,13 +32,60 @@ class VerificationResult(TypedDict):
 
     valid: bool  # Overall result
     structure_ok: bool  # ByteRange and CMS structure valid
-    hash_ok: bool  # Hash matches expected value
+    hash_ok: bool  # CMS digest matches data (and optional expected hash matches)
+    signature_valid: bool | None  # None = cryptographic verification unavailable
     ltv_enabled: bool  # Contains embedded revocation data
     details: list[str]  # Human-readable messages
     signer: dict[str, str | None] | None  # Certificate info (name, email, org, dn)
     chain_valid: bool | None  # None = not attempted, True/False = result
     trust_anchor: str | None  # CA name from TSL
     trust_status: str | None  # "trusted" | "untrusted" | "unknown"
+
+
+def _verify_hash(
+    data: bytes,
+    cms_der: bytes,
+    details: list[str],
+    *,
+    data_label: str,
+    expected_hash: bytes | None = None,
+) -> bool:
+    """Verify both an optional post-sign oracle and the signed CMS digest."""
+    expected_ok = True
+    if expected_hash is not None:
+        actual_sha1 = hashlib.sha1(data).digest()
+        expected_ok = actual_sha1 == expected_hash
+        if expected_ok:
+            details.append(f"Hash OK -- SHA-1 matches expected: {actual_sha1.hex()}")
+        else:
+            details.append(
+                f"Hash MISMATCH!\n"
+                f"  {data_label} SHA-1: {actual_sha1.hex()}\n"
+                f"  Expected:        {expected_hash.hex()}"
+            )
+
+    digest_info = extract_digest_info(cms_der)
+    if digest_info is None:
+        details.append("Could not extract CMS messageDigest -- hash verification unavailable")
+        return False
+
+    algo_name, cms_digest = digest_info
+    try:
+        actual_digest = hashlib.new(algo_name, data).digest()
+    except (TypeError, ValueError):
+        details.append(f"CMS digest algorithm {algo_name!r} is unsupported -- cannot verify hash")
+        return False
+    algo_upper = algo_name.upper().replace("_", "-")
+    cms_digest_ok = actual_digest == cms_digest
+    if cms_digest_ok:
+        details.append(f"Hash OK -- {algo_upper} matches CMS messageDigest: {actual_digest.hex()}")
+    else:
+        details.append(
+            f"Hash MISMATCH!\n"
+            f"  {data_label} {algo_upper}:   {actual_digest.hex()}\n"
+            f"  CMS messageDigest:  {cms_digest.hex()}"
+        )
+    return expected_ok and cms_digest_ok
 
 
 def _verify_signature_match(
@@ -51,7 +99,7 @@ def _verify_signature_match(
     Args:
         pdf_bytes: Complete PDF file bytes.
         br_match: Regex match from BYTERANGE_PATTERN.
-        expected_hash: If provided, the exact hash sent for signing (SHA-1).
+        expected_hash: Optional SHA-1 oracle checked in addition to CMS messageDigest.
 
     Returns:
         Verification result for this signature.
@@ -69,6 +117,7 @@ def _verify_signature_match(
             "valid": False,
             "structure_ok": False,
             "hash_ok": False,
+            "signature_valid": None,
             "ltv_enabled": False,
             "details": [f"Structure error: {e}"],
             "signer": None,
@@ -93,57 +142,26 @@ def _verify_signature_match(
         details.append(f"Signer: {signer['name']}")
 
     # ── 4. Hash verification ─────────────────────────────────────
-    hash_ok = False
+    hash_ok = _verify_hash(
+        signed_data,
+        cms_der,
+        details,
+        data_label="ByteRange",
+        expected_hash=expected_hash,
+    )
 
-    if expected_hash is not None:
-        # Post-sign path: we know the exact SHA-1 hash sent to CoSign
-        actual_hash = hashlib.sha1(signed_data).digest()
-        if actual_hash == expected_hash:
-            hash_ok = True
-            details.append(f"Hash OK -- SHA-1 matches expected: {actual_hash.hex()}")
-        else:
-            details.append(
-                f"Hash MISMATCH!\n"
-                f"  ByteRange SHA-1: {actual_hash.hex()}\n"
-                f"  Expected:        {expected_hash.hex()}"
-            )
-    else:
-        # Standalone verification: determine algorithm from CMS
-        digest_info = extract_digest_info(cms_der)
-        if digest_info is not None:
-            algo_name, cms_digest = digest_info
-            actual_hash = hashlib.new(algo_name, signed_data).digest()
-            algo_upper = algo_name.upper().replace("_", "-")
-            if actual_hash == cms_digest:
-                hash_ok = True
-                details.append(
-                    f"Hash OK -- {algo_upper} matches CMS messageDigest: {actual_hash.hex()}"
-                )
-            else:
-                details.append(
-                    f"Hash MISMATCH!\n"
-                    f"  ByteRange {algo_upper}:   {actual_hash.hex()}\n"
-                    f"  CMS messageDigest:  {cms_digest.hex()}"
-                )
-        elif len(cms_der) >= MIN_CMS_SIZE and cms_der[0] == ASN1_SEQUENCE_TAG:
-            # Could not extract digest info (non-standard CMS) -- hash cannot
-            # be verified without a reference value to compare against.
-            actual_hash = hashlib.sha1(signed_data).digest()
-            details.append(
-                f"Hash computed -- SHA-1: {actual_hash.hex()} "
-                "(CMS digest info not available -- cannot verify)"
-            )
-        else:
-            details.append("Hash: cannot verify without expected hash and CMS is suspect")
+    # ── 5. Cryptographic signature verification ─────────────────────
+    signature = verify_signer_signature(cms_der)
+    details.append(signature.describe())
 
-    # ── 5. LTV status ────────────────────────────────────────────────
+    # ── 6. LTV status ────────────────────────────────────────────────
     from .ltv import check_ltv_status
 
     ltv = check_ltv_status(cms_der)
     ltv_label = "LTV enabled" if ltv.ltv_enabled else "Not LTV enabled"
     details.append(f"LTV: {ltv_label}")
 
-    # ── 6. Chain validation (optional, best-effort) ────────────────────
+    # ── 7. Chain validation (optional, best-effort) ────────────────────
     chain_valid: bool | None = None
     trust_anchor: str | None = None
     trust_status: str | None = "unknown"
@@ -164,11 +182,12 @@ def _verify_signature_match(
             _logger.debug("Chain validation failed (non-fatal)", exc_info=True)
             details.append("Chain: validation unavailable")
 
-    valid = structure_ok and hash_ok
+    valid = structure_ok and hash_ok and signature.valid is True
     return {
         "valid": valid,
         "structure_ok": structure_ok,
         "hash_ok": hash_ok,
+        "signature_valid": signature.valid,
         "ltv_enabled": ltv.ltv_enabled,
         "details": details,
         "signer": signer,
@@ -188,20 +207,20 @@ def verify_embedded_signature(
 
     Checks:
     1. Structure -- ByteRange is valid, CMS is present, PDF readable by pikepdf
-    2. Hash -- computed from ByteRange data, compared against CMS messageDigest
-       (algorithm auto-detected) or expected_hash if provided
-    3. CMS -- blob is non-empty and parseable
+    2. Hash -- computed from ByteRange data and compared against CMS messageDigest
+       (algorithm auto-detected); expected_hash is an additional check if provided
+    3. Signature -- the CMS signer signature verifies against its certificate
 
     For multi-signature PDFs, verifies only the last (most recent) signature.
     Use verify_all_embedded_signatures() to check all signatures.
 
     Args:
         pdf_bytes: The signed PDF.
-        expected_hash: 20-byte SHA-1 hash that was sent to CoSign for signing.
-            If provided, forces SHA-1 comparison against this exact value.
+        expected_hash: Optional 20-byte SHA-1 hash that was sent to CoSign for
+            signing. It is checked in addition to the signed CMS messageDigest.
 
     Returns:
-        VerificationResult with valid, structure_ok, hash_ok, details, signer.
+        VerificationResult including hash, signer-signature, structure, and trust status.
 
     Never raises on verification failure -- returns valid=False with details.
     Raises RevenantError only on parse failures (not a signed PDF, etc.)
@@ -212,6 +231,7 @@ def verify_embedded_signature(
             "valid": False,
             "structure_ok": False,
             "hash_ok": False,
+            "signature_valid": None,
             "ltv_enabled": False,
             "details": ["Structure error: No /ByteRange found in PDF -- not a signed PDF?"],
             "signer": None,
@@ -289,15 +309,15 @@ def verify_detached_signature(
 ) -> VerificationResult:
     """Verify a detached CMS/PKCS#7 signature against original data.
 
-    Extracts the digest algorithm and messageDigest from the CMS blob,
-    computes the hash of the original data, and compares.
+    Extracts the digest algorithm and messageDigest from the CMS blob, compares
+    it with the original data, and verifies the signer signature.
 
     Args:
         data_bytes: The original data that was signed.
         cms_der: The detached CMS/PKCS#7 signature (DER-encoded).
 
     Returns:
-        VerificationResult with valid, structure_ok, hash_ok, details, signer.
+        VerificationResult including hash, signer-signature, structure, and trust status.
     """
     details: list[str] = []
     structure_ok = True
@@ -318,25 +338,11 @@ def verify_detached_signature(
         details.append(f"Signer: {signer['name']}")
 
     # Hash verification
-    hash_ok = False
-    digest_info = extract_digest_info(cms_der)
-    if digest_info is not None:
-        algo_name, cms_digest = digest_info
-        actual_hash = hashlib.new(algo_name, data_bytes).digest()
-        algo_upper = algo_name.upper().replace("_", "-")
-        if actual_hash == cms_digest:
-            hash_ok = True
-            details.append(
-                f"Hash OK -- {algo_upper} matches CMS messageDigest: {actual_hash.hex()}"
-            )
-        else:
-            details.append(
-                f"Hash MISMATCH!\n"
-                f"  Data {algo_upper}:        {actual_hash.hex()}\n"
-                f"  CMS messageDigest:  {cms_digest.hex()}"
-            )
-    else:
-        details.append("Could not extract digest info -- hash verification unavailable")
+    hash_ok = _verify_hash(data_bytes, cms_der, details, data_label="Data")
+
+    # Cryptographic signature verification
+    signature = verify_signer_signature(cms_der)
+    details.append(signature.describe())
 
     # LTV status
     from .ltv import check_ltv_status
@@ -366,11 +372,12 @@ def verify_detached_signature(
             _logger.debug("Chain validation failed (non-fatal)", exc_info=True)
             details.append("Chain: validation unavailable")
 
-    valid = structure_ok and hash_ok
+    valid = structure_ok and hash_ok and signature.valid is True
     return {
         "valid": valid,
         "structure_ok": structure_ok,
         "hash_ok": hash_ok,
+        "signature_valid": signature.valid,
         "ltv_enabled": ltv.ltv_enabled,
         "details": details,
         "signer": signer,
