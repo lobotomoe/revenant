@@ -85,7 +85,11 @@ FieldStatus      SignatureStatus="0"
 `SignedFieldInfo` also contains `Certificate` (base64 X.509), `GraphicImage`
 and `GraphicLogo` child elements (both empty/zero on this appliance).
 
-Signature verification is also done client-side (ByteRange hash check, CMS structure validation, PDF readability via pikepdf/pdf-lib).
+Signature verification is also done client-side: Revenant checks the PDF
+ByteRange against the signed CMS `messageDigest`, verifies the RSA
+`SignerInfo.signature` and any ESS certificate binding, and reports PDF
+readability via pikepdf/pdf-lib. Certificate-chain trust remains a separate
+result.
 
 ### Multi-signature verification
 

@@ -3,21 +3,12 @@
 
 from __future__ import annotations
 
-import datetime
 import io
 from pathlib import Path
-from typing import ClassVar, Literal
 
 import pikepdf
 import pytest
-from asn1crypto import algos as asn1_algos
 from asn1crypto import cms as asn1_cms
-from asn1crypto import core as asn1_core
-from asn1crypto import x509 as asn1_x509
-from cryptography import x509
-from cryptography.hazmat.primitives import hashes, serialization
-from cryptography.hazmat.primitives.asymmetric import padding, rsa
-from cryptography.x509.oid import NameOID
 
 from revenant.core.pdf import (
     compute_byterange_hash,
@@ -33,50 +24,6 @@ _PKI_TESTDATA = (
     Path(__file__).resolve().parents[2] / "rust/crates/revenant-sign-core/src/pki/testdata"
 )
 
-_OID_SIGNING_CERTIFICATE = "1.2.840.113549.1.9.16.2.12"
-_OID_SIGNING_CERTIFICATE_V2 = "1.2.840.113549.1.9.16.2.47"
-
-
-class _EssCertId(asn1_core.Sequence):
-    _fields: ClassVar[list[object]] = [
-        ("cert_hash", asn1_core.OctetString),
-        ("issuer_serial", asn1_core.Any, {"optional": True}),
-    ]
-
-
-class _EssCertIds(asn1_core.SequenceOf):
-    _child_spec = _EssCertId
-
-
-class _SigningCertificate(asn1_core.Sequence):
-    _fields: ClassVar[list[object]] = [
-        ("certs", _EssCertIds),
-        ("policies", asn1_core.Any, {"optional": True}),
-    ]
-
-
-class _EssCertIdV2(asn1_core.Sequence):
-    _fields: ClassVar[list[object]] = [
-        (
-            "hash_algorithm",
-            asn1_algos.DigestAlgorithm,
-            {"default": {"algorithm": "sha256"}},
-        ),
-        ("cert_hash", asn1_core.OctetString),
-        ("issuer_serial", asn1_core.Any, {"optional": True}),
-    ]
-
-
-class _EssCertIdsV2(asn1_core.SequenceOf):
-    _child_spec = _EssCertIdV2
-
-
-class _SigningCertificateV2(asn1_core.Sequence):
-    _fields: ClassVar[list[object]] = [
-        ("certs", _EssCertIdsV2),
-        ("policies", asn1_core.Any, {"optional": True}),
-    ]
-
 
 def _real_cms(data: bytes) -> bytes:
     root_cert, root_key = make_root_ca()
@@ -84,88 +31,8 @@ def _real_cms(data: bytes) -> bytes:
     return build_cms_with_certs(leaf_cert, leaf_key, data=data)
 
 
-def _digest(data: bytes, algorithm: hashes.HashAlgorithm) -> bytes:
-    digest = hashes.Hash(algorithm)
-    digest.update(data)
-    return digest.finalize()
-
-
-def _ess_bound_cms(
-    data: bytes,
-    version: Literal["v1", "v2"],
-    *,
-    v2_hash: str | None = None,
-    malformed: bool = False,
-) -> tuple[bytes, x509.Certificate, rsa.RSAPrivateKey]:
-    root_cert, root_key = make_root_ca()
-    leaf_cert, leaf_key = make_leaf(root_cert, root_key)
-    content_info = asn1_cms.ContentInfo.load(
-        build_cms_with_certs(leaf_cert, leaf_key, data=data)
-    )
-    signer_info = content_info["content"]["signer_infos"][0]
-
-    if malformed:
-        binding_value: asn1_core.Asn1Value = asn1_core.OctetString(b"not a sequence")
-    else:
-        cert_der = leaf_cert.public_bytes(serialization.Encoding.DER)
-        if version == "v1":
-            # RFC 2634 fixes ESSCertID v1 to SHA-1.
-            cert_hash = _digest(cert_der, hashes.SHA1())  # noqa: S303
-            binding_value = _SigningCertificate({"certs": [{"cert_hash": cert_hash}]})
-        else:
-            hash_name = v2_hash or "sha256"
-            hash_type = {
-                "sha256": hashes.SHA256,
-                "sha384": hashes.SHA384,
-            }[hash_name]
-            cert_id: dict[str, object] = {"cert_hash": _digest(cert_der, hash_type())}
-            if v2_hash is not None:
-                cert_id["hash_algorithm"] = {"algorithm": v2_hash}
-            binding_value = _SigningCertificateV2({"certs": [cert_id]})
-
-    oid = _OID_SIGNING_CERTIFICATE if version == "v1" else _OID_SIGNING_CERTIFICATE_V2
-    binding_attr = asn1_cms.CMSAttribute(
-        {"type": oid, "values": [asn1_core.Any(binding_value)]}
-    )
-    signer_info["signed_attrs"] = asn1_cms.CMSAttributes(
-        [*signer_info["signed_attrs"], binding_attr]
-    )
-    signed_attrs = bytearray(signer_info["signed_attrs"].dump(force=True))
-    signed_attrs[0] = 0x31
-    signer_info["signature"] = leaf_key.sign(
-        bytes(signed_attrs),
-        padding.PKCS1v15(),
-        hashes.SHA256(),
-    )
-    return content_info.dump(force=True), leaf_cert, leaf_key
-
-
-def _replacement_certificate(
-    original: x509.Certificate,
-    signer_key: rsa.RSAPrivateKey,
-) -> x509.Certificate:
-    rogue_issuer_key = rsa.generate_private_key(public_exponent=65537, key_size=2048)
-    return (
-        x509.CertificateBuilder()
-        .subject_name(x509.Name([x509.NameAttribute(NameOID.COMMON_NAME, "Substituted Identity")]))
-        .issuer_name(original.issuer)
-        .public_key(signer_key.public_key())
-        .serial_number(original.serial_number)
-        .not_valid_before(datetime.datetime(2025, 1, 1, tzinfo=datetime.timezone.utc))
-        .not_valid_after(datetime.datetime(2032, 1, 1, tzinfo=datetime.timezone.utc))
-        .sign(rogue_issuer_key, hashes.SHA256())
-    )
-
-
-def _replace_embedded_certificate(cms_der: bytes, certificate: x509.Certificate) -> bytes:
-    content_info = asn1_cms.ContentInfo.load(cms_der)
-    asn1_certificate = asn1_x509.Certificate.load(
-        certificate.public_bytes(serialization.Encoding.DER)
-    )
-    content_info["content"]["certificates"] = asn1_cms.CertificateSet(
-        [asn1_cms.CertificateChoices(name="certificate", value=asn1_certificate)]
-    )
-    return content_info.dump(force=True)
+def _fixture(name: str) -> bytes:
+    return (_PKI_TESTDATA / name).read_bytes()
 
 
 def _forge_signature(cms_der: bytes) -> bytes:
@@ -198,32 +65,26 @@ def test_detached_accepts_genuine_cms_signature():
 
 
 @pytest.mark.parametrize(
-    ("version", "v2_hash"),
-    [("v1", None), ("v2", None), ("v2", "sha384")],
+    "fixture_name",
+    ["cms_ess_v1.der", "cms_ess_v2.der", "cms_ess_v2_sha384.der"],
 )
 def test_detached_accepts_matching_ess_certificate_binding(
-    version: Literal["v1", "v2"],
-    v2_hash: str | None,
+    fixture_name: str,
 ):
-    data = b"ESS-bound detached document"
-    cms_der, _, _ = _ess_bound_cms(data, version, v2_hash=v2_hash)
-
-    result = verify_detached_signature(data, cms_der)
+    result = verify_detached_signature(b"test data", _fixture(fixture_name))
 
     assert result["signature_valid"] is True
     assert result["valid"] is True
 
 
-@pytest.mark.parametrize("version", ["v1", "v2"])
+@pytest.mark.parametrize(
+    "fixture_name",
+    ["cms_ess_v1_substituted.der", "cms_ess_v2_substituted.der"],
+)
 def test_detached_rejects_ess_certificate_substitution(
-    version: Literal["v1", "v2"],
+    fixture_name: str,
 ):
-    data = b"certificate substitution"
-    cms_der, original_cert, signer_key = _ess_bound_cms(data, version)
-    replacement = _replacement_certificate(original_cert, signer_key)
-    substituted_cms = _replace_embedded_certificate(cms_der, replacement)
-
-    result = verify_detached_signature(data, substituted_cms)
+    result = verify_detached_signature(b"test data", _fixture(fixture_name))
 
     assert result["hash_ok"] is True
     assert result["signature_valid"] is None
@@ -237,10 +98,7 @@ def test_detached_rejects_ess_certificate_substitution(
 
 
 def test_detached_rejects_malformed_ess_certificate_binding():
-    data = b"malformed ESS binding"
-    cms_der, _, _ = _ess_bound_cms(data, "v1", malformed=True)
-
-    result = verify_detached_signature(data, cms_der)
+    result = verify_detached_signature(b"test data", _fixture("cms_ess_v1_malformed.der"))
 
     assert result["hash_ok"] is True
     assert result["signature_valid"] is None
@@ -338,7 +196,7 @@ def test_expected_hash_cannot_hide_different_signed_message_digest():
 
 
 def test_multicertificate_cms_reports_the_certificate_named_by_signer_info():
-    cms_der = (_PKI_TESTDATA / "cms_chain3.der").read_bytes()
+    cms_der = _fixture("cms_chain3.der")
     result = verify_detached_signature(b"test data", cms_der)
 
     assert result["valid"] is True
@@ -370,3 +228,19 @@ def test_accepts_cosign_digest_quirk_with_bare_rsa_signature_algorithm():
     assert result["hash_ok"] is True
     assert result["signature_valid"] is True
     assert result["valid"] is True
+
+
+def test_rejects_conflicting_combined_signature_algorithm():
+    data = b"conflicting signature algorithm"
+    content_info = asn1_cms.ContentInfo.load(_real_cms(data))
+    signer_info = content_info["content"]["signer_infos"][0]
+    signer_info["signature_algorithm"]["algorithm"] = "1.2.840.113549.1.1.13"
+
+    result = verify_detached_signature(data, content_info.dump(force=True))
+    assert result["hash_ok"] is True
+    assert result["signature_valid"] is None
+    assert result["valid"] is False
+    assert (
+        "Signature not verified (signatureAlgorithm conflicts with digestAlgorithm)"
+        in result["details"]
+    )
