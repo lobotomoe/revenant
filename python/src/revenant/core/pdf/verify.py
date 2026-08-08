@@ -22,7 +22,7 @@ from .cms_extraction import (
     extract_signature_data_from_match,
 )
 from .cms_info import extract_digest_info, extract_signer_info
-from .cms_signature import verify_signer_signature
+from .cms_signature import SignatureVerification, verify_signer_signature
 
 _logger = logging.getLogger(__name__)
 
@@ -36,7 +36,7 @@ class VerificationResult(TypedDict):
     signature_valid: bool | None  # None = cryptographic verification unavailable
     ltv_enabled: bool  # Contains embedded revocation data
     details: list[str]  # Human-readable messages
-    signer: dict[str, str | None] | None  # Certificate info (name, email, org, dn)
+    signer: dict[str, str | None] | None  # Authenticated certificate info, or None
     chain_valid: bool | None  # None = not attempted, True/False = result
     trust_anchor: str | None  # CA name from TSL
     trust_status: str | None  # "trusted" | "untrusted" | "unknown"
@@ -88,6 +88,29 @@ def _verify_hash(
     return expected_ok and cms_digest_ok
 
 
+def _authenticated_signer(
+    candidate: dict[str, str | None] | None,
+    signature: SignatureVerification,
+    chain_valid: bool | None,
+    details: list[str],
+) -> dict[str, str | None] | None:
+    """Expose certificate identity only when ESS or a trusted chain binds it."""
+    if candidate is None:
+        return None
+
+    if signature.valid is True and (signature.signer_certificate_bound or chain_valid is True):
+        if candidate.get("name"):
+            details.append(f"Signer: {candidate['name']}")
+        return candidate
+
+    if signature.valid is True:
+        details.append(
+            "Signer identity not authenticated -- no matching ESS certificate binding "
+            "or trusted certificate chain"
+        )
+    return None
+
+
 def _verify_signature_match(
     pdf_bytes: bytes,
     br_match: re.Match[bytes],
@@ -137,9 +160,7 @@ def _verify_signature_match(
         details.append("CMS: valid ASN.1 structure")
 
     # ── 3. Signer info ───────────────────────────────────────────
-    signer = extract_signer_info(cms_der)
-    if signer and signer.get("name"):
-        details.append(f"Signer: {signer['name']}")
+    candidate_signer = extract_signer_info(cms_der)
 
     # ── 4. Hash verification ─────────────────────────────────────
     hash_ok = _verify_hash(
@@ -182,6 +203,7 @@ def _verify_signature_match(
             _logger.debug("Chain validation failed (non-fatal)", exc_info=True)
             details.append("Chain: validation unavailable")
 
+    signer = _authenticated_signer(candidate_signer, signature, chain_valid, details)
     valid = structure_ok and hash_ok and signature.valid is True
     return {
         "valid": valid,
@@ -333,9 +355,7 @@ def verify_detached_signature(
         details.append(f"CMS blob: {len(cms_der)} bytes, valid ASN.1 structure")
 
     # Signer info
-    signer = extract_signer_info(cms_der)
-    if signer and signer.get("name"):
-        details.append(f"Signer: {signer['name']}")
+    candidate_signer = extract_signer_info(cms_der)
 
     # Hash verification
     hash_ok = _verify_hash(data_bytes, cms_der, details, data_label="Data")
@@ -372,6 +392,7 @@ def verify_detached_signature(
             _logger.debug("Chain validation failed (non-fatal)", exc_info=True)
             details.append("Chain: validation unavailable")
 
+    signer = _authenticated_signer(candidate_signer, signature, chain_valid, details)
     valid = structure_ok and hash_ok and signature.valid is True
     return {
         "valid": valid,

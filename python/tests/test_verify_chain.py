@@ -46,6 +46,7 @@ def test_verify_detached_chain_trusted():
     assert result["chain_valid"] is True
     assert result["trust_anchor"] == "TestCA"
     assert result["trust_status"] == "trusted"
+    assert result["signer"] is not None
 
 
 def test_verify_detached_chain_untrusted():
@@ -67,6 +68,7 @@ def test_verify_detached_chain_untrusted():
 
     assert result["chain_valid"] is False
     assert result["trust_status"] == "untrusted"
+    assert result["signer"] is None
 
 
 def test_verify_detached_chain_exception():
@@ -81,6 +83,7 @@ def test_verify_detached_chain_exception():
 
     assert result["chain_valid"] is None
     assert result["trust_status"] == "unknown"
+    assert result["signer"] is None
     assert any("unavailable" in d for d in result["details"])
 
 
@@ -90,6 +93,7 @@ def test_verify_detached_no_tsl_url():
     result = verify_detached_signature(data, cms_der, tsl_url=None)
     assert result["chain_valid"] is None
     assert result["trust_status"] == "unknown"
+    assert result["signer"] is None
 
 
 def test_verify_detached_bad_asn1_tag():
@@ -100,8 +104,8 @@ def test_verify_detached_bad_asn1_tag():
     assert any("ASN.1" in d for d in result["details"])
 
 
-def test_verify_detached_signer_name():
-    """Detached verify should extract signer name."""
+def test_verify_detached_does_not_expose_unbound_signer_name():
+    """Detached verify should hide certificate identity without ESS or trust."""
     data, cms_der = _make_detached_cms()
     result = verify_detached_signature(data, cms_der)
-    assert result["signer"] is not None
+    assert result["signer"] is None

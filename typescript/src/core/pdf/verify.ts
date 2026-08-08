@@ -19,7 +19,7 @@ import {
   findByteRanges,
 } from "./cms-extraction.js";
 import { extractDigestInfo, extractSignerInfo, type SignerInfo } from "./cms-info.js";
-import { verifySignerSignature } from "./cms-signature.js";
+import { type SignatureVerification, verifySignerSignature } from "./cms-signature.js";
 
 // -- Types --------------------------------------------------------------------
 
@@ -36,7 +36,7 @@ export interface VerificationResult {
   ltvEnabled: boolean;
   /** Human-readable messages. */
   details: string[];
-  /** Certificate info (name, email, org, dn). */
+  /** Authenticated certificate info (name, email, org, dn), or null. */
   signer: SignerInfo | null;
   /** Chain validation result (null = not attempted). */
   chainValid: boolean | null;
@@ -60,6 +60,28 @@ function bytesEqual(a: Uint8Array, b: Uint8Array): boolean {
     if (a[i] !== b[i]) return false;
   }
   return true;
+}
+
+/** Expose certificate identity only when it is bound by ESS or a trusted chain. */
+function authenticatedSigner(
+  candidate: SignerInfo | null,
+  signature: SignatureVerification,
+  chainValid: boolean | null,
+  details: string[],
+): SignerInfo | null {
+  if (candidate === null) return null;
+
+  if (signature.valid === true && (signature.signerCertificateBound || chainValid === true)) {
+    if (candidate.name) details.push(`Signer: ${candidate.name}`);
+    return candidate;
+  }
+
+  if (signature.valid === true) {
+    details.push(
+      "Signer identity not authenticated -- no matching ESS certificate binding or trusted certificate chain",
+    );
+  }
+  return null;
 }
 
 function verifyHash(
@@ -158,16 +180,13 @@ async function verifySignatureMatch(
   }
 
   // 3. Signer info
-  const signer = await extractSignerInfo(cmsDer);
-  if (signer?.name) {
-    details.push(`Signer: ${signer.name}`);
-  }
+  const candidateSigner = await extractSignerInfo(cmsDer);
 
   // 4. Hash verification
   const hashOk = verifyHash(signedData, cmsDer, details, "ByteRange", expectedHash);
 
   // 5. Cryptographic signature verification
-  const signature = await verifySignerSignature(cmsDer, signedData);
+  const signature = await verifySignerSignature(cmsDer);
   details.push(signature.detail);
 
   // 6. LTV status
@@ -195,6 +214,7 @@ async function verifySignatureMatch(
     }
   }
 
+  const signer = authenticatedSigner(candidateSigner, signature, chainValid, details);
   const valid = structureOk && hashOk && signature.valid === true;
   return {
     valid,
@@ -339,16 +359,13 @@ export async function verifyDetachedSignature(
   }
 
   // Signer info
-  const signer = await extractSignerInfo(cmsDer);
-  if (signer?.name) {
-    details.push(`Signer: ${signer.name}`);
-  }
+  const candidateSigner = await extractSignerInfo(cmsDer);
 
   // Hash verification
   const hashOk = verifyHash(dataBytes, cmsDer, details, "Data");
 
   // Cryptographic signature verification
-  const signature = await verifySignerSignature(cmsDer, dataBytes);
+  const signature = await verifySignerSignature(cmsDer);
   details.push(signature.detail);
 
   // LTV status
@@ -376,6 +393,7 @@ export async function verifyDetachedSignature(
     }
   }
 
+  const signer = authenticatedSigner(candidateSigner, signature, chainValid, details);
   const valid = structureOk && hashOk && signature.valid === true;
   return {
     valid,

@@ -8,11 +8,11 @@ After inserting the CMS into the PDF, the tool automatically verifies the result
 
 1. **Structure check** — re-reads the PDF, finds the last `/ByteRange`, extracts chunk1 + chunk2 (the signed data) and the CMS hex from `/Contents`.
 2. **Signed-digest check** — reads the digest algorithm and mandatory `messageDigest` signed attribute from CMS, hashes the ByteRange data, and compares the two. The SHA-1 value originally sent to CoSign is an additional post-sign check when available; it never replaces the signed CMS digest.
-3. **Signer-signature check** — verifies the RSA PKCS#1 v1.5 signature over the DER-encoded signed attributes with the certificate identified by `SignerInfo.sid`. When present, the ESS `signingCertificate` or `signingCertificateV2` attribute must hash that exact certificate, preventing same-key certificate substitution. Missing, ambiguous, malformed, mismatched, or unsupported values fail closed.
-4. **Signer and trust check** — extracts the signer identity and, when configured, starts chain validation from the same `SignerInfo.sid` certificate. CMS certificate order is never used to identify the signer.
+3. **Signer-signature check** — verifies the RSA PKCS#1 v1.5 signature directly with the certificate identified by `SignerInfo.sid`; the crypto library is not allowed to select a second certificate internally. When present, the ESS `signingCertificate` or `signingCertificateV2` attribute must hash that exact certificate, preventing same-key certificate substitution. Missing or ambiguous signer certificates and malformed, mismatched, or unsupported values fail closed.
+4. **Signer identity and trust check** — starts optional chain validation from the same `SignerInfo.sid` certificate. Certificate metadata is returned as the authenticated `signer` only when a signed ESS attribute binds that exact certificate or its chain reaches the configured TSL. Otherwise `signer` is `null`, even though document integrity may still be valid. CMS certificate order is never used to identify the signer.
 5. **PDF readability** — opens the final PDF with pikepdf (Python) or pdf-lib (TypeScript) to report structural problems.
 
-If a core structure, signed-digest, or signer-signature check fails, a newly signed PDF is **not saved** and an error is raised. Trust-chain status remains a separate result because a cryptographically authentic signature may use a certificate outside the configured TSL.
+If a core structure, signed-digest, or signer-signature check fails, a newly signed PDF is **not saved** and an error is raised. Trust-chain status remains a separate result because a cryptographically valid signature may use a certificate outside the configured TSL. In that case the signed bytes are valid, but Revenant does not claim an unbound certificate identity as the signer.
 
 ## Why not `openssl cms -verify`?
 
@@ -64,7 +64,8 @@ This catches integrity and authenticity failures, including:
 - Original PDF bytes corrupted during incremental update -> hash mismatch
 - A fabricated or modified signature with a matching `messageDigest` -> signer-signature failure
 - An unrelated certificate placed first in the CMS certificate set -> ignored; the `SignerInfo.sid` certificate is used
-- A replacement certificate with the same key and `SignerInfo.sid` but a different identity -> ESS certificate-binding failure
+- A library that resolves an SKI `SignerInfo.sid` differently from Revenant -> cannot verify with a second certificate; the SID-selected certificate's key is authoritative
+- A replacement certificate with the same key and `SignerInfo.sid` but a different identity -> ESS certificate-binding failure, or an unauthenticated (`null`) signer when ESS and trusted-chain validation are both absent
 - Object serialization errors (e.g. `None` vs `null`) -> PDF readability check fails
 
 ### Note on pyhanko
@@ -90,7 +91,7 @@ Since v1.1, revenant can validate the signer's certificate chain against a Trust
 | `untrusted` | Valid signature, but the root CA is not in the TSL. |
 | `unknown` | Chain validation was not attempted (no TSL URL configured). |
 
-The `valid` field requires valid structure, a matching signed `messageDigest`, a cryptographically verified signer signature, and any present ESS certificate binding to match. Trust is reported separately via `chain_valid`, `trust_anchor`, and `trust_status`.
+The `valid` field requires valid structure, a matching signed `messageDigest`, a cryptographically verified signer signature, and any present ESS certificate binding to match. Trust is reported separately via `chain_valid`, `trust_anchor`, and `trust_status`. The `signer` field is stricter: it is populated only when matching ESS binds the exact certificate or `chain_valid` is `true`; otherwise it is `null` and details report that the identity was not authenticated.
 
 ### TSL configuration
 

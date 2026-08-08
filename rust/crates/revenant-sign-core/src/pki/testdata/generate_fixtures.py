@@ -14,6 +14,7 @@ Regenerate with:
         crates/revenant-sign-core/src/pki/testdata/generate_fixtures.py
 
 Pass ``--ess-only`` to update only the shared ESS CMS fixtures.
+Pass ``--identity-only`` to update only the signer-identity regression fixtures.
 """
 
 from __future__ import annotations
@@ -304,12 +305,13 @@ def build_ess_bound_cms(
 def replacement_certificate(
     original: x509.Certificate,
     signer_key: rsa.RSAPrivateKey,
+    cn: str = "Substituted Identity",
 ) -> x509.Certificate:
     """Create a different identity with the same public key and CMS sid fields."""
     rogue_issuer_key = _key()
     return (
         x509.CertificateBuilder()
-        .subject_name(_name("Substituted Identity"))
+        .subject_name(_name(cn))
         .issuer_name(original.issuer)
         .public_key(signer_key.public_key())
         .serial_number(original.serial_number)
@@ -329,6 +331,71 @@ def substitute_embedded_certificate(
         [acms.CertificateChoices(name="certificate", value=asn1_certificate)]
     )
     return content_info.dump(force=True)
+
+
+def build_ski_selector_confusion_cms() -> bytes:
+    """Build a CMS where extension-SKI and PKIjs key-hash selection diverge.
+
+    The SignerInfo SID names the ``Claimed identity`` certificate through its
+    Subject Key Identifier extension.  The signature was made by a different
+    certificate whose public-key SHA-1 happens to equal that SID.  PKIjs 3.4.0
+    selects the latter by hashing SubjectPublicKeyInfo instead of reading the
+    certificate extension, which used to let verification and identity display
+    use different certificates.
+    """
+    root, root_key = make_root_ca("Selector Test Root")
+    actual_key = _key()
+    actual_key_id = x509.SubjectKeyIdentifier.from_public_key(actual_key.public_key()).digest
+
+    actual_cert = (
+        x509.CertificateBuilder()
+        .subject_name(_name("Actual signer"))
+        .issuer_name(root.subject)
+        .public_key(actual_key.public_key())
+        .serial_number(x509.random_serial_number())
+        .not_valid_before(NOT_BEFORE)
+        .not_valid_after(NOT_AFTER)
+        .add_extension(x509.SubjectKeyIdentifier(b"\x42" * 20), critical=False)
+        .sign(root_key, hashes.SHA256())
+    )
+
+    claimed_key = _key()
+    claimed_cert = (
+        x509.CertificateBuilder()
+        .subject_name(_name("Claimed identity"))
+        .issuer_name(root.subject)
+        .public_key(claimed_key.public_key())
+        .serial_number(x509.random_serial_number())
+        .not_valid_before(NOT_BEFORE)
+        .not_valid_after(NOT_AFTER)
+        .add_extension(x509.SubjectKeyIdentifier(actual_key_id), critical=False)
+        .sign(root_key, hashes.SHA256())
+    )
+
+    content_info = acms.ContentInfo.load(build_cms(actual_cert, actual_key, [claimed_cert]))
+    content_info["content"]["signer_infos"][0]["sid"] = acms.SignerIdentifier(
+        name="subject_key_identifier",
+        value=actual_key_id,
+    )
+    return content_info.dump(force=True)
+
+
+def write_identity_hardening_fixtures() -> None:
+    """Write CMS vectors for signer-certificate and identity regressions."""
+    root, root_key = make_root_ca("Identity Test Root")
+    signer, signer_key = make_leaf(root, root_key, "Original Display Identity")
+    unbound_cms = build_cms(signer, signer_key)
+    forged_identity = replacement_certificate(
+        signer,
+        signer_key,
+        cn="Forged Display Identity",
+    )
+
+    write("cms_ski_selector_confusion.der", build_ski_selector_confusion_cms())
+    write(
+        "cms_unbound_identity_substituted.der",
+        substitute_embedded_certificate(unbound_cms, forged_identity),
+    )
 
 
 def build_cms_with_crl(
@@ -375,7 +442,11 @@ def write(name: str, data: bytes) -> None:
     print(f"wrote {name} ({len(data)} bytes)")
 
 
-def main(*, ess_only: bool = False) -> None:
+def main(*, ess_only: bool = False, identity_only: bool = False) -> None:
+    if identity_only:
+        write_identity_hardening_fixtures()
+        return
+
     root, root_key = make_root_ca("Test Root CA")
     inter, inter_key = make_intermediate(root, root_key, "Test Intermediate")
     leaf, leaf_key = make_leaf(inter, inter_key, "Test Signer")
@@ -432,10 +503,17 @@ def main(*, ess_only: bool = False) -> None:
             build_cms_with_crl(leaf_direct, leaf_direct_key, root, root_key),
         )
         write("cms_with_archival.der", build_cms_with_archival(leaf_direct, leaf_direct_key))
+        write_identity_hardening_fixtures()
 
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("--ess-only", action="store_true", help="write only ESS CMS fixtures")
+    group = parser.add_mutually_exclusive_group()
+    group.add_argument("--ess-only", action="store_true", help="write only ESS CMS fixtures")
+    group.add_argument(
+        "--identity-only",
+        action="store_true",
+        help="write only signer identity hardening fixtures",
+    )
     args = parser.parse_args()
-    main(ess_only=args.ess_only)
+    main(ess_only=args.ess_only, identity_only=args.identity_only)

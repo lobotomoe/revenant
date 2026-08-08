@@ -16,13 +16,6 @@ const OID_MESSAGE_DIGEST = "1.2.840.113549.1.9.4";
 const OID_SIGNING_CERTIFICATE = "1.2.840.113549.1.9.16.2.12";
 const OID_SIGNING_CERTIFICATE_V2 = "1.2.840.113549.1.9.16.2.47";
 
-const STANDARD_DIGEST_OIDS: ReadonlyMap<string, string> = new Map([
-  ["SHA-1", "1.3.14.3.2.26"],
-  ["SHA-256", "2.16.840.1.101.3.4.2.1"],
-  ["SHA-384", "2.16.840.1.101.3.4.2.2"],
-  ["SHA-512", "2.16.840.1.101.3.4.2.3"],
-]);
-
 const RSA_SIGNATURE_DIGESTS: ReadonlyMap<string, string | null> = new Map([
   ["1.2.840.113549.1.1.1", null], // rsaEncryption: digestAlgorithm is authoritative
   ["1.2.840.113549.1.1.5", "SHA-1"],
@@ -41,6 +34,8 @@ const DIGEST_LENGTHS: ReadonlyMap<string, number> = new Map([
 export interface SignatureVerification {
   /** true = verified, false = bad signature, null = verification unavailable. */
   valid: boolean | null;
+  /** Whether a matching signed ESS attribute binds the exact signer certificate. */
+  signerCertificateBound: boolean;
   /** Stable diagnostic line for VerificationResult.details. */
   detail: string;
 }
@@ -48,6 +43,7 @@ export interface SignatureVerification {
 function unverifiable(reason: string): SignatureVerification {
   return {
     valid: null,
+    signerCertificateBound: false,
     detail: `Signature not verified (${reason})`,
   };
 }
@@ -176,10 +172,7 @@ function signingCertificateBinding(
  * Certificate-chain trust is deliberately separate. Unsupported or malformed
  * inputs fail closed and can never produce a valid overall verification result.
  */
-export async function verifySignerSignature(
-  cmsDer: Uint8Array,
-  data: Uint8Array,
-): Promise<SignatureVerification> {
+export async function verifySignerSignature(cmsDer: Uint8Array): Promise<SignatureVerification> {
   try {
     const asn1 = asn1js.fromBER(toArrayBuffer(cmsDer));
     if (asn1.offset === -1 || asn1.offset !== cmsDer.byteLength) {
@@ -214,21 +207,28 @@ export async function verifySignerSignature(
     const attrError = validateSignedAttributes(signedData, signerInfo, digestAlgorithm);
     if (attrError) return unverifiable(attrError);
 
-    // CoSign may put a sha*WithRSAEncryption OID in digestAlgorithm. PKIjs
-    // expects the corresponding pure digest OID there, so normalize only its
-    // in-memory algorithm dispatch; signed attribute bytes remain untouched.
-    const standardDigestOid = STANDARD_DIGEST_OIDS.get(digestAlgorithm);
-    if (!standardDigestOid) return unverifiable("unrecognized digest algorithm");
-    signerInfo.digestAlgorithm.algorithmId = standardDigestOid;
+    const signedAttrs = signerInfo.signedAttrs;
+    if (!signedAttrs || signedAttrs.encodedValue.byteLength === 0) {
+      return unverifiable("cannot encode signed attributes");
+    }
 
-    const verified = await signedData.verify({
-      signer: 0,
-      checkChain: false,
-      data: toArrayBuffer(data),
-    });
+    // SignedData.verify() performs its own signer-certificate lookup. For an
+    // SKI SignerIdentifier, PKIjs 3.4.0 hashes SubjectPublicKey instead of
+    // matching the certificate's Subject Key Identifier extension, so it can
+    // verify with a different certificate than findSignerCertificate selected.
+    // Invoke the crypto primitive directly with the already selected key.
+    const crypto = pkijs.getCrypto(true);
+    const verified = await crypto.verifyWithPublicKey(
+      signedAttrs.encodedValue,
+      signerInfo.signature,
+      signerCertificate.subjectPublicKeyInfo,
+      signerInfo.signatureAlgorithm,
+      digestAlgorithm,
+    );
     if (!verified) {
       return {
         valid: false,
+        signerCertificateBound: false,
         detail: "Signature INVALID -- does not verify against the signer certificate",
       };
     }
@@ -240,14 +240,12 @@ export async function verifySignerSignature(
     if (binding === "unparsable") {
       return unverifiable("signingCertificate attribute could not be parsed");
     }
-    return { valid: true, detail: "Signature OK -- signer signature verifies" };
-  } catch (error) {
-    if (error instanceof pkijs.SignedDataVerifyError && error.signatureVerified === false) {
-      return {
-        valid: false,
-        detail: "Signature INVALID -- does not verify against the signer certificate",
-      };
-    }
+    return {
+      valid: true,
+      signerCertificateBound: binding === "match",
+      detail: "Signature OK -- signer signature verifies",
+    };
+  } catch {
     return unverifiable("CMS signature check failed");
   }
 }
