@@ -9,6 +9,9 @@ from pathlib import Path
 import pikepdf
 import pytest
 from asn1crypto import cms as asn1_cms
+from asn1crypto import core as asn1_core
+from cryptography.hazmat.primitives import hashes
+from cryptography.hazmat.primitives.asymmetric import padding
 
 from revenant.core.pdf import (
     compute_byterange_hash,
@@ -17,6 +20,7 @@ from revenant.core.pdf import (
     verify_detached_signature,
     verify_embedded_signature,
 )
+from revenant.core.pdf.cms_signature import _SigningCertificate, _SigningCertificateV2
 
 from ._cert_factory import build_cms_with_certs, make_leaf, make_root_ca, to_der
 
@@ -29,6 +33,49 @@ def _real_cms(data: bytes) -> bytes:
     root_cert, root_key = make_root_ca()
     leaf_cert, leaf_key = make_leaf(root_cert, root_key)
     return build_cms_with_certs(leaf_cert, leaf_key, data=data)
+
+
+def _real_cms_with_dual_ess(data: bytes, *, mismatch_v2: bool = False) -> bytes:
+    root_cert, root_key = make_root_ca()
+    leaf_cert, leaf_key = make_leaf(root_cert, root_key, "Dual ESS Signer")
+    content_info = asn1_cms.ContentInfo.load(build_cms_with_certs(leaf_cert, leaf_key, data=data))
+    signer_info = content_info["content"]["signer_infos"][0]
+    cert_der = to_der(leaf_cert)
+
+    sha1 = hashes.Hash(hashes.SHA1())  # noqa: S303 -- ESSCertID v1 requires SHA-1
+    sha1.update(cert_der)
+    v1_hash = sha1.finalize()
+    sha256 = hashes.Hash(hashes.SHA256())
+    sha256.update(cert_der)
+    v2_hash = bytearray(sha256.finalize())
+    if mismatch_v2:
+        v2_hash[0] ^= 0x01
+
+    v1_attr = asn1_cms.CMSAttribute(
+        {
+            "type": "1.2.840.113549.1.9.16.2.12",
+            "values": [asn1_core.Any(_SigningCertificate({"certs": [{"cert_hash": v1_hash}]}))],
+        }
+    )
+    v2_attr = asn1_cms.CMSAttribute(
+        {
+            "type": "1.2.840.113549.1.9.16.2.47",
+            "values": [
+                asn1_core.Any(_SigningCertificateV2({"certs": [{"cert_hash": bytes(v2_hash)}]}))
+            ],
+        }
+    )
+    signer_info["signed_attrs"] = asn1_cms.CMSAttributes(
+        [*signer_info["signed_attrs"], v1_attr, v2_attr]
+    )
+    signed_attrs = bytearray(signer_info["signed_attrs"].dump(force=True))
+    signed_attrs[0] = 0x31
+    signer_info["signature"] = leaf_key.sign(
+        bytes(signed_attrs),
+        padding.PKCS1v15(),
+        hashes.SHA256(),
+    )
+    return content_info.dump(force=True)
 
 
 def _fixture(name: str) -> bytes:
@@ -92,6 +139,30 @@ def test_detached_accepts_matching_ess_certificate_binding(
     assert result["valid"] is True
     assert result["signer"] is not None
     assert result["signer"]["name"] == "Test Signer Direct"
+
+
+def test_detached_accepts_matching_ess_v1_and_v2_bindings_together():
+    data = b"dual matching ESS attributes"
+    result = verify_detached_signature(data, _real_cms_with_dual_ess(data))
+
+    assert result["hash_ok"] is True
+    assert result["signature_valid"] is True
+    assert result["valid"] is True
+    assert result["signer"] is not None
+    assert result["signer"]["name"] == "Dual ESS Signer"
+
+
+def test_detached_rejects_dual_ess_when_either_binding_mismatches():
+    data = b"dual ESS attributes with one mismatch"
+    result = verify_detached_signature(data, _real_cms_with_dual_ess(data, mismatch_v2=True))
+
+    assert result["hash_ok"] is True
+    assert result["signature_valid"] is None
+    assert result["valid"] is False
+    assert (
+        "Signature not verified (signingCertificate attribute names a different certificate)"
+        in result["details"]
+    )
 
 
 @pytest.mark.parametrize(

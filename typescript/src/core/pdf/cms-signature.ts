@@ -15,6 +15,7 @@ const OID_CONTENT_TYPE = "1.2.840.113549.1.9.3";
 const OID_MESSAGE_DIGEST = "1.2.840.113549.1.9.4";
 const OID_SIGNING_CERTIFICATE = "1.2.840.113549.1.9.16.2.12";
 const OID_SIGNING_CERTIFICATE_V2 = "1.2.840.113549.1.9.16.2.47";
+const OID_RSA_ENCRYPTION = "1.2.840.113549.1.1.1";
 
 const RSA_SIGNATURE_DIGESTS: ReadonlyMap<string, string | null> = new Map([
   ["1.2.840.113549.1.1.1", null], // rsaEncryption: digestAlgorithm is authoritative
@@ -146,24 +147,46 @@ function signingCertificateBinding(
       attribute.type === OID_SIGNING_CERTIFICATE || attribute.type === OID_SIGNING_CERTIFICATE_V2,
   );
   if (bindingAttrs.length === 0) return "absent";
-  if (bindingAttrs.length !== 1 || bindingAttrs[0]?.values.length !== 1) {
+  if (new Set(bindingAttrs.map((attribute) => attribute.type)).size !== bindingAttrs.length) {
     return "unparsable";
   }
 
+  let certificateDer: Uint8Array;
   try {
-    const bindingAttr = bindingAttrs[0];
-    const bindingValue = bindingAttr?.values[0];
-    if (!bindingAttr || !bindingValue) return "unparsable";
-    const parsed = parseEssCertHash(bindingValue, bindingAttr.type === OID_SIGNING_CERTIFICATE_V2);
-    if (!parsed) return "unparsable";
-
-    const certificateDer = new Uint8Array(signerCertificate.toSchema().toBER(false));
-    const nodeAlgorithm = parsed.algorithm.toLowerCase().replace("-", "");
-    const actualHash = new Uint8Array(createHash(nodeAlgorithm).update(certificateDer).digest());
-    return bytesEqual(actualHash, parsed.value) ? "match" : "mismatch";
+    certificateDer = new Uint8Array(signerCertificate.toSchema().toBER(false));
   } catch {
     return "unparsable";
   }
+  let unparsable = false;
+  for (const bindingAttr of bindingAttrs) {
+    try {
+      if (bindingAttr.values.length !== 1) {
+        unparsable = true;
+        continue;
+      }
+      const bindingValue = bindingAttr.values[0];
+      if (!bindingValue) {
+        unparsable = true;
+        continue;
+      }
+      const parsed = parseEssCertHash(
+        bindingValue,
+        bindingAttr.type === OID_SIGNING_CERTIFICATE_V2,
+      );
+      if (!parsed) {
+        unparsable = true;
+        continue;
+      }
+
+      const nodeAlgorithm = parsed.algorithm.toLowerCase().replace("-", "");
+      const actualHash = new Uint8Array(createHash(nodeAlgorithm).update(certificateDer).digest());
+      if (!bytesEqual(actualHash, parsed.value)) return "mismatch";
+    } catch {
+      unparsable = true;
+    }
+  }
+
+  return unparsable ? "unparsable" : "match";
 }
 
 /**
@@ -202,6 +225,9 @@ export async function verifySignerSignature(cmsDer: Uint8Array): Promise<Signatu
     const signatureDigest = RSA_SIGNATURE_DIGESTS.get(signatureAlgorithm);
     if (signatureDigest !== null && signatureDigest !== digestAlgorithm) {
       return unverifiable("signatureAlgorithm conflicts with digestAlgorithm");
+    }
+    if (signerCertificate.subjectPublicKeyInfo.algorithm.algorithmId !== OID_RSA_ENCRYPTION) {
+      return unverifiable("RSA signatureAlgorithm used with a non-RSA signer key");
     }
 
     const attrError = validateSignedAttributes(signedData, signerInfo, digestAlgorithm);

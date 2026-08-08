@@ -176,23 +176,14 @@ def _signed_attributes_der(signer_info: asn1_cms.SignerInfo) -> bytes | None:
 SigningCertificateBinding = Literal["absent", "match", "mismatch", "unparsable"]
 
 
-def _signing_certificate_binding(
-    signer_info: asn1_cms.SignerInfo,
+def _single_signing_certificate_binding(
+    binding_attr: asn1_cms.CMSAttribute,
     signer_cert_der: bytes,
 ) -> SigningCertificateBinding:
-    """Classify an optional ESS certificate binding against the signer cert."""
-    signed_attrs = signer_info["signed_attrs"]
-    binding_attrs = [
-        attr
-        for attr in signed_attrs
-        if attr["type"].dotted in {_OID_SIGNING_CERTIFICATE, _OID_SIGNING_CERTIFICATE_V2}
-    ]
-    if not binding_attrs:
-        return "absent"
-    if len(binding_attrs) != 1 or len(binding_attrs[0]["values"]) != 1:
+    """Evaluate one ESS certificate-binding attribute."""
+    if len(binding_attr["values"]) != 1:
         return "unparsable"
 
-    binding_attr = binding_attrs[0]
     is_v2 = binding_attr["type"].dotted == _OID_SIGNING_CERTIFICATE_V2
     try:
         value_der = binding_attr["values"][0].dump()
@@ -228,6 +219,35 @@ def _signing_certificate_binding(
     digest.update(signer_cert_der)
     if not hmac.compare_digest(digest.finalize(), expected_hash):
         return "mismatch"
+    return "match"
+
+
+def _signing_certificate_binding(
+    signer_info: asn1_cms.SignerInfo,
+    signer_cert_der: bytes,
+) -> SigningCertificateBinding:
+    """Classify all optional ESS certificate bindings against the signer cert."""
+    signed_attrs = signer_info["signed_attrs"]
+    binding_attrs = [
+        attr
+        for attr in signed_attrs
+        if attr["type"].dotted in {_OID_SIGNING_CERTIFICATE, _OID_SIGNING_CERTIFICATE_V2}
+    ]
+    if not binding_attrs:
+        return "absent"
+
+    binding_oids = [attr["type"].dotted for attr in binding_attrs]
+    if len(set(binding_oids)) != len(binding_oids):
+        return "unparsable"
+
+    statuses = [
+        _single_signing_certificate_binding(binding_attr, signer_cert_der)
+        for binding_attr in binding_attrs
+    ]
+    if "mismatch" in statuses:
+        return "mismatch"
+    if "unparsable" in statuses:
+        return "unparsable"
     return "match"
 
 
