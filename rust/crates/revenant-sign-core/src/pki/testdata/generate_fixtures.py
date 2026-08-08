@@ -535,6 +535,53 @@ def build_der_signed_unsorted_transmitted_cms(
     return content_info.dump()
 
 
+def build_no_signed_attrs_cms(
+    signer: x509.Certificate,
+    signer_key: rsa.RSAPrivateKey,
+) -> bytes:
+    """Build a detached CMS that carries no signed attributes at all.
+
+    RFC 5652 section 5.4 makes ``signedAttrs`` optional: when it is absent the
+    signature is computed over the content itself rather than over the encoded
+    attributes. EKENG issues its credential documents in exactly this shape, so
+    a verifier that requires signed attributes rejects genuine signatures.
+    """
+    content = b"test data"
+    signer_info = acms.SignerInfo(
+        {
+            "version": "v1",
+            "sid": acms.SignerIdentifier(
+                name="issuer_and_serial_number",
+                value=acms.IssuerAndSerialNumber(
+                    {
+                        "issuer": ax509.Certificate.load(to_der(signer))["tbs_certificate"][
+                            "issuer"
+                        ],
+                        "serial_number": signer.serial_number,
+                    }
+                ),
+            ),
+            "digest_algorithm": aalgos.DigestAlgorithm({"algorithm": "sha256"}),
+            "signature_algorithm": aalgos.SignedDigestAlgorithm({"algorithm": "rsassa_pkcs1v15"}),
+            "signature": signer_key.sign(content, padding.PKCS1v15(), hashes.SHA256()),
+        }
+    )
+    return acms.ContentInfo(
+        {
+            "content_type": "signed_data",
+            "content": acms.SignedData(
+                {
+                    "version": "v1",
+                    "digest_algorithms": [aalgos.DigestAlgorithm({"algorithm": "sha256"})],
+                    "encap_content_info": {"content_type": "data"},
+                    "certificates": [ax509.Certificate.load(to_der(signer))],
+                    "signer_infos": [signer_info],
+                }
+            ),
+        }
+    ).dump()
+
+
 def write_identity_hardening_fixtures() -> None:
     """Write CMS vectors for signer-certificate and identity regressions."""
     root, root_key = make_root_ca("Identity Test Root")
@@ -551,6 +598,7 @@ def write_identity_hardening_fixtures() -> None:
         "cms_der_signed_attrs.der",
         build_der_signed_unsorted_transmitted_cms(signer, signer_key),
     )
+    write("cms_no_signed_attrs.der", build_no_signed_attrs_cms(signer, signer_key))
     write("cms_ski_selector_confusion.der", build_ski_selector_confusion_cms())
     write(
         "cms_unbound_identity_substituted.der",

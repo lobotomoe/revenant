@@ -81,16 +81,37 @@ impl SignatureStatus {
     }
 }
 
-/// Verify the first `SignerInfo`'s signature in a CMS/PKCS#7 blob.
+/// Whether the first `SignerInfo` carries signed attributes.
+///
+/// RFC 5652 section 5.4 makes them optional. Without them the signature covers
+/// the content itself, so there is no `messageDigest` attribute to compare
+/// against the signed bytes separately -- the signature is the only binding.
 #[must_use]
-pub fn verify_signer_signature(cms_der: &[u8]) -> SignatureStatus {
+pub fn has_signed_attributes(cms_der: &[u8]) -> bool {
+    signed_data_from_der(cms_der).is_ok_and(|signed_data| {
+        signed_data
+            .signer_infos
+            .0
+            .iter()
+            .next()
+            .is_some_and(|signer_info| signer_info.signed_attrs.is_some())
+    })
+}
+
+/// Verify the first `SignerInfo`'s signature in a CMS/PKCS#7 blob.
+///
+/// `content` is the detached content the signature covers. It is consulted only
+/// when the CMS carries no signed attributes and embeds no content of its own;
+/// EKENG issues its credential documents in exactly that shape.
+#[must_use]
+pub fn verify_signer_signature(cms_der: &[u8], content: Option<&[u8]>) -> SignatureStatus {
     match signed_data_from_der(cms_der) {
-        Ok(signed_data) => verify_from_signed_data(&signed_data),
+        Ok(signed_data) => verify_from_signed_data(&signed_data, content),
         Err(_) => SignatureStatus::Unverifiable("CMS did not parse"),
     }
 }
 
-fn verify_from_signed_data(signed_data: &SignedData) -> SignatureStatus {
+fn verify_from_signed_data(signed_data: &SignedData, content: Option<&[u8]>) -> SignatureStatus {
     let Some(signer_info) = signed_data.signer_infos.0.iter().next() else {
         return SignatureStatus::Unverifiable("no SignerInfo present");
     };
@@ -106,14 +127,27 @@ fn verify_from_signed_data(signed_data: &SignedData) -> SignatureStatus {
         return SignatureStatus::Unverifiable("signer certificate not embedded");
     };
 
-    // The signature is computed over the signed attributes re-encoded as an
-    // EXPLICIT SET OF (RFC 5652 section 5.4): the [0] IMPLICIT tag under which
-    // they appear in the SignerInfo is replaced by the universal SET OF tag.
-    let Some(signed_attrs) = signer_info.signed_attrs.as_ref() else {
-        return SignatureStatus::Unverifiable("no signed attributes");
-    };
-    let Ok(message) = signed_attrs.to_der() else {
-        return SignatureStatus::Unverifiable("cannot re-encode signed attributes");
+    // With signed attributes the signature is computed over them re-encoded as
+    // an EXPLICIT SET OF (RFC 5652 section 5.4): the [0] IMPLICIT tag under
+    // which they appear in the SignerInfo is replaced by the universal SET OF
+    // tag. Without them the same section puts the signature over the content
+    // itself. The branch is taken strictly on presence, so a CMS that carries
+    // signed attributes can never fall back to the content path.
+    let message = if let Some(signed_attrs) = signer_info.signed_attrs.as_ref() {
+        let Ok(encoded) = signed_attrs.to_der() else {
+            return SignatureStatus::Unverifiable("cannot re-encode signed attributes");
+        };
+        encoded
+    } else {
+        let embedded = signed_data
+            .encap_content_info
+            .econtent
+            .as_ref()
+            .map(der::asn1::Any::value);
+        let Some(body) = embedded.or(content) else {
+            return SignatureStatus::Unverifiable("no signed attributes and no content to verify");
+        };
+        body.to_vec()
     };
 
     // x509-verify dispatches on the *signature* algorithm OID and hashes the
@@ -161,6 +195,12 @@ fn finalize_valid(
     signer_info: &SignerInfo,
     signer_cert: &Certificate,
 ) -> SignatureStatus {
+    // contentType and the ESS bindings all live in the signed attributes. With
+    // none present (RFC 5652 section 5.4) there is nothing further to reconcile:
+    // the signature was verified over the content itself.
+    if signer_info.signed_attrs.is_none() {
+        return SignatureStatus::Valid;
+    }
     if !content_type_ok(signed_data, signer_info) {
         return SignatureStatus::Unverifiable("contentType attribute missing or inconsistent");
     }
@@ -377,10 +417,13 @@ mod tests {
     #[test]
     fn valid_signature_verifies() {
         assert_eq!(
-            verify_signer_signature(CMS_LEAF_DIRECT),
+            verify_signer_signature(CMS_LEAF_DIRECT, None),
             SignatureStatus::Valid
         );
-        assert_eq!(verify_signer_signature(CMS_CHAIN3), SignatureStatus::Valid);
+        assert_eq!(
+            verify_signer_signature(CMS_CHAIN3, None),
+            SignatureStatus::Valid
+        );
     }
 
     #[test]
@@ -390,9 +433,33 @@ mod tests {
         // The vector transmits a different ordering to keep all three
         // implementations agreeing on the same verdict.
         assert_eq!(
-            verify_signer_signature(CMS_DER_SIGNED_ATTRS),
+            verify_signer_signature(CMS_DER_SIGNED_ATTRS, None),
             SignatureStatus::Valid
         );
+    }
+
+    #[test]
+    fn cms_without_signed_attributes_verifies_over_the_content() {
+        // RFC 5652 section 5.4 makes signedAttrs optional; EKENG issues its
+        // credential documents that way, so requiring them rejects genuine
+        // signatures. The content is detached, hence supplied by the caller.
+        const CMS_NO_ATTRS: &[u8] = include_bytes!("../pki/testdata/cms_no_signed_attrs.der");
+
+        assert_eq!(
+            verify_signer_signature(CMS_NO_ATTRS, Some(b"test data")),
+            SignatureStatus::Valid
+        );
+        assert_eq!(
+            verify_signer_signature(CMS_NO_ATTRS, Some(b"tampered data")),
+            SignatureStatus::Invalid,
+            "the signature must bind the exact content"
+        );
+        assert!(matches!(
+            verify_signer_signature(CMS_NO_ATTRS, None),
+            SignatureStatus::Unverifiable(_)
+        ));
+        assert!(!has_signed_attributes(CMS_NO_ATTRS));
+        assert!(has_signed_attributes(CMS_LEAF_DIRECT));
     }
 
     #[test]
@@ -402,7 +469,7 @@ mod tests {
         // outright. Deriving the signer's public key must not depend on
         // decoding the subject DN.
         assert_eq!(
-            verify_signer_signature(CMS_NONCONFORMING_DN),
+            verify_signer_signature(CMS_NONCONFORMING_DN, None),
             SignatureStatus::Valid
         );
     }
@@ -415,7 +482,7 @@ mod tests {
         let last = tampered.len() - 5;
         tampered[last] ^= 0xFF;
         assert_eq!(
-            verify_signer_signature(&tampered),
+            verify_signer_signature(&tampered, None),
             SignatureStatus::Invalid,
             "a tampered signature must be Invalid"
         );
@@ -424,7 +491,7 @@ mod tests {
     #[test]
     fn garbage_is_unverifiable_not_valid() {
         assert!(matches!(
-            verify_signer_signature(b"not a cms blob at all"),
+            verify_signer_signature(b"not a cms blob at all", None),
             SignatureStatus::Unverifiable(_)
         ));
     }

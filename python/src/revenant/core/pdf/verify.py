@@ -46,6 +46,7 @@ def _verify_hash(
     data: bytes,
     cms_der: bytes,
     details: list[str],
+    signature: SignatureVerification,
     *,
     data_label: str,
     expected_hash: bytes | None = None,
@@ -66,6 +67,14 @@ def _verify_hash(
 
     digest_info = extract_digest_info(cms_der)
     if digest_info is None:
+        if signature.covers_content:
+            # RFC 5652 section 5.4: with no signed attributes there is no separate
+            # messageDigest to compare -- the signature itself binds these bytes,
+            # so integrity follows from the signature verdict alone.
+            details.append(
+                "Integrity: signature covers the signed bytes directly (no signed attributes)"
+            )
+            return expected_ok and signature.valid is True
         details.append("Could not extract CMS messageDigest -- hash verification unavailable")
         return False
 
@@ -162,17 +171,18 @@ def _verify_signature_match(
     # ── 3. Signer info ───────────────────────────────────────────
     candidate_signer = extract_signer_info(cms_der)
 
-    # ── 4. Hash verification ─────────────────────────────────────
+    # ── 4. Cryptographic signature verification ─────────────────────
+    signature = verify_signer_signature(cms_der, signed_data)
+
+    # ── 5. Hash verification ─────────────────────────────────────
     hash_ok = _verify_hash(
         signed_data,
         cms_der,
         details,
+        signature,
         data_label="ByteRange",
         expected_hash=expected_hash,
     )
-
-    # ── 5. Cryptographic signature verification ─────────────────────
-    signature = verify_signer_signature(cms_der)
     details.append(signature.describe())
 
     # ── 6. LTV status ────────────────────────────────────────────────
@@ -357,11 +367,11 @@ def verify_detached_signature(
     # Signer info
     candidate_signer = extract_signer_info(cms_der)
 
-    # Hash verification
-    hash_ok = _verify_hash(data_bytes, cms_der, details, data_label="Data")
-
     # Cryptographic signature verification
-    signature = verify_signer_signature(cms_der)
+    signature = verify_signer_signature(cms_der, data_bytes)
+
+    # Hash verification
+    hash_ok = _verify_hash(data_bytes, cms_der, details, signature, data_label="Data")
     details.append(signature.describe())
 
     # LTV status

@@ -37,6 +37,11 @@ export interface SignatureVerification {
   valid: boolean | null;
   /** Whether a matching signed ESS attribute binds the exact signer certificate. */
   signerCertificateBound: boolean;
+  /**
+   * True when the CMS carries no signed attributes, so the signature was
+   * verified over the content itself and no separate digest exists to compare.
+   */
+  coversContent: boolean;
   /** Stable diagnostic line for VerificationResult.details. */
   detail: string;
 }
@@ -104,6 +109,7 @@ function unverifiable(reason: string): SignatureVerification {
   return {
     valid: null,
     signerCertificateBound: false,
+    coversContent: false,
     detail: `Signature not verified (${reason})`,
   };
 }
@@ -254,7 +260,10 @@ function signingCertificateBinding(
  * Certificate-chain trust is deliberately separate. Unsupported or malformed
  * inputs fail closed and can never produce a valid overall verification result.
  */
-export async function verifySignerSignature(cmsDer: Uint8Array): Promise<SignatureVerification> {
+export async function verifySignerSignature(
+  cmsDer: Uint8Array,
+  content: Uint8Array | null = null,
+): Promise<SignatureVerification> {
   try {
     const asn1 = asn1js.fromBER(toArrayBuffer(cmsDer));
     if (asn1.offset === -1 || asn1.offset !== cmsDer.byteLength) {
@@ -289,20 +298,30 @@ export async function verifySignerSignature(cmsDer: Uint8Array): Promise<Signatu
       return unverifiable("RSA signatureAlgorithm used with a non-RSA signer key");
     }
 
-    const attrError = validateSignedAttributes(signedData, signerInfo, digestAlgorithm);
-    if (attrError) return unverifiable(attrError);
-
+    // RFC 5652 section 5.4: the signature covers the DER-encoded signed
+    // attributes when they are present, and the content itself when they are
+    // not. The branch is taken strictly on presence, so a CMS that carries
+    // signed attributes can never fall back to the content path.
     const signedAttrs = signerInfo.signedAttrs;
-    if (!signedAttrs || signedAttrs.encodedValue.byteLength === 0) {
-      return unverifiable("cannot encode signed attributes");
+    let signatureInputs: ArrayBuffer[];
+    if (signedAttrs) {
+      const attrError = validateSignedAttributes(signedData, signerInfo, digestAlgorithm);
+      if (attrError) return unverifiable(attrError);
+      if (signedAttrs.encodedValue.byteLength === 0) {
+        return unverifiable("cannot encode signed attributes");
+      }
+      // The as-transmitted encoding first, then the canonical DER re-encoding.
+      const transmitted = new Uint8Array(signedAttrs.encodedValue);
+      const canonical = canonicalSignedAttributes(signedAttrs);
+      signatureInputs = bytesEqual(transmitted, canonical)
+        ? [signedAttrs.encodedValue]
+        : [signedAttrs.encodedValue, toArrayBuffer(canonical)];
+    } else {
+      const eContent = signedData.encapContentInfo.eContent;
+      const body = eContent ? new Uint8Array(eContent.valueBlock.valueHexView) : content;
+      if (!body) return unverifiable("no signed attributes and no content to verify");
+      signatureInputs = [toArrayBuffer(body)];
     }
-
-    // The as-transmitted encoding first, then the canonical DER re-encoding.
-    const transmitted = new Uint8Array(signedAttrs.encodedValue);
-    const canonical = canonicalSignedAttributes(signedAttrs);
-    const signatureInputs = bytesEqual(transmitted, canonical)
-      ? [signedAttrs.encodedValue]
-      : [signedAttrs.encodedValue, toArrayBuffer(canonical)];
 
     // SignedData.verify() performs its own signer-certificate lookup. For an
     // SKI SignerIdentifier, PKIjs 3.4.0 hashes SubjectPublicKey instead of
@@ -325,20 +344,27 @@ export async function verifySignerSignature(cmsDer: Uint8Array): Promise<Signatu
       return {
         valid: false,
         signerCertificateBound: false,
+        coversContent: !signedAttrs,
         detail: "Signature INVALID -- does not verify against the signer certificate",
       };
     }
 
-    const binding = signingCertificateBinding(signerInfo, signerCertificate);
-    if (binding === "mismatch") {
-      return unverifiable("signingCertificate attribute names a different certificate");
-    }
-    if (binding === "unparsable") {
-      return unverifiable("signingCertificate attribute could not be parsed");
+    // An ESS binding lives in the signed attributes, so without them there is
+    // nothing to bind the certificate beyond the signature itself.
+    let binding: SigningCertificateBinding = "absent";
+    if (signedAttrs) {
+      binding = signingCertificateBinding(signerInfo, signerCertificate);
+      if (binding === "mismatch") {
+        return unverifiable("signingCertificate attribute names a different certificate");
+      }
+      if (binding === "unparsable") {
+        return unverifiable("signingCertificate attribute could not be parsed");
+      }
     }
     return {
       valid: true,
       signerCertificateBound: binding === "match",
+      coversContent: !signedAttrs,
       detail: "Signature OK -- signer signature verifies",
     };
   } catch (error) {
