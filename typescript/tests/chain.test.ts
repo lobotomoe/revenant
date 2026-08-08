@@ -53,8 +53,9 @@ describe("validateChain", () => {
     };
 
     const result = await validateChain(fixture("cms_chain3.der"), store);
-    // Chain construction policy is outside this regression; the target is
-    // selecting the actual signer leaf before validation starts.
+    expect(result.chainValid).toBe(true);
+    expect(result.trustAnchor).toBe("TestRootCA");
+    expect(result.chainDepth).toBe(3);
     expect(result.details.some((detail) => detail.includes("signer cert: CN=Test Signer"))).toBe(
       true,
     );

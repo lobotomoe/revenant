@@ -81,13 +81,17 @@ function getAkiKeyId(cert: pkijs.Certificate): Uint8Array | null {
       const asn1 = asn1js.fromBER(ext.extnValue.valueBlock.valueHexView);
       if (asn1.offset === -1) return null;
       const seq = asn1.result;
-      // keyIdentifier is context-tagged [0], extract via Primitive wrapper
+      // keyIdentifier is an IMPLICIT context-tagged [0] OCTET STRING. Its
+      // primitive value contains only the identifier bytes; valueBeforeDecode
+      // would also include the context tag and DER length.
       if (seq instanceof asn1js.Sequence && seq.valueBlock.value.length > 0) {
         const first = seq.valueBlock.value[0];
-        if (first !== undefined && first.idBlock.tagNumber === 0) {
-          // Re-parse as OctetString to get proper typed access
-          const wrapped = new asn1js.OctetString({ valueHex: first.valueBeforeDecodeView });
-          return new Uint8Array(wrapped.valueBlock.valueHexView);
+        if (
+          first instanceof asn1js.Primitive &&
+          first.idBlock.tagClass === 3 &&
+          first.idBlock.tagNumber === 0
+        ) {
+          return new Uint8Array(first.valueBlock.valueHexView);
         }
       }
     }

@@ -161,7 +161,117 @@ function corruptPdfForPdfLib(signedPdf: Uint8Array): Uint8Array {
 const OID_SIGNED_DATA = "1.2.840.113549.1.7.2";
 const OID_DATA = "1.2.840.113549.1.7.1";
 const OID_SHA1 = "1.3.14.3.2.26";
+const OID_CONTENT_TYPE = "1.2.840.113549.1.9.3";
 const OID_MESSAGE_DIGEST = "1.2.840.113549.1.9.4";
+const OID_SIGNING_CERTIFICATE = "1.2.840.113549.1.9.16.2.12";
+const OID_SIGNING_CERTIFICATE_V2 = "1.2.840.113549.1.9.16.2.47";
+const OID_RSA_ENCRYPTION = "1.2.840.113549.1.1.1";
+
+function essCertificateAttribute(
+  oid: string,
+  certificateDer: Uint8Array,
+  mismatched: boolean,
+): pkijs.Attribute {
+  const hashAlgorithm = oid === OID_SIGNING_CERTIFICATE ? "sha1" : "sha256";
+  const certHash = new Uint8Array(createHash(hashAlgorithm).update(certificateDer).digest());
+  if (mismatched) certHash[0] ^= 0x01;
+  const value = new asn1js.Sequence({
+    value: [
+      new asn1js.Sequence({
+        value: [
+          new asn1js.Sequence({
+            value: [new asn1js.OctetString({ valueHex: certHash })],
+          }),
+        ],
+      }),
+    ],
+  });
+  return new pkijs.Attribute({ type: oid, values: [value] });
+}
+
+/** Build and sign a detached CMS with an ephemeral RSA or ECDSA certificate. */
+async function buildSignedCms(
+  data: Uint8Array,
+  keyType: "rsa" | "ecdsa",
+  essOids: readonly string[] = [],
+  mismatchedEssOids: readonly string[] = [],
+): Promise<Uint8Array> {
+  const crypto = pkijs.getCrypto(true);
+  let keyPair: CryptoKeyPair;
+  if (keyType === "rsa") {
+    keyPair = await crypto.generateKey(
+      {
+        name: "RSASSA-PKCS1-v1_5",
+        modulusLength: 2048,
+        publicExponent: new Uint8Array([1, 0, 1]),
+        hash: "SHA-256",
+      },
+      true,
+      ["sign", "verify"],
+    );
+  } else {
+    keyPair = await crypto.generateKey({ name: "ECDSA", namedCurve: "P-256" }, true, [
+      "sign",
+      "verify",
+    ]);
+  }
+
+  const certificate = new pkijs.Certificate();
+  certificate.version = 2;
+  certificate.serialNumber = new asn1js.Integer({ value: 42 });
+  for (const name of [certificate.issuer, certificate.subject]) {
+    name.typesAndValues.push(
+      new pkijs.AttributeTypeAndValue({
+        type: "2.5.4.3",
+        value: new asn1js.Utf8String({ value: `${keyType.toUpperCase()} Test Signer` }),
+      }),
+    );
+  }
+  certificate.notBefore.value = new Date("2020-01-01T00:00:00Z");
+  certificate.notAfter.value = new Date("2099-01-01T00:00:00Z");
+  await certificate.subjectPublicKeyInfo.importKey(keyPair.publicKey);
+  await certificate.sign(keyPair.privateKey, "SHA-256");
+
+  const certificateDer = new Uint8Array(certificate.toSchema().toBER(false));
+  const messageDigest = createHash("sha256").update(data).digest();
+  const signedAttrs = new pkijs.SignedAndUnsignedAttributes({
+    type: 0,
+    attributes: [
+      new pkijs.Attribute({
+        type: OID_CONTENT_TYPE,
+        values: [new asn1js.ObjectIdentifier({ value: OID_DATA })],
+      }),
+      new pkijs.Attribute({
+        type: OID_MESSAGE_DIGEST,
+        values: [new asn1js.OctetString({ valueHex: messageDigest })],
+      }),
+      ...essOids.map((oid) =>
+        essCertificateAttribute(oid, certificateDer, mismatchedEssOids.includes(oid)),
+      ),
+    ],
+  });
+  const signerInfo = new pkijs.SignerInfo({
+    version: 1,
+    sid: new pkijs.IssuerAndSerialNumber({
+      issuer: certificate.issuer,
+      serialNumber: certificate.serialNumber,
+    }),
+    signedAttrs,
+  });
+  const signedData = new pkijs.SignedData({
+    version: 1,
+    encapContentInfo: new pkijs.EncapsulatedContentInfo({ eContentType: OID_DATA }),
+    certificates: [certificate],
+    signerInfos: [signerInfo],
+  });
+  await signedData.sign(keyPair.privateKey, 0, "SHA-256", data);
+
+  const contentInfo = new pkijs.ContentInfo({
+    contentType: OID_SIGNED_DATA,
+    content: signedData.toSchema(true),
+  });
+  return new Uint8Array(contentInfo.toSchema().toBER(false));
+}
 
 /**
  * Build a minimal but structurally valid CMS/PKCS#7 SignedData blob
@@ -1150,6 +1260,36 @@ describe("detached verification with real CMS digest", () => {
     });
   }
 
+  it("accepts matching ESS v1 and v2 bindings together", async () => {
+    const cms = await buildSignedCms(VALID_CMS_DATA, "rsa", [
+      OID_SIGNING_CERTIFICATE,
+      OID_SIGNING_CERTIFICATE_V2,
+    ]);
+    const result = await verifyDetachedSignature(VALID_CMS_DATA, cms);
+
+    expect(result.hashOk).toBe(true);
+    expect(result.signatureValid).toBe(true);
+    expect(result.valid).toBe(true);
+    expect(result.signer?.name).toBe("RSA Test Signer");
+  });
+
+  it("rejects dual ESS bindings when either version names another certificate", async () => {
+    const cms = await buildSignedCms(
+      VALID_CMS_DATA,
+      "rsa",
+      [OID_SIGNING_CERTIFICATE, OID_SIGNING_CERTIFICATE_V2],
+      [OID_SIGNING_CERTIFICATE_V2],
+    );
+    const result = await verifyDetachedSignature(VALID_CMS_DATA, cms);
+
+    expect(result.hashOk).toBe(true);
+    expect(result.signatureValid).toBeNull();
+    expect(result.valid).toBe(false);
+    expect(result.details).toContain(
+      "Signature not verified (signingCertificate attribute names a different certificate)",
+    );
+  });
+
   for (const [version, fixtureName] of [
     ["v1", "cms_ess_v1_substituted.der"],
     ["v2", "cms_ess_v2_substituted.der"],
@@ -1249,6 +1389,19 @@ describe("detached verification with real CMS digest", () => {
     expect(result.valid).toBe(false);
     expect(result.details).toContain(
       "Signature not verified (signatureAlgorithm conflicts with digestAlgorithm)",
+    );
+  });
+
+  it("rejects an ECDSA key mislabeled with an RSA signatureAlgorithm", async () => {
+    const ecdsaCms = await buildSignedCms(VALID_CMS_DATA, "ecdsa");
+    const cms = withSignatureAlgorithm(ecdsaCms, OID_RSA_ENCRYPTION);
+    const result = await verifyDetachedSignature(VALID_CMS_DATA, cms);
+
+    expect(result.hashOk).toBe(true);
+    expect(result.signatureValid).toBeNull();
+    expect(result.valid).toBe(false);
+    expect(result.details).toContain(
+      "Signature not verified (RSA signatureAlgorithm used with a non-RSA signer key)",
     );
   });
 
