@@ -15,7 +15,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   optional trust-chain validation now select the certificate named by
   `SignerInfo.sid` instead of relying on certificate `SET OF` order, and an ESS
   `signingCertificate`/`signingCertificateV2` attribute binds that identity to
-  the exact embedded certificate.
+  the exact embedded certificate. TypeScript verifies directly with that
+  selected certificate instead of allowing PKIjs to resolve `sid` again, and
+  both implementations expose signer metadata only when matching ESS or a
+  trusted certificate chain authenticates it.
 
 ## [2.1.2] - 2026-08-03
 

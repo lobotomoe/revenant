@@ -1129,7 +1129,11 @@ describe("detached verification with real CMS digest", () => {
     expect(result.hashOk).toBe(true);
     expect(result.signatureValid).toBe(true);
     expect(result.valid).toBe(true);
+    expect(result.signer).toBeNull();
     expect(result.details).toContain("Signature OK -- signer signature verifies");
+    expect(result.details).toContain(
+      "Signer identity not authenticated -- no matching ESS certificate binding or trusted certificate chain",
+    );
   });
 
   for (const [label, fixtureName] of [
@@ -1142,6 +1146,7 @@ describe("detached verification with real CMS digest", () => {
 
       expect(result.signatureValid).toBe(true);
       expect(result.valid).toBe(true);
+      expect(result.signer?.name).toBe("Test Signer Direct");
     });
   }
 
@@ -1155,7 +1160,7 @@ describe("detached verification with real CMS digest", () => {
       expect(result.hashOk).toBe(true);
       expect(result.signatureValid).toBeNull();
       expect(result.valid).toBe(false);
-      expect(result.signer?.name).toBe("Substituted Identity");
+      expect(result.signer).toBeNull();
       expect(result.details).toContain(
         "Signature not verified (signingCertificate attribute names a different certificate)",
       );
@@ -1176,12 +1181,44 @@ describe("detached verification with real CMS digest", () => {
     );
   });
 
-  it("reports the certificate named by SignerInfo in a multi-certificate CMS", async () => {
+  it("verifies with the certificate selected by the SKI extension", async () => {
+    const result = await verifyDetachedSignature(
+      VALID_CMS_DATA,
+      pkiFixture("cms_ski_selector_confusion.der"),
+    );
+
+    expect(result.hashOk).toBe(true);
+    expect(result.signatureValid).toBe(false);
+    expect(result.valid).toBe(false);
+    expect(result.signer).toBeNull();
+    expect(result.details).toContain(
+      "Signature INVALID -- does not verify against the signer certificate",
+    );
+  });
+
+  it("does not authenticate an unbound substituted identity", async () => {
+    const result = await verifyDetachedSignature(
+      VALID_CMS_DATA,
+      pkiFixture("cms_unbound_identity_substituted.der"),
+    );
+
+    expect(result.hashOk).toBe(true);
+    expect(result.signatureValid).toBe(true);
+    expect(result.valid).toBe(true);
+    expect(result.trustStatus).toBe("unknown");
+    expect(result.signer).toBeNull();
+    expect(result.details.some((detail) => detail.includes("Forged Display Identity"))).toBe(false);
+    expect(result.details).toContain(
+      "Signer identity not authenticated -- no matching ESS certificate binding or trusted certificate chain",
+    );
+  });
+
+  it("does not expose an unbound identity from a multi-certificate CMS", async () => {
     const result = await verifyDetachedSignature(VALID_CMS_DATA, CHAIN_CMS);
 
     expect(result.valid).toBe(true);
     expect(result.signatureValid).toBe(true);
-    expect(result.signer?.name).toBe("Test Signer");
+    expect(result.signer).toBeNull();
   });
 
   it("accepts CoSign's combined RSA OID in digestAlgorithm", async () => {
@@ -1326,11 +1363,11 @@ describe("verifyAllEmbeddedSignatures with real CMS digest", () => {
 });
 
 // =============================================================================
-// Signer name extraction (covers signer?.name branches)
+// Unauthenticated signer names are not exposed
 // =============================================================================
 
-describe("signer name extraction via embedded verification", () => {
-  it("extracts signer name from CMS with embedded certificate", async () => {
+describe("unauthenticated signer identity", () => {
+  it("does not expose a signer from CMS with an unverifiable signature", async () => {
     const pdfBytes = await createValidPdf();
     const prepared = await preparePdfWithSigField(pdfBytes, { visible: false });
     const byterangeHash = computeByterangeHash(prepared.pdf, prepared.hexStart, prepared.hexLen);
@@ -1344,21 +1381,12 @@ describe("signer name extraction via embedded verification", () => {
     expect(result.signatureValid).toBeNull();
     expect(result.valid).toBe(false);
 
-    // Should have signer info
-    expect(result.signer).not.toBeNull();
-    if (result.signer !== null) {
-      expect(result.signer.name).toBe("Test Signer");
-    }
-
-    // Should include signer name in details
+    expect(result.signer).toBeNull();
     const signerDetail = result.details.find((d) => d.includes("Signer:"));
-    expect(signerDetail).toBeDefined();
-    if (signerDetail !== undefined) {
-      expect(signerDetail).toContain("Test Signer");
-    }
+    expect(signerDetail).toBeUndefined();
   });
 
-  it("extracts signer name in detached signature verification", async () => {
+  it("does not expose a signer in detached verification", async () => {
     const data = new TextEncoder().encode("data for detached verification");
     const dataHash = new Uint8Array(createHash("sha1").update(data).digest());
 
@@ -1370,16 +1398,13 @@ describe("signer name extraction via embedded verification", () => {
     expect(result.signatureValid).toBeNull();
     expect(result.valid).toBe(false);
 
-    expect(result.signer).not.toBeNull();
-    if (result.signer !== null) {
-      expect(result.signer.name).toBe("Detached Signer");
-    }
+    expect(result.signer).toBeNull();
 
     const signerDetail = result.details.find((d) => d.includes("Signer:"));
-    expect(signerDetail).toBeDefined();
+    expect(signerDetail).toBeUndefined();
   });
 
-  it("extracts signer name in verifyAll with certificate CMS", async () => {
+  it("does not expose a signer in verifyAll", async () => {
     const pdfBytes = await createValidPdf();
     const prepared = await preparePdfWithSigField(pdfBytes, { visible: false });
     const hash = computeByterangeHash(prepared.pdf, prepared.hexStart, prepared.hexLen);
@@ -1392,10 +1417,7 @@ describe("signer name extraction via embedded verification", () => {
     const first = results[0];
     expect(first).toBeDefined();
     if (first !== undefined) {
-      expect(first.signer).not.toBeNull();
-      if (first.signer !== null) {
-        expect(first.signer.name).toBe("All Sigs Signer");
-      }
+      expect(first.signer).toBeNull();
     }
   });
 });

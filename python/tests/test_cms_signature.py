@@ -61,7 +61,12 @@ def test_detached_accepts_genuine_cms_signature():
     assert result["hash_ok"] is True
     assert result["signature_valid"] is True
     assert result["valid"] is True
+    assert result["signer"] is None
     assert "Signature OK -- signer signature verifies" in result["details"]
+    assert (
+        "Signer identity not authenticated -- no matching ESS certificate binding "
+        "or trusted certificate chain" in result["details"]
+    )
 
 
 @pytest.mark.parametrize(
@@ -75,6 +80,8 @@ def test_detached_accepts_matching_ess_certificate_binding(
 
     assert result["signature_valid"] is True
     assert result["valid"] is True
+    assert result["signer"] is not None
+    assert result["signer"]["name"] == "Test Signer Direct"
 
 
 @pytest.mark.parametrize(
@@ -89,8 +96,7 @@ def test_detached_rejects_ess_certificate_substitution(
     assert result["hash_ok"] is True
     assert result["signature_valid"] is None
     assert result["valid"] is False
-    assert result["signer"] is not None
-    assert result["signer"]["name"] == "Substituted Identity"
+    assert result["signer"] is None
     assert (
         "Signature not verified (signingCertificate attribute names a different certificate)"
         in result["details"]
@@ -106,6 +112,39 @@ def test_detached_rejects_malformed_ess_certificate_binding():
     assert (
         "Signature not verified (signingCertificate attribute could not be parsed)"
         in result["details"]
+    )
+
+
+def test_detached_verifies_with_the_certificate_selected_by_ski_extension():
+    result = verify_detached_signature(
+        b"test data",
+        _fixture("cms_ski_selector_confusion.der"),
+    )
+
+    assert result["hash_ok"] is True
+    assert result["signature_valid"] is False
+    assert result["valid"] is False
+    assert result["signer"] is None
+    assert (
+        "Signature INVALID -- does not verify against the signer certificate" in result["details"]
+    )
+
+
+def test_detached_does_not_authenticate_unbound_substituted_identity():
+    result = verify_detached_signature(
+        b"test data",
+        _fixture("cms_unbound_identity_substituted.der"),
+    )
+
+    assert result["hash_ok"] is True
+    assert result["signature_valid"] is True
+    assert result["valid"] is True
+    assert result["trust_status"] == "unknown"
+    assert result["signer"] is None
+    assert not any("Forged Display Identity" in detail for detail in result["details"])
+    assert (
+        "Signer identity not authenticated -- no matching ESS certificate binding "
+        "or trusted certificate chain" in result["details"]
     )
 
 
@@ -168,6 +207,7 @@ def test_embedded_accepts_genuine_cms_signature():
     assert result["hash_ok"] is True
     assert result["signature_valid"] is True
     assert result["valid"] is True
+    assert result["signer"] is None
 
 
 def test_expected_hash_cannot_hide_different_signed_message_digest():
@@ -195,14 +235,13 @@ def test_expected_hash_cannot_hide_different_signed_message_digest():
     )
 
 
-def test_multicertificate_cms_reports_the_certificate_named_by_signer_info():
+def test_multicertificate_cms_does_not_expose_unbound_signer_identity():
     cms_der = _fixture("cms_chain3.der")
     result = verify_detached_signature(b"test data", cms_der)
 
     assert result["valid"] is True
     assert result["signature_valid"] is True
-    assert result["signer"] is not None
-    assert result["signer"]["name"] == "Test Signer"
+    assert result["signer"] is None
 
 
 def test_accepts_cosign_digest_algorithm_quirk():

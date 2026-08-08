@@ -14,7 +14,7 @@ from __future__ import annotations
 import hmac
 import logging
 from dataclasses import dataclass
-from typing import ClassVar
+from typing import ClassVar, Literal
 
 from asn1crypto import algos as asn1_algos
 from asn1crypto import cms as asn1_cms
@@ -103,6 +103,7 @@ class SignatureVerification:
 
     valid: bool | None
     reason: str | None = None
+    signer_certificate_bound: bool = False
 
     def describe(self) -> str:
         """Return a stable, human-readable diagnostic line."""
@@ -172,11 +173,14 @@ def _signed_attributes_der(signer_info: asn1_cms.SignerInfo) -> bytes | None:
     return bytes(encoded)
 
 
-def _signing_certificate_binding_error(
+SigningCertificateBinding = Literal["absent", "match", "mismatch", "unparsable"]
+
+
+def _signing_certificate_binding(
     signer_info: asn1_cms.SignerInfo,
     signer_cert_der: bytes,
-) -> str | None:
-    """Validate an optional ESS certificate binding against the signer cert."""
+) -> SigningCertificateBinding:
+    """Classify an optional ESS certificate binding against the signer cert."""
     signed_attrs = signer_info["signed_attrs"]
     binding_attrs = [
         attr
@@ -184,9 +188,9 @@ def _signing_certificate_binding_error(
         if attr["type"].dotted in {_OID_SIGNING_CERTIFICATE, _OID_SIGNING_CERTIFICATE_V2}
     ]
     if not binding_attrs:
-        return None
+        return "absent"
     if len(binding_attrs) != 1 or len(binding_attrs[0]["values"]) != 1:
-        return "signingCertificate attribute could not be parsed"
+        return "unparsable"
 
     binding_attr = binding_attrs[0]
     is_v2 = binding_attr["type"].dotted == _OID_SIGNING_CERTIFICATE_V2
@@ -195,7 +199,7 @@ def _signing_certificate_binding_error(
         if is_v2:
             parsed = _SigningCertificateV2.load(value_der, strict=True)
             if not parsed["certs"]:
-                return "signingCertificate attribute could not be parsed"
+                return "unparsable"
             cert_id = parsed["certs"][0]
             algorithm_id = cert_id["hash_algorithm"]["algorithm"]
             algorithm_name = resolve_hash_algo(algorithm_id.native)
@@ -203,12 +207,12 @@ def _signing_certificate_binding_error(
                 algorithm_name = resolve_hash_algo(algorithm_id.dotted)
             hash_type = _HASH_ALGORITHMS.get(algorithm_name) if algorithm_name else None
             if hash_type is None:
-                return "signingCertificate attribute could not be parsed"
+                return "unparsable"
             hash_algorithm = hash_type()
         else:
             parsed = _SigningCertificate.load(value_der, strict=True)
             if not parsed["certs"]:
-                return "signingCertificate attribute could not be parsed"
+                return "unparsable"
             cert_id = parsed["certs"][0]
             # RFC 2634 fixes ESSCertID v1 to SHA-1; this is an identifier hash,
             # not a signature or collision-resistance security decision.
@@ -216,15 +220,15 @@ def _signing_certificate_binding_error(
 
         expected_hash = cert_id["cert_hash"].native
         if not isinstance(expected_hash, bytes):
-            return "signingCertificate attribute could not be parsed"
+            return "unparsable"
     except Exception:
-        return "signingCertificate attribute could not be parsed"
+        return "unparsable"
 
     digest = hashes.Hash(hash_algorithm)
     digest.update(signer_cert_der)
     if not hmac.compare_digest(digest.finalize(), expected_hash):
-        return "signingCertificate attribute names a different certificate"
-    return None
+        return "mismatch"
+    return "match"
 
 
 def verify_signer_signature(cms_der: bytes) -> SignatureVerification:
@@ -281,9 +285,11 @@ def verify_signer_signature(cms_der: bytes) -> SignatureVerification:
             digest_algorithm,
         )
 
-        binding_error = _signing_certificate_binding_error(signer_info, signer_cert_der)
-        if binding_error is not None:
-            return _unverifiable(binding_error)
+        binding = _signing_certificate_binding(signer_info, signer_cert_der)
+        if binding == "mismatch":
+            return _unverifiable("signingCertificate attribute names a different certificate")
+        if binding == "unparsable":
+            return _unverifiable("signingCertificate attribute could not be parsed")
     except InvalidSignature:
         return SignatureVerification(valid=False)
     except Exception:
@@ -292,4 +298,4 @@ def verify_signer_signature(cms_der: bytes) -> SignatureVerification:
         _logger.debug("Could not verify CMS signer signature", exc_info=True)
         return _unverifiable("CMS signature check failed")
 
-    return SignatureVerification(valid=True)
+    return SignatureVerification(valid=True, signer_certificate_bound=binding == "match")
