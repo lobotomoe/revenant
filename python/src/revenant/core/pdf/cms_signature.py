@@ -110,6 +110,9 @@ class SignatureVerification:
     valid: bool | None
     reason: str | None = None
     signer_certificate_bound: bool = False
+    #: True when the CMS carries no signed attributes, so the signature was
+    #: verified over the content itself and no separate digest exists to compare.
+    covers_content: bool = False
 
     def describe(self) -> str:
         """Return a stable, human-readable diagnostic line."""
@@ -286,12 +289,22 @@ def _signing_certificate_binding(
     return "match"
 
 
-def verify_signer_signature(cms_der: bytes) -> SignatureVerification:
+def verify_signer_signature(
+    cms_der: bytes,
+    content: bytes | None = None,
+) -> SignatureVerification:
     """Verify the first CMS signer's RSA PKCS#1 v1.5 signature.
 
     Certificate-chain trust is intentionally not checked here; the caller
     reports it separately. Unsupported algorithms, missing certificates, and
     malformed CMS values are reported as unverifiable and never accepted.
+
+    Args:
+        cms_der: DER-encoded CMS/PKCS#7 ``SignedData``.
+        content: The detached content the signature covers. Only consulted when
+            the CMS carries no signed attributes and embeds no content of its
+            own; RFC 5652 section 5.4 defines the signature input as the content
+            itself in that case. EKENG issues its credential documents this way.
     """
     try:
         content_info = asn1_cms.ContentInfo.load(cms_der, strict=True)
@@ -315,17 +328,29 @@ def verify_signer_signature(cms_der: bytes) -> SignatureVerification:
         if signature_digest is not None and signature_digest != digest_algorithm.name:
             return _unverifiable("signatureAlgorithm conflicts with digestAlgorithm")
 
-        attr_error = _validate_signed_attributes(signed_data, signer_info, digest_algorithm)
-        if attr_error is not None:
-            return _unverifiable(attr_error)
+        # RFC 5652 section 5.4: the signature covers the DER-encoded signed
+        # attributes when they are present, and the content itself when they are
+        # not. The branch is taken strictly on presence -- a CMS that carries
+        # signed attributes can never fall back to the content path, so a
+        # malformed attribute set still fails closed.
+        signed_attrs_present = signer_info["signed_attrs"].native is not None
+        if signed_attrs_present:
+            attr_error = _validate_signed_attributes(signed_data, signer_info, digest_algorithm)
+            if attr_error is not None:
+                return _unverifiable(attr_error)
+            signature_inputs = _signed_attributes_signature_inputs(signer_info)
+            if not signature_inputs:
+                return _unverifiable("cannot encode signed attributes")
+        else:
+            encapsulated = signed_data["encap_content_info"]["content"].native
+            body = encapsulated if encapsulated is not None else content
+            if body is None:
+                return _unverifiable("no signed attributes and no content to verify")
+            signature_inputs = [body]
 
         signer_cert = find_signer_certificate(signed_data, signer_info)
         if signer_cert is None:
             return _unverifiable("signer certificate not embedded or ambiguous")
-
-        signature_inputs = _signed_attributes_signature_inputs(signer_info)
-        if not signature_inputs:
-            return _unverifiable("cannot encode signed attributes")
 
         signer_cert_der = signer_cert.dump()
         # Only the public key is needed, so load the SubjectPublicKeyInfo rather
@@ -356,13 +381,17 @@ def verify_signer_signature(cms_der: bytes) -> SignatureVerification:
             except InvalidSignature:
                 continue
         else:
-            return SignatureVerification(valid=False)
+            return SignatureVerification(valid=False, covers_content=not signed_attrs_present)
 
-        binding = _signing_certificate_binding(signer_info, signer_cert_der)
-        if binding == "mismatch":
-            return _unverifiable("signingCertificate attribute names a different certificate")
-        if binding == "unparsable":
-            return _unverifiable("signingCertificate attribute could not be parsed")
+        # An ESS binding lives in the signed attributes, so without them there is
+        # nothing to bind the certificate beyond the signature itself.
+        binding: SigningCertificateBinding = "absent"
+        if signed_attrs_present:
+            binding = _signing_certificate_binding(signer_info, signer_cert_der)
+            if binding == "mismatch":
+                return _unverifiable("signingCertificate attribute names a different certificate")
+            if binding == "unparsable":
+                return _unverifiable("signingCertificate attribute could not be parsed")
     except Exception as e:
         # CMS is untrusted input and this API promises a verdict rather than a
         # parser exception, so it fails closed.  The reason names the underlying
@@ -372,4 +401,8 @@ def verify_signer_signature(cms_der: bytes) -> SignatureVerification:
         _logger.warning("Could not verify CMS signer signature: %s", e, exc_info=True)
         return _unverifiable(f"CMS signature check failed -- {_describe_exception(e)}")
 
-    return SignatureVerification(valid=True, signer_certificate_bound=binding == "match")
+    return SignatureVerification(
+        valid=True,
+        signer_certificate_bound=binding == "match",
+        covers_content=not signed_attrs_present,
+    )

@@ -489,6 +489,32 @@ def test_verifies_signature_over_canonically_reencoded_attributes():
     assert result["valid"] is True
 
 
+def test_verifies_cms_without_signed_attributes():
+    """RFC 5652 section 5.4 makes signed attributes optional.
+
+    EKENG issues its credential documents without them, so the signature covers
+    the content itself and requiring attributes rejects genuine signatures.
+    """
+    cms_der = _fixture("cms_no_signed_attrs.der")
+    result = verify_detached_signature(b"test data", cms_der)
+
+    assert result["signature_valid"] is True
+    assert result["hash_ok"] is True
+    assert result["valid"] is True
+    assert (
+        "Integrity: signature covers the signed bytes directly (no signed attributes)"
+        in result["details"]
+    )
+
+
+def test_rejects_tampered_content_without_signed_attributes():
+    result = verify_detached_signature(b"tampered data", _fixture("cms_no_signed_attrs.der"))
+
+    assert result["signature_valid"] is False
+    assert result["hash_ok"] is False
+    assert result["valid"] is False
+
+
 def test_exception_description_is_bounded_and_names_the_type():
     described = _describe_exception(ValueError("boom " * 200))
 

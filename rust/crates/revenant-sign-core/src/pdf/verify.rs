@@ -14,8 +14,8 @@
 use super::reader::PdfReader;
 use crate::cms::{
     check_ltv_status, extract_digest_info, extract_signature_data_for, extract_signer_info,
-    find_byteranges, verify_signer_signature, ByteRange, DigestAlgorithm, SignatureStatus,
-    ASN1_SEQUENCE_TAG, MIN_CMS_SIZE,
+    find_byteranges, has_signed_attributes, verify_signer_signature, ByteRange, DigestAlgorithm,
+    SignatureStatus, ASN1_SEQUENCE_TAG, MIN_CMS_SIZE,
 };
 use crate::pki::{CertInfo, ChainResult, TrustStatus};
 use crate::{Result, RevenantError};
@@ -115,13 +115,20 @@ fn verify_signature_match(
         details.push(format!("Signer: {name}"));
     }
 
-    // 4. Hash verification (messageDigest == hash of the signed bytes).
-    let hash_ok = verify_hash(&signed_data, &cms_der, expected_hash, &mut details);
+    // 4. Cryptographic signature verification (the signer's key signed the
+    //    signed attributes, or the content itself when there are none).
+    let signature = verify_signer_signature(&cms_der, Some(&signed_data));
 
-    // 5. Cryptographic signature verification (the signer's key signed the
-    //    signed attributes). Together with the hash check this proves the named
-    //    signer signed exactly these bytes.
-    let signature = verify_signer_signature(&cms_der);
+    // 5. Hash verification (messageDigest == hash of the signed bytes). Together
+    //    with the signature check this proves the named signer signed exactly
+    //    these bytes.
+    let hash_ok = verify_hash(
+        &signed_data,
+        &cms_der,
+        expected_hash,
+        signature,
+        &mut details,
+    );
     details.push(signature.describe());
 
     // 6. LTV status.
@@ -175,6 +182,7 @@ fn verify_hash(
     signed_data: &[u8],
     cms_der: &[u8],
     expected_hash: Option<&[u8]>,
+    signature: SignatureStatus,
     details: &mut Vec<String>,
 ) -> bool {
     if let Some(expected) = expected_hash {
@@ -211,6 +219,17 @@ fn verify_hash(
             hex::encode(&cms_digest)
         ));
         return false;
+    }
+
+    if !has_signed_attributes(cms_der) {
+        // RFC 5652 section 5.4: with no signed attributes there is no separate
+        // messageDigest to compare -- the signature itself binds these bytes,
+        // so integrity follows from the signature verdict alone.
+        details.push(
+            "Integrity: signature covers the signed bytes directly (no signed attributes)"
+                .to_owned(),
+        );
+        return signature.is_valid();
     }
 
     if cms_der.len() >= MIN_CMS_SIZE && cms_der.first() == Some(&ASN1_SEQUENCE_TAG) {
@@ -339,8 +358,9 @@ pub fn verify_detached_signature(
         details.push(format!("Signer: {name}"));
     }
 
-    // Cryptographic signature verification (signer's key over the signed attrs).
-    let signature = verify_signer_signature(cms_der);
+    // Cryptographic signature verification (signer's key over the signed attrs,
+    // or over the content itself when the CMS carries none).
+    let signature = verify_signer_signature(cms_der, Some(data_bytes));
     details.push(signature.describe());
 
     // Detached signatures are always verified against the CMS-declared digest.
@@ -361,6 +381,13 @@ pub fn verify_detached_signature(
             ));
             false
         }
+    } else if !has_signed_attributes(cms_der) {
+        // RFC 5652 section 5.4: the signature covers the content directly.
+        details.push(
+            "Integrity: signature covers the signed bytes directly (no signed attributes)"
+                .to_owned(),
+        );
+        signature.is_valid()
     } else {
         details.push("Could not extract digest info -- hash verification unavailable".to_owned());
         false

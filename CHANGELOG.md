@@ -49,8 +49,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   Callers that displayed signer identity unconditionally must handle absence.
 - Only RSA PKCS#1 v1.5 signers are verified. ECDSA and RSASSA-PSS signers are
   reported as unverifiable, and therefore invalid, rather than accepted.
-- CMS without signed attributes remains unsupported and is reported as
-  unverifiable by all three implementations.
+### Added
+
+- **CMS without signed attributes is now verified.** RFC 5652 section 5.4 makes
+  `signedAttrs` optional and puts the signature over the content itself when it
+  is absent. EKENG issues its credential documents in exactly that shape, so all
+  three implementations previously reported genuine EKENG-issued signatures as
+  invalid. The signature is now verified against the signed bytes, and because
+  no `messageDigest` attribute exists in that form, integrity follows from the
+  signature verdict alone. Such signatures can carry no ESS binding, so signer
+  identity is exposed only when a trusted certificate chain authenticates it.
 
 ## [2.1.2] - 2026-08-03
 

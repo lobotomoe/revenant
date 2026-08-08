@@ -88,6 +88,7 @@ function verifyHash(
   data: Uint8Array,
   cmsDer: Uint8Array,
   details: string[],
+  signature: SignatureVerification,
   dataLabel: string,
   expectedHash: Uint8Array | null = null,
 ): boolean {
@@ -108,6 +109,13 @@ function verifyHash(
 
   const digestInfo = extractDigestInfo(cmsDer);
   if (digestInfo === null) {
+    if (signature.coversContent) {
+      // RFC 5652 section 5.4: with no signed attributes there is no separate
+      // messageDigest to compare -- the signature itself binds these bytes,
+      // so integrity follows from the signature verdict alone.
+      details.push("Integrity: signature covers the signed bytes directly (no signed attributes)");
+      return expectedOk && signature.valid === true;
+    }
     details.push("CMS messageDigest unavailable -- cannot verify hash");
     return false;
   }
@@ -182,11 +190,11 @@ async function verifySignatureMatch(
   // 3. Signer info
   const candidateSigner = await extractSignerInfo(cmsDer);
 
-  // 4. Hash verification
-  const hashOk = verifyHash(signedData, cmsDer, details, "ByteRange", expectedHash);
+  // 4. Cryptographic signature verification
+  const signature = await verifySignerSignature(cmsDer, signedData);
 
-  // 5. Cryptographic signature verification
-  const signature = await verifySignerSignature(cmsDer);
+  // 5. Hash verification
+  const hashOk = verifyHash(signedData, cmsDer, details, signature, "ByteRange", expectedHash);
   details.push(signature.detail);
 
   // 6. LTV status
@@ -361,11 +369,11 @@ export async function verifyDetachedSignature(
   // Signer info
   const candidateSigner = await extractSignerInfo(cmsDer);
 
-  // Hash verification
-  const hashOk = verifyHash(dataBytes, cmsDer, details, "Data");
-
   // Cryptographic signature verification
-  const signature = await verifySignerSignature(cmsDer);
+  const signature = await verifySignerSignature(cmsDer, dataBytes);
+
+  // Hash verification
+  const hashOk = verifyHash(dataBytes, cmsDer, details, signature, "Data");
   details.push(signature.detail);
 
   // LTV status

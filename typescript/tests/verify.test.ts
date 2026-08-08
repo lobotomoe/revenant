@@ -852,6 +852,22 @@ describe("verifyDetachedSignature", () => {
     expect(result.valid).toBe(true);
   });
 
+  it("verifies a CMS that carries no signed attributes", async () => {
+    // RFC 5652 section 5.4 makes signed attributes optional. EKENG issues its
+    // credential documents without them, so the signature covers the content
+    // itself and requiring attributes rejects genuine signatures.
+    const cms = pkiFixture("cms_no_signed_attrs.der");
+
+    const result = await verifyDetachedSignature(VALID_CMS_DATA, cms);
+    expect(result.signatureValid).toBe(true);
+    expect(result.hashOk).toBe(true);
+    expect(result.valid).toBe(true);
+
+    const tampered = await verifyDetachedSignature(new TextEncoder().encode("tampered data"), cms);
+    expect(tampered.signatureValid).toBe(false);
+    expect(tampered.valid).toBe(false);
+  });
+
   it("verifies a signer whose subject DN is nonconforming", async () => {
     // Real EKENG/CoSign certificates encode emailAddress as a PrintableString
     // holding '@', which strict X.509 parsers reject outright. Deriving the
