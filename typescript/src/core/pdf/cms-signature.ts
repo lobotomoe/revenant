@@ -23,6 +23,14 @@ const STANDARD_DIGEST_OIDS: ReadonlyMap<string, string> = new Map([
   ["SHA-512", "2.16.840.1.101.3.4.2.3"],
 ]);
 
+const RSA_SIGNATURE_DIGESTS: ReadonlyMap<string, string | null> = new Map([
+  ["1.2.840.113549.1.1.1", null], // rsaEncryption: digestAlgorithm is authoritative
+  ["1.2.840.113549.1.1.5", "SHA-1"],
+  ["1.2.840.113549.1.1.11", "SHA-256"],
+  ["1.2.840.113549.1.1.12", "SHA-384"],
+  ["1.2.840.113549.1.1.13", "SHA-512"],
+]);
+
 const DIGEST_LENGTHS: ReadonlyMap<string, number> = new Map([
   ["SHA-1", 20],
   ["SHA-256", 32],
@@ -193,6 +201,15 @@ export async function verifySignerSignature(
 
     const digestAlgorithm = resolveHashAlgo(signerInfo.digestAlgorithm.algorithmId);
     if (!digestAlgorithm) return unverifiable("unrecognized digest algorithm");
+
+    const signatureAlgorithm = signerInfo.signatureAlgorithm.algorithmId;
+    if (!RSA_SIGNATURE_DIGESTS.has(signatureAlgorithm)) {
+      return unverifiable("non-RSA signer is unsupported");
+    }
+    const signatureDigest = RSA_SIGNATURE_DIGESTS.get(signatureAlgorithm);
+    if (signatureDigest !== null && signatureDigest !== digestAlgorithm) {
+      return unverifiable("signatureAlgorithm conflicts with digestAlgorithm");
+    }
 
     const attrError = validateSignedAttributes(signedData, signerInfo, digestAlgorithm);
     if (attrError) return unverifiable(attrError);

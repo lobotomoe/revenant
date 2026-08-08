@@ -35,12 +35,12 @@ _OID_MESSAGE_DIGEST = "1.2.840.113549.1.9.4"
 _OID_SIGNING_CERTIFICATE = "1.2.840.113549.1.9.16.2.12"
 _OID_SIGNING_CERTIFICATE_V2 = "1.2.840.113549.1.9.16.2.47"
 
-_RSA_SIGNATURE_OIDS = {
-    "1.2.840.113549.1.1.1",  # rsaEncryption (hash is in digestAlgorithm)
-    "1.2.840.113549.1.1.5",  # sha1WithRSAEncryption
-    "1.2.840.113549.1.1.11",  # sha256WithRSAEncryption
-    "1.2.840.113549.1.1.12",  # sha384WithRSAEncryption
-    "1.2.840.113549.1.1.13",  # sha512WithRSAEncryption
+_RSA_SIGNATURE_DIGESTS: dict[str, str | None] = {
+    "1.2.840.113549.1.1.1": None,  # rsaEncryption (hash is in digestAlgorithm)
+    "1.2.840.113549.1.1.5": "sha1",  # sha1WithRSAEncryption
+    "1.2.840.113549.1.1.11": "sha256",  # sha256WithRSAEncryption
+    "1.2.840.113549.1.1.12": "sha384",  # sha384WithRSAEncryption
+    "1.2.840.113549.1.1.13": "sha512",  # sha512WithRSAEncryption
 }
 
 _HASH_ALGORITHMS: dict[str, type[hashes.HashAlgorithm]] = {
@@ -250,8 +250,11 @@ def verify_signer_signature(cms_der: bytes) -> SignatureVerification:
             return _unverifiable("unrecognized digest algorithm")
 
         signature_oid = signer_info["signature_algorithm"]["algorithm"].dotted
-        if signature_oid not in _RSA_SIGNATURE_OIDS:
+        if signature_oid not in _RSA_SIGNATURE_DIGESTS:
             return _unverifiable("non-RSA signer is unsupported")
+        signature_digest = _RSA_SIGNATURE_DIGESTS[signature_oid]
+        if signature_digest is not None and signature_digest != digest_algorithm.name:
+            return _unverifiable("signatureAlgorithm conflicts with digestAlgorithm")
 
         attr_error = _validate_signed_attributes(signed_data, signer_info, digest_algorithm)
         if attr_error is not None:
