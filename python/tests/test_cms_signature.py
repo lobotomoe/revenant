@@ -20,7 +20,11 @@ from revenant.core.pdf import (
     verify_detached_signature,
     verify_embedded_signature,
 )
-from revenant.core.pdf.cms_signature import _SigningCertificate, _SigningCertificateV2
+from revenant.core.pdf.cms_signature import (
+    _describe_exception,
+    _SigningCertificate,
+    _SigningCertificateV2,
+)
 
 from ._cert_factory import build_cms_with_certs, make_leaf, make_root_ca, to_der
 
@@ -412,3 +416,82 @@ def test_rejects_conflicting_combined_signature_algorithm():
         "Signature not verified (signatureAlgorithm conflicts with digestAlgorithm)"
         in result["details"]
     )
+
+
+def test_verifies_signer_with_nonconforming_subject_dn():
+    """A nonconforming subject DN must not block signature verification.
+
+    Real EKENG/CoSign signer certificates encode ``emailAddress`` as a
+    PrintableString holding '@', which strict X.509 parsers reject outright.
+    Deriving the signer's public key must not depend on decoding the DN.
+    """
+    result = verify_detached_signature(b"test data", _fixture("cms_nonconforming_dn.der"))
+
+    assert result["hash_ok"] is True
+    assert result["signature_valid"] is True
+    assert result["valid"] is True
+
+
+def _der_length(size: int) -> bytes:
+    if size < 0x80:
+        return bytes([size])
+    encoded = size.to_bytes((size.bit_length() + 7) // 8, "big")
+    return bytes([0x80 | len(encoded)]) + encoded
+
+
+def _cms_with_unsorted_signed_attributes(data: bytes) -> bytes:
+    """Build a CMS whose signed attributes are transmitted in non-DER order.
+
+    RFC 5652 asks for DER, but a signer emitting another ordering signs the bytes
+    it actually transmitted.  Re-encoding those attributes before verifying turns
+    such a signature into a false negative.
+    """
+    root_cert, root_key = make_root_ca()
+    leaf_cert, leaf_key = make_leaf(root_cert, root_key, "Unsorted Attrs Signer")
+    content_info = asn1_cms.ContentInfo.load(build_cms_with_certs(leaf_cert, leaf_key, data=data))
+    signer_info = content_info["content"]["signer_infos"][0]
+
+    members = [attr.dump() for attr in signer_info["signed_attrs"]]
+    members.reverse()
+    body = b"".join(members)
+    signature_input = bytes([0x31]) + _der_length(len(body)) + body
+
+    signer_info["signed_attrs"] = asn1_cms.CMSAttributes.load(signature_input)
+    signer_info["signature"] = leaf_key.sign(signature_input, padding.PKCS1v15(), hashes.SHA256())
+    # Plain dump(): force=True would re-sort the attributes into DER order and
+    # destroy the very ordering this vector exists to exercise.
+    return content_info.dump()
+
+
+def test_verifies_signature_over_attributes_as_transmitted():
+    data = b"attributes transmitted out of DER order"
+    cms_der = _cms_with_unsorted_signed_attributes(data)
+
+    transmitted = asn1_cms.ContentInfo.load(cms_der)["content"]["signer_infos"][0]["signed_attrs"]
+    assert transmitted.dump() != transmitted.dump(force=True), (
+        "fixture must actually be transmitted out of DER order"
+    )
+
+    result = verify_detached_signature(data, cms_der)
+    assert result["signature_valid"] is True
+    assert result["valid"] is True
+
+
+def test_verifies_signature_over_canonically_reencoded_attributes():
+    """A signature over the canonical DER must verify when another order is sent.
+
+    RFC 5652 section 5.4 defines the signature input as the DER encoding, so a
+    verifier that only ever hashes the as-transmitted bytes rejects this.
+    """
+    result = verify_detached_signature(b"test data", _fixture("cms_der_signed_attrs.der"))
+
+    assert result["signature_valid"] is True
+    assert result["valid"] is True
+
+
+def test_exception_description_is_bounded_and_names_the_type():
+    described = _describe_exception(ValueError("boom " * 200))
+
+    assert described.startswith("ValueError: ")
+    assert described.endswith("...")
+    assert len(described) < 200

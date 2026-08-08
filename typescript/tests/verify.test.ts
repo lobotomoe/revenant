@@ -839,6 +839,33 @@ describe("verifyDetachedSignature", () => {
     expect(result.valid).toBe(false);
   });
 
+  it("verifies a signature made over the canonically re-encoded attributes", async () => {
+    // RFC 5652 section 5.4 defines the signature input as the DER encoding of
+    // the signed attributes. A verifier that only hashes the as-transmitted
+    // bytes rejects a signer that transmits another ordering.
+    const result = await verifyDetachedSignature(
+      VALID_CMS_DATA,
+      pkiFixture("cms_der_signed_attrs.der"),
+    );
+
+    expect(result.signatureValid).toBe(true);
+    expect(result.valid).toBe(true);
+  });
+
+  it("verifies a signer whose subject DN is nonconforming", async () => {
+    // Real EKENG/CoSign certificates encode emailAddress as a PrintableString
+    // holding '@', which strict X.509 parsers reject outright. Deriving the
+    // signer's public key must not depend on decoding the subject DN.
+    const result = await verifyDetachedSignature(
+      VALID_CMS_DATA,
+      pkiFixture("cms_nonconforming_dn.der"),
+    );
+
+    expect(result.hashOk).toBe(true);
+    expect(result.signatureValid).toBe(true);
+    expect(result.valid).toBe(true);
+  });
+
   it("detects too-small CMS", async () => {
     const data = new TextEncoder().encode("test data");
     const tinyCms = new Uint8Array([0x30, 0x01]); // Valid tag but tiny

@@ -26,7 +26,7 @@ from typing import ClassVar, Literal
 
 from asn1crypto import algos as aalgos
 from asn1crypto import cms as acms
-from asn1crypto import core, crl as acrl, x509 as ax509
+from asn1crypto import core, crl as acrl, keys as akeys, x509 as ax509
 from cryptography import x509
 from cryptography.hazmat.primitives import hashes, serialization
 from cryptography.hazmat.primitives.asymmetric import padding, rsa
@@ -37,6 +37,9 @@ from cryptography.x509.oid import ExtendedKeyUsageOID, NameOID
 OID_REVOCATION_INFO_ARCHIVAL = "1.2.840.113583.1.1.8"
 OID_SIGNING_CERTIFICATE = "1.2.840.113549.1.9.16.2.12"
 OID_SIGNING_CERTIFICATE_V2 = "1.2.840.113549.1.9.16.2.47"
+
+# '@' is outside the PrintableString character set; see build_nonconforming_dn_cms.
+NONCONFORMING_DN_EMAIL = "signer@example.com"
 
 NOT_BEFORE = datetime.datetime(2020, 1, 1, tzinfo=datetime.timezone.utc)
 NOT_AFTER = datetime.datetime(2099, 1, 1, tzinfo=datetime.timezone.utc)
@@ -380,6 +383,158 @@ def build_ski_selector_confusion_cms() -> bytes:
     return content_info.dump(force=True)
 
 
+def build_nonconforming_dn_cms() -> bytes:
+    """Build a valid CMS whose signer certificate has a nonconforming subject DN.
+
+    The ``emailAddress`` attribute is encoded as a ``PrintableString`` even though
+    '@' lies outside that type's character set.  Production signer certificates
+    (EKENG/CoSign among them) really are issued this way, and strict X.509 parsers
+    reject the certificate as a whole over a field signature verification never
+    reads.  A verifier must derive the signer's public key without decoding the
+    subject DN, so this vector fails closed for any implementation that does not.
+
+    ``cryptography`` refuses to emit such a certificate, so the TBS is assembled
+    with asn1crypto, retagged, and only then signed -- the result is a genuinely
+    self-consistent certificate rather than one with a broken signature.
+    """
+    key = _key()
+    serial = 0x4E4F4E434F4E46  # "NONCONF"
+    algorithm = aalgos.SignedDigestAlgorithm({"algorithm": "sha256_rsa"})
+    name = ax509.Name.build(
+        {"common_name": "Nonconforming DN Signer", "email_address": NONCONFORMING_DN_EMAIL}
+    )
+    spki = akeys.PublicKeyInfo.load(
+        key.public_key().public_bytes(
+            serialization.Encoding.DER, serialization.PublicFormat.SubjectPublicKeyInfo
+        )
+    )
+    tbs = ax509.TbsCertificate(
+        {
+            "version": "v3",
+            "serial_number": serial,
+            "signature": algorithm,
+            "issuer": name,
+            "subject": name,
+            "subject_public_key_info": spki,
+            "validity": ax509.Validity(
+                {
+                    # RFC 5280: dates through 2049 are UTCTime, later ones GeneralizedTime.
+                    "not_before": ax509.Time({"utc_time": NOT_BEFORE}),
+                    "not_after": ax509.Time({"general_time": NOT_AFTER}),
+                }
+            ),
+        }
+    )
+
+    ia5_email = bytes([0x16, len(NONCONFORMING_DN_EMAIL)]) + NONCONFORMING_DN_EMAIL.encode()
+    printable_email = bytes([0x13, len(NONCONFORMING_DN_EMAIL)]) + NONCONFORMING_DN_EMAIL.encode()
+    tbs_der = tbs.dump()
+    if ia5_email not in tbs_der:
+        raise AssertionError("email attribute was not encoded as the expected IA5String")
+    tbs_der = tbs_der.replace(ia5_email, printable_email)
+
+    patched_tbs = ax509.TbsCertificate.load(tbs_der)
+    cert = ax509.Certificate(
+        {
+            "tbs_certificate": patched_tbs,
+            "signature_algorithm": algorithm,
+            "signature_value": key.sign(tbs_der, padding.PKCS1v15(), hashes.SHA256()),
+        }
+    )
+    # The SignerIdentifier must carry the retagged issuer bytes: implementations
+    # that select the signer certificate by comparing encoded names would
+    # otherwise find no match, masking what this vector is meant to exercise.
+    issuer_name = patched_tbs["issuer"]
+
+    content = b"test data"
+    signed_attrs = acms.CMSAttributes(
+        [
+            acms.CMSAttribute({"type": "content_type", "values": [acms.ContentType("data")]}),
+            acms.CMSAttribute(
+                {"type": "message_digest", "values": [core.OctetString(_digest(content, hashes.SHA256()))]}
+            ),
+        ]
+    )
+    signature_input = bytearray(signed_attrs.dump(force=True))
+    signature_input[0] = 0x31  # universal SET OF tag used as the signature input
+
+    signer_info = acms.SignerInfo(
+        {
+            "version": "v1",
+            "sid": acms.SignerIdentifier(
+                name="issuer_and_serial_number",
+                value=acms.IssuerAndSerialNumber(
+                    {"issuer": issuer_name, "serial_number": serial}
+                ),
+            ),
+            "digest_algorithm": aalgos.DigestAlgorithm({"algorithm": "sha256"}),
+            "signed_attrs": signed_attrs,
+            "signature_algorithm": aalgos.SignedDigestAlgorithm(
+                {"algorithm": "rsassa_pkcs1v15"}
+            ),
+            "signature": key.sign(bytes(signature_input), padding.PKCS1v15(), hashes.SHA256()),
+        }
+    )
+
+    return acms.ContentInfo(
+        {
+            "content_type": "signed_data",
+            "content": acms.SignedData(
+                {
+                    "version": "v1",
+                    "digest_algorithms": [aalgos.DigestAlgorithm({"algorithm": "sha256"})],
+                    "encap_content_info": {"content_type": "data"},
+                    "certificates": [cert],
+                    "signer_infos": [signer_info],
+                }
+            ),
+        }
+        # Plain dump(): force=True would re-encode the certificate against the
+        # asn1crypto spec and silently revert emailAddress to an IA5String,
+        # destroying the very quirk this vector exists to capture.
+    ).dump()
+
+
+def _der_length(size: int) -> bytes:
+    if size < 0x80:
+        return bytes([size])
+    encoded = size.to_bytes((size.bit_length() + 7) // 8, "big")
+    return bytes([0x80 | len(encoded)]) + encoded
+
+
+def build_der_signed_unsorted_transmitted_cms(
+    signer: x509.Certificate,
+    signer_key: rsa.RSAPrivateKey,
+) -> bytes:
+    """Build a CMS signed over canonical DER but transmitting another ordering.
+
+    RFC 5652 section 5.4 defines the signature input as the DER encoding of the
+    signed attributes, and a conforming signer transmits exactly those bytes.
+    This vector separates the two so that verifiers relying solely on the
+    as-transmitted encoding are caught: all implementations must agree that the
+    signature is valid, since both encodings carry the same parsed attributes.
+    """
+    content_info = acms.ContentInfo.load(build_cms(signer, signer_key))
+    signer_info = content_info["content"]["signer_infos"][0]
+
+    canonical = bytearray(signer_info["signed_attrs"].dump(force=True))
+    canonical[0] = 0x31  # universal SET OF tag used as the signature input
+
+    members = [attribute.dump() for attribute in signer_info["signed_attrs"]]
+    members.reverse()
+    body = b"".join(members)
+    transmitted = bytes([0x31]) + _der_length(len(body)) + body
+    if transmitted == bytes(canonical):
+        raise AssertionError("transmitted ordering must differ from canonical DER")
+
+    signer_info["signed_attrs"] = acms.CMSAttributes.load(transmitted)
+    signer_info["signature"] = signer_key.sign(
+        bytes(canonical), padding.PKCS1v15(), hashes.SHA256()
+    )
+    # Plain dump(): force=True would re-sort the attributes back into DER order.
+    return content_info.dump()
+
+
 def write_identity_hardening_fixtures() -> None:
     """Write CMS vectors for signer-certificate and identity regressions."""
     root, root_key = make_root_ca("Identity Test Root")
@@ -391,6 +546,11 @@ def write_identity_hardening_fixtures() -> None:
         cn="Forged Display Identity",
     )
 
+    write("cms_nonconforming_dn.der", build_nonconforming_dn_cms())
+    write(
+        "cms_der_signed_attrs.der",
+        build_der_signed_unsorted_transmitted_cms(signer, signer_key),
+    )
     write("cms_ski_selector_confusion.der", build_ski_selector_confusion_cms())
     write(
         "cms_unbound_identity_substituted.der",

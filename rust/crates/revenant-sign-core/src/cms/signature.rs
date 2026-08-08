@@ -371,6 +371,8 @@ mod tests {
     // each carries a genuine RSA signature over its signed attributes.
     const CMS_LEAF_DIRECT: &[u8] = include_bytes!("../pki/testdata/cms_leaf_direct.der");
     const CMS_CHAIN3: &[u8] = include_bytes!("../pki/testdata/cms_chain3.der");
+    const CMS_NONCONFORMING_DN: &[u8] = include_bytes!("../pki/testdata/cms_nonconforming_dn.der");
+    const CMS_DER_SIGNED_ATTRS: &[u8] = include_bytes!("../pki/testdata/cms_der_signed_attrs.der");
 
     #[test]
     fn valid_signature_verifies() {
@@ -379,6 +381,30 @@ mod tests {
             SignatureStatus::Valid
         );
         assert_eq!(verify_signer_signature(CMS_CHAIN3), SignatureStatus::Valid);
+    }
+
+    #[test]
+    fn signature_over_canonically_reencoded_attributes_verifies() {
+        // RFC 5652 section 5.4 defines the signature input as the DER encoding
+        // of the signed attributes, which is what this implementation rebuilds.
+        // The vector transmits a different ordering to keep all three
+        // implementations agreeing on the same verdict.
+        assert_eq!(
+            verify_signer_signature(CMS_DER_SIGNED_ATTRS),
+            SignatureStatus::Valid
+        );
+    }
+
+    #[test]
+    fn nonconforming_subject_dn_still_verifies() {
+        // Real EKENG/CoSign signer certificates encode emailAddress as a
+        // PrintableString holding '@', which strict X.509 parsers reject
+        // outright. Deriving the signer's public key must not depend on
+        // decoding the subject DN.
+        assert_eq!(
+            verify_signer_signature(CMS_NONCONFORMING_DN),
+            SignatureStatus::Valid
+        );
     }
 
     #[test]
