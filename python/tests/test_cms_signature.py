@@ -18,7 +18,7 @@ from revenant.core.pdf import (
     verify_embedded_signature,
 )
 
-from ._cert_factory import build_cms_with_certs, make_leaf, make_root_ca
+from ._cert_factory import build_cms_with_certs, make_leaf, make_root_ca, to_der
 
 _PKI_TESTDATA = (
     Path(__file__).resolve().parents[2] / "rust/crates/revenant-sign-core/src/pki/testdata"
@@ -51,6 +51,16 @@ def _without_signed_attribute(cms_der: bytes, oid: str) -> bytes:
         [attr for attr in signer_info["signed_attrs"] if attr["type"].dotted != oid]
     )
     return content_info.dump(force=True)
+
+
+def _with_malformed_certificate_key_usage(der: bytes) -> bytes:
+    """Corrupt an inner certificate extension without breaking its DER envelope."""
+    key_usage_extension = bytes.fromhex("0603551d0f0101ff0404030205a0")
+    assert der.count(key_usage_extension) == 1
+    offset = der.index(key_usage_extension)
+    malformed = bytearray(der)
+    malformed[offset + 11] = 0  # BIT STRING length: 2 -> 0, leaving trailing bytes
+    return bytes(malformed)
 
 
 def test_detached_accepts_genuine_cms_signature():
@@ -187,6 +197,54 @@ def test_missing_signer_certificate_fails_closed():
     assert (
         "Signature not verified (signer certificate not embedded or ambiguous)" in result["details"]
     )
+
+
+@pytest.mark.parametrize("embedded", [False, True], ids=["detached", "embedded"])
+def test_malformed_signer_certificate_fails_closed(embedded: bool):
+    data = b"malformed signer certificate"
+
+    if embedded:
+        pdf = pikepdf.Pdf.new()
+        pdf.add_blank_page()
+        stream = io.BytesIO()
+        pdf.save(stream)
+        prepared, hex_start, hex_len = prepare_pdf_with_sig_field(
+            stream.getvalue(),
+            visible=False,
+        )
+        signed_data = prepared[:hex_start] + prepared[hex_start + hex_len + 1 :]
+        cms_der = _with_malformed_certificate_key_usage(_real_cms(signed_data))
+        result = verify_embedded_signature(insert_cms(prepared, hex_start, hex_len, cms_der))
+    else:
+        cms_der = _with_malformed_certificate_key_usage(_real_cms(data))
+        result = verify_detached_signature(data, cms_der)
+
+    assert result["hash_ok"] is True
+    assert result["signature_valid"] is None
+    assert result["valid"] is False
+    assert result["signer"] is None
+
+
+def test_malformed_unrelated_certificate_does_not_hide_valid_signer():
+    data = b"valid signer with malformed unrelated certificate"
+    signer_root, signer_root_key = make_root_ca("Signer Root")
+    signer, signer_key = make_leaf(signer_root, signer_root_key, "Valid Signer")
+    other_root, other_root_key = make_root_ca("Other Root")
+    other_cert, _ = make_leaf(other_root, other_root_key, "Malformed Extra")
+    other_der = to_der(other_cert)
+    cms_der = build_cms_with_certs(signer, signer_key, [other_cert], data=data)
+    cms_der = cms_der.replace(
+        other_der,
+        _with_malformed_certificate_key_usage(other_der),
+        1,
+    )
+
+    result = verify_detached_signature(data, cms_der)
+
+    assert result["hash_ok"] is True
+    assert result["signature_valid"] is True
+    assert result["valid"] is True
+    assert result["signer"] is None
 
 
 def test_embedded_accepts_genuine_cms_signature():
