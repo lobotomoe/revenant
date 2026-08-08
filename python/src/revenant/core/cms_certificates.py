@@ -4,19 +4,34 @@
 
 from __future__ import annotations
 
+import logging
 from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
     from asn1crypto import cms as asn1_cms
     from asn1crypto import x509 as asn1_x509
 
+_logger = logging.getLogger(__name__)
+
 
 def x509_certificates(signed_data: asn1_cms.SignedData) -> list[asn1_x509.Certificate]:
-    """Return all embedded X.509 certificates, ignoring other certificate choices."""
+    """Return parseable embedded X.509 certificates, ignoring other choices."""
     certificates = signed_data["certificates"]
-    if certificates.native is None:
+    if not certificates:
         return []
-    return [choice.chosen for choice in certificates if choice.name == "certificate"]
+
+    result: list[asn1_x509.Certificate] = []
+    for choice in certificates:
+        if choice.name != "certificate":
+            continue
+        try:
+            cert = choice.chosen
+            _ = cert.native
+        except Exception:
+            _logger.debug("Ignoring malformed embedded X.509 certificate", exc_info=True)
+            continue
+        result.append(cert)
+    return result
 
 
 def find_signer_certificate(
