@@ -19,10 +19,10 @@ from typing import ClassVar, Literal
 from asn1crypto import algos as asn1_algos
 from asn1crypto import cms as asn1_cms
 from asn1crypto import core as asn1_core
-from cryptography import x509
-from cryptography.exceptions import InvalidSignature
+from cryptography.exceptions import InvalidSignature, UnsupportedAlgorithm
 from cryptography.hazmat.primitives import hashes
 from cryptography.hazmat.primitives.asymmetric import padding, rsa
+from cryptography.hazmat.primitives.serialization import load_der_public_key
 
 from ..cms_certificates import find_signer_certificate
 from .cms_info import resolve_hash_algo
@@ -32,6 +32,12 @@ _logger = logging.getLogger(__name__)
 _OID_SIGNED_DATA = "1.2.840.113549.1.7.2"
 _OID_CONTENT_TYPE = "1.2.840.113549.1.9.3"
 _OID_MESSAGE_DIGEST = "1.2.840.113549.1.9.4"
+_TAG_CONTEXT_0_CONSTRUCTED = 0xA0  # [0] IMPLICIT, as signed attrs appear in SignerInfo
+_TAG_SET_OF = 0x31  # universal SET OF, as required for the signature input
+
+# Diagnostics are surfaced to users through VerificationResult.details.
+_MAX_REASON_LENGTH = 160
+
 _OID_SIGNING_CERTIFICATE = "1.2.840.113549.1.9.16.2.12"
 _OID_SIGNING_CERTIFICATE_V2 = "1.2.840.113549.1.9.16.2.47"
 
@@ -119,6 +125,14 @@ def _unverifiable(reason: str) -> SignatureVerification:
     return SignatureVerification(valid=None, reason=reason)
 
 
+def _describe_exception(error: Exception) -> str:
+    """Render an exception compactly enough to sit in a user-facing detail line."""
+    message = str(error).strip().replace("\n", " ")
+    if len(message) > _MAX_REASON_LENGTH:
+        message = message[: _MAX_REASON_LENGTH - 3] + "..."
+    return f"{type(error).__name__}: {message}" if message else type(error).__name__
+
+
 def _resolve_digest_algorithm(signer_info: asn1_cms.SignerInfo) -> hashes.HashAlgorithm | None:
     algo_id = signer_info["digest_algorithm"]["algorithm"]
     algo_name = resolve_hash_algo(algo_id.native)
@@ -160,17 +174,38 @@ def _validate_signed_attributes(
     return None
 
 
-def _signed_attributes_der(signer_info: asn1_cms.SignerInfo) -> bytes | None:
-    """Encode signed attributes using the universal SET OF tag required by CMS."""
-    signed_attrs = signer_info["signed_attrs"]
-    encoded = bytearray(signed_attrs.dump(force=True))
+def _retag_as_set_of(encoded: bytes) -> bytes | None:
+    """Replace the ``[0] IMPLICIT`` tag with the universal SET OF tag."""
     if not encoded:
         return None
-    if encoded[0] == 0xA0:  # [0] IMPLICIT in SignerInfo
-        encoded[0] = 0x31  # universal SET OF for the signature input
-    elif encoded[0] != 0x31:
+    retagged = bytearray(encoded)
+    if retagged[0] == _TAG_CONTEXT_0_CONSTRUCTED:
+        retagged[0] = _TAG_SET_OF
+    elif retagged[0] != _TAG_SET_OF:
         return None
-    return bytes(encoded)
+    return bytes(retagged)
+
+
+def _signed_attributes_signature_inputs(signer_info: asn1_cms.SignerInfo) -> list[bytes]:
+    """Return the candidate byte strings the signer may have signed.
+
+    RFC 5652 section 5.4 defines the signature input as the DER encoding of the
+    signed attributes with the ``[0] IMPLICIT`` tag replaced by a universal
+    ``SET OF`` tag.  Signers that emit a non-DER attribute ordering nevertheless
+    sign the bytes they transmitted, so the as-transmitted encoding is tried
+    first and the canonical DER re-encoding second.
+
+    Accepting either encoding does not weaken the check: both encode the very
+    same parsed attributes, and those attributes are validated independently by
+    :func:`_validate_signed_attributes` before any signature is checked.
+    """
+    signed_attrs = signer_info["signed_attrs"]
+    candidates: list[bytes] = []
+    for encoded in (signed_attrs.dump(), signed_attrs.dump(force=True)):
+        retagged = _retag_as_set_of(encoded)
+        if retagged is not None and retagged not in candidates:
+            candidates.append(retagged)
+    return candidates
 
 
 SigningCertificateBinding = Literal["absent", "match", "mismatch", "unparsable"]
@@ -288,34 +323,53 @@ def verify_signer_signature(cms_der: bytes) -> SignatureVerification:
         if signer_cert is None:
             return _unverifiable("signer certificate not embedded or ambiguous")
 
-        signed_attrs_der = _signed_attributes_der(signer_info)
-        if signed_attrs_der is None:
+        signature_inputs = _signed_attributes_signature_inputs(signer_info)
+        if not signature_inputs:
             return _unverifiable("cannot encode signed attributes")
 
         signer_cert_der = signer_cert.dump()
-        certificate = x509.load_der_x509_certificate(signer_cert_der)
-        public_key = certificate.public_key()
+        # Only the public key is needed, so load the SubjectPublicKeyInfo rather
+        # than the whole certificate. Real signer certificates (EKENG/CoSign among
+        # them) encode DN attributes such as emailAddress as a PrintableString
+        # holding '@', which is outside that type's character set; a strict X.509
+        # parser rejects the entire certificate over a field this check never
+        # reads. Signature verification must not depend on decoding the subject DN.
+        try:
+            public_key = load_der_public_key(
+                signer_cert["tbs_certificate"]["subject_public_key_info"].dump()
+            )
+        except (ValueError, UnsupportedAlgorithm):
+            return _unverifiable("signer public key is unusable")
         if not isinstance(public_key, rsa.RSAPublicKey):
             return _unverifiable("signer public key is not RSA")
 
-        public_key.verify(
-            signer_info["signature"].native,
-            signed_attrs_der,
-            padding.PKCS1v15(),
-            digest_algorithm,
-        )
+        signature = signer_info["signature"].native
+        for signature_input in signature_inputs:
+            try:
+                public_key.verify(
+                    signature,
+                    signature_input,
+                    padding.PKCS1v15(),
+                    digest_algorithm,
+                )
+                break
+            except InvalidSignature:
+                continue
+        else:
+            return SignatureVerification(valid=False)
 
         binding = _signing_certificate_binding(signer_info, signer_cert_der)
         if binding == "mismatch":
             return _unverifiable("signingCertificate attribute names a different certificate")
         if binding == "unparsable":
             return _unverifiable("signingCertificate attribute could not be parsed")
-    except InvalidSignature:
-        return SignatureVerification(valid=False)
-    except Exception:
-        # CMS is untrusted input and verification APIs promise a verdict rather
-        # than a parser exception. Log diagnostics and fail closed.
-        _logger.debug("Could not verify CMS signer signature", exc_info=True)
-        return _unverifiable("CMS signature check failed")
+    except Exception as e:
+        # CMS is untrusted input and this API promises a verdict rather than a
+        # parser exception, so it fails closed.  The reason names the underlying
+        # exception: an opaque "check failed" once masked a certificate-parsing
+        # incompatibility that silently invalidated genuine signatures, and a
+        # diagnostic nobody can read is how that reaches production unnoticed.
+        _logger.warning("Could not verify CMS signer signature: %s", e, exc_info=True)
+        return _unverifiable(f"CMS signature check failed -- {_describe_exception(e)}")
 
     return SignatureVerification(valid=True, signer_certificate_bound=binding == "match")

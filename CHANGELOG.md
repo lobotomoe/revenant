@@ -19,6 +19,38 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   selected certificate instead of allowing PKIjs to resolve `sid` again, and
   both implementations expose signer metadata only when matching ESS or a
   trusted certificate chain authenticates it.
+- **Python: the signer public key is read from the certificate's
+  `SubjectPublicKeyInfo` instead of parsing the whole certificate.** Production
+  signer certificates (EKENG/CoSign among them) encode DN attributes such as
+  `emailAddress` as a `PrintableString` containing `@`, which is outside that
+  type's character set; a strict X.509 parser rejects the entire certificate
+  over a field signature verification never reads, turning genuine signatures
+  into false negatives.
+- **Python and TypeScript now agree on the CMS signature input.** Python hashed
+  the signed attributes re-encoded as canonical DER while TypeScript hashed only
+  the bytes as transmitted, so the same document could verify in one and fail in
+  the other. Both now try the as-transmitted encoding first and the canonical
+  DER re-encoding second. The two encodings carry the same parsed attributes,
+  which are validated independently before any signature is checked, so nothing
+  is loosened. Rust remains canonical-DER only and still rejects a signature
+  made over a non-DER transmitted ordering.
+- Failures that cannot be attributed to a specific check now name the
+  underlying error instead of reporting an opaque "CMS signature check failed".
+
+### Changed
+
+- **Breaking (Python/TypeScript API):** `VerificationResult` gains
+  `signature_valid` / `signatureValid` (`true`, `false`, or `null` when
+  verification could not be performed), and `valid` now additionally requires
+  that the signer signature verifies. Documents that earlier releases reported
+  as valid on digest agreement alone are now reported invalid.
+- **Breaking (Python/TypeScript API):** `signer` is `null` unless a matching ESS
+  attribute or a trusted certificate chain authenticates the certificate.
+  Callers that displayed signer identity unconditionally must handle absence.
+- Only RSA PKCS#1 v1.5 signers are verified. ECDSA and RSASSA-PSS signers are
+  reported as unverifiable, and therefore invalid, rather than accepted.
+- CMS without signed attributes remains unsupported and is reported as
+  unverifiable by all three implementations.
 
 ## [2.1.2] - 2026-08-03
 

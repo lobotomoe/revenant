@@ -41,6 +41,65 @@ export interface SignatureVerification {
   detail: string;
 }
 
+/** Diagnostics are surfaced to users through VerificationResult.details. */
+const MAX_REASON_LENGTH = 160;
+
+/** Render a thrown value compactly enough to sit in a user-facing detail line. */
+export function describeError(error: unknown): string {
+  const name = error instanceof Error ? error.name : "Error";
+  const raw = error instanceof Error ? error.message : String(error);
+  const message = raw.trim().replace(/\s+/g, " ");
+  if (message.length === 0) return name;
+  const trimmed =
+    message.length > MAX_REASON_LENGTH ? `${message.slice(0, MAX_REASON_LENGTH - 3)}...` : message;
+  return `${name}: ${trimmed}`;
+}
+
+/** DER SET OF ordering: components sort by their complete encodings (X.690 11.6). */
+function compareDerElements(a: Uint8Array, b: Uint8Array): number {
+  const shared = Math.min(a.length, b.length);
+  for (let i = 0; i < shared; i++) {
+    const left = a[i] ?? 0;
+    const right = b[i] ?? 0;
+    if (left !== right) return left - right;
+  }
+  return a.length - b.length;
+}
+
+function derLength(size: number): Uint8Array {
+  if (size < 0x80) return new Uint8Array([size]);
+  const octets: number[] = [];
+  for (let rest = size; rest > 0; rest = Math.floor(rest / 256)) octets.unshift(rest % 256);
+  return new Uint8Array([0x80 | octets.length, ...octets]);
+}
+
+/**
+ * Re-encode the signed attributes as a canonical DER SET OF.
+ *
+ * RFC 5652 section 5.4 defines the signature input this way, and a conforming
+ * signer transmits exactly these bytes. Signers that emit another ordering sign
+ * what they transmitted instead, so both encodings are tried; they encode the
+ * same parsed attributes, which validateSignedAttributes has already checked.
+ */
+function canonicalSignedAttributes(signedAttrs: pkijs.SignedAndUnsignedAttributes): Uint8Array {
+  const members = signedAttrs.attributes.map(
+    (attribute) => new Uint8Array(attribute.toSchema().toBER(false)),
+  );
+  members.sort(compareDerElements);
+  const body = new Uint8Array(members.reduce((total, member) => total + member.length, 0));
+  let offset = 0;
+  for (const member of members) {
+    body.set(member, offset);
+    offset += member.length;
+  }
+  const header = derLength(body.length);
+  const encoded = new Uint8Array(1 + header.length + body.length);
+  encoded[0] = 0x31; // universal SET OF, as required for the signature input
+  encoded.set(header, 1);
+  encoded.set(body, 1 + header.length);
+  return encoded;
+}
+
 function unverifiable(reason: string): SignatureVerification {
   return {
     valid: null,
@@ -238,19 +297,30 @@ export async function verifySignerSignature(cmsDer: Uint8Array): Promise<Signatu
       return unverifiable("cannot encode signed attributes");
     }
 
+    // The as-transmitted encoding first, then the canonical DER re-encoding.
+    const transmitted = new Uint8Array(signedAttrs.encodedValue);
+    const canonical = canonicalSignedAttributes(signedAttrs);
+    const signatureInputs = bytesEqual(transmitted, canonical)
+      ? [signedAttrs.encodedValue]
+      : [signedAttrs.encodedValue, toArrayBuffer(canonical)];
+
     // SignedData.verify() performs its own signer-certificate lookup. For an
     // SKI SignerIdentifier, PKIjs 3.4.0 hashes SubjectPublicKey instead of
     // matching the certificate's Subject Key Identifier extension, so it can
     // verify with a different certificate than findSignerCertificate selected.
     // Invoke the crypto primitive directly with the already selected key.
     const crypto = pkijs.getCrypto(true);
-    const verified = await crypto.verifyWithPublicKey(
-      signedAttrs.encodedValue,
-      signerInfo.signature,
-      signerCertificate.subjectPublicKeyInfo,
-      signerInfo.signatureAlgorithm,
-      digestAlgorithm,
-    );
+    let verified = false;
+    for (const signatureInput of signatureInputs) {
+      verified = await crypto.verifyWithPublicKey(
+        signatureInput,
+        signerInfo.signature,
+        signerCertificate.subjectPublicKeyInfo,
+        signerInfo.signatureAlgorithm,
+        digestAlgorithm,
+      );
+      if (verified) break;
+    }
     if (!verified) {
       return {
         valid: false,
@@ -271,7 +341,12 @@ export async function verifySignerSignature(cmsDer: Uint8Array): Promise<Signatu
       signerCertificateBound: binding === "match",
       detail: "Signature OK -- signer signature verifies",
     };
-  } catch {
-    return unverifiable("CMS signature check failed");
+  } catch (error) {
+    // CMS is untrusted input and this API promises a verdict rather than a
+    // thrown parser error, so it fails closed. The reason names the underlying
+    // failure: an opaque "check failed" once masked a certificate-parsing
+    // incompatibility that silently invalidated genuine signatures, and a
+    // diagnostic nobody can read is how that reaches production unnoticed.
+    return unverifiable(`CMS signature check failed -- ${describeError(error)}`);
   }
 }
