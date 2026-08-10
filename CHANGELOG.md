@@ -36,6 +36,26 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   made over a non-DER transmitted ordering.
 - Failures that cannot be attributed to a specific check now name the
   underlying error instead of reporting an opaque "CMS signature check failed".
+- **Signing workflows no longer return a signature nobody verified.** The
+  CMS/PKCS#7 bytes a signing service sends back are now proven to be a genuine
+  signature over exactly the bytes that were submitted, before any workflow
+  reports success. A compromised or impersonated service could previously make
+  `sign_data` / `sign_pdf_detached` succeed while returning something no
+  conforming verifier would accept, and the embedded flow accepted a response
+  that merely hashed correctly. Failures raise a distinct
+  `SigningResponseError` (`RevenantError::SigningResponse` in Rust): the request
+  succeeded at the protocol level, so retrying is pointless and nothing is
+  saved. The raw `SigningTransport` methods remain unverified by design -- they
+  are the low-level primitive, and calling them directly is an explicit opt-out.
+- **Rust: knowing the hash that was submitted no longer stands in for checking
+  what came back.** Post-sign verification treated a matching `expected_hash` as
+  proof and skipped the CMS `messageDigest` comparison entirely, so a response
+  carrying no digest at all could be reported as intact. Both are now required,
+  matching Python and TypeScript.
+- **Rust: `has_signed_attributes` distinguishes "the CMS says it has none" from
+  "the CMS did not parse".** It now returns `Option<bool>`; previously a
+  corrupt blob borrowed the diagnostic wording of a legitimate
+  no-`signedAttrs` signature.
 
 ### Changed
 
@@ -49,6 +69,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   Callers that displayed signer identity unconditionally must handle absence.
 - Only RSA PKCS#1 v1.5 signers are verified. ECDSA and RSASSA-PSS signers are
   reported as unverifiable, and therefore invalid, rather than accepted.
+- **Consequence, stated deliberately:** because signing workflows now refuse a
+  response they cannot verify, a signing service that switched to ECDSA or
+  RSASSA-PSS would fail signing outright rather than return an unverifiable
+  signature. That is the intended direction -- an unverifiable signature
+  returned under a success message is the defect being fixed -- but it means
+  algorithm support is now on the signing path, not only the verification path.
 ### Added
 
 - **Signature coverage is now measured and reported.** A signature covers only

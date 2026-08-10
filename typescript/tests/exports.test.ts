@@ -50,6 +50,7 @@ describe("src/index.ts re-exports", () => {
     expect(mod.PDFError).toBeDefined();
     expect(mod.RevenantError).toBeDefined();
     expect(mod.ServerError).toBeDefined();
+    expect(mod.SigningResponseError).toBeDefined();
     expect(mod.TLSError).toBeDefined();
   });
 

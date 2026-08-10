@@ -26,6 +26,7 @@ import {
   SIG_WIDTH,
   verifyEmbeddedSignature,
 } from "./pdf/index.js";
+import { checkSigningResponse } from "./signing-response.js";
 
 // -- Helpers ------------------------------------------------------------------
 
@@ -46,6 +47,11 @@ function validatePdf(pdfBytes: Uint8Array): void {
  * Sign a PDF document with an explicit transport — returns a detached
  * CMS/PKCS#7 signature. Low-level; production callers should prefer
  * the `signDetached` export from `revenant-sign` top-level.
+ *
+ * The response is verified against the submitted bytes before it is returned:
+ * a signature nobody could check is not a result worth handing back.
+ *
+ * @throws SigningResponseError if the response is not a signature over pdfBytes.
  */
 export async function signPdfDetachedWithTransport(
   pdfBytes: Uint8Array,
@@ -55,7 +61,9 @@ export async function signPdfDetachedWithTransport(
   timeout: number = DEFAULT_TIMEOUT_SOAP,
 ): Promise<Uint8Array> {
   validatePdf(pdfBytes);
-  return transport.signPdfDetached(pdfBytes, username, password, timeout);
+  const cmsDer = await transport.signPdfDetached(pdfBytes, username, password, timeout);
+  await checkSigningResponse(cmsDer, pdfBytes, "signPdfDetached");
+  return cmsDer;
 }
 
 // -- Hash signing -------------------------------------------------------------
@@ -64,6 +72,13 @@ export async function signPdfDetachedWithTransport(
  * Sign a pre-computed 20-byte SHA-1 hash with an explicit transport.
  * Low-level; production callers should prefer the `signHash` export
  * from `revenant-sign` top-level.
+ *
+ * The returned signature is checked to be a genuine signature, but — unlike the
+ * operations that submit content — nothing here can tie it to the document the
+ * hash was taken from: what a service binds in response to a pre-computed
+ * digest is service-defined, and observed to vary.
+ *
+ * @throws SigningResponseError if the response is not a verifiable signature.
  */
 export async function signHashWithTransport(
   hashBytes: Uint8Array,
@@ -77,7 +92,9 @@ export async function signHashWithTransport(
       `Expected ${SHA1_DIGEST_SIZE}-byte SHA-1 hash, got ${hashBytes.length} bytes.`,
     );
   }
-  return transport.signHash(hashBytes, username, password, timeout);
+  const cmsDer = await transport.signHash(hashBytes, username, password, timeout);
+  await checkSigningResponse(cmsDer, null, "signHash");
+  return cmsDer;
 }
 
 // -- Data signing -------------------------------------------------------------
@@ -86,6 +103,10 @@ export async function signHashWithTransport(
  * Sign arbitrary data with an explicit transport. The server computes
  * SHA-1 internally. Low-level; production callers should prefer the
  * `signData` export from `revenant-sign` top-level.
+ *
+ * The response is verified against dataBytes before it is returned.
+ *
+ * @throws SigningResponseError if the response is not a signature over dataBytes.
  */
 export async function signDataWithTransport(
   dataBytes: Uint8Array,
@@ -97,7 +118,9 @@ export async function signDataWithTransport(
   if (dataBytes.length === 0) {
     throw new RevenantError("Cannot sign empty data.");
   }
-  return transport.signData(dataBytes, username, password, timeout);
+  const cmsDer = await transport.signData(dataBytes, username, password, timeout);
+  await checkSigningResponse(cmsDer, dataBytes, "signData");
+  return cmsDer;
 }
 
 // -- Embedded PDF signing -----------------------------------------------------

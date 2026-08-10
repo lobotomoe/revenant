@@ -216,10 +216,10 @@ def test_sign_embedded_registers_tls(valid_pdf_bytes, mock_transport, cms_signer
 # ── sign_one_detached tests ──────────────────────────────────────
 
 
-def test_sign_detached_happy_path(valid_pdf_bytes, mock_transport, tmp_path):
+def test_sign_detached_happy_path(valid_pdf_bytes, mock_transport, cms_signer, tmp_path):
     """Valid PDF should produce detached .p7s signature."""
     output = tmp_path / "doc.p7s"
-    fake_cms = b"\x30\x82\x01\x00"
+    fake_cms = cms_signer(valid_pdf_bytes)
     mock_transport.sign_pdf_detached = Mock(return_value=fake_cms)
 
     with (
@@ -274,10 +274,10 @@ def test_sign_detached_tls_error(valid_pdf_bytes, tmp_path):
     assert result.tls_error
 
 
-def test_sign_detached_permission_error(valid_pdf_bytes, mock_transport, tmp_path):
+def test_sign_detached_permission_error(valid_pdf_bytes, mock_transport, cms_signer, tmp_path):
     """PermissionError on write should produce failure."""
     output = tmp_path / "doc.p7s"
-    fake_cms = b"\x30\x82\x01\x00"
+    fake_cms = cms_signer(valid_pdf_bytes)
     mock_transport.sign_pdf_detached = Mock(return_value=fake_cms)
 
     with (

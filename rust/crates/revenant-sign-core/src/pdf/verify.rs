@@ -1,9 +1,10 @@
 //! Post-sign verification of embedded and detached PDF signatures.
 //!
 //! Extracts the ByteRange data and CMS blob, checks structural validity, and
-//! verifies the ByteRange hash against either an expected value (the exact hash
-//! sent to the appliance) or the algorithm and `messageDigest` declared in the
-//! CMS.
+//! verifies the ByteRange hash against the algorithm and `messageDigest`
+//! declared in the CMS -- plus, on the post-sign path, the exact hash that was
+//! sent for signing. The two are checked together, never one instead of the
+//! other.
 //!
 //! Certificate-chain validation needs a network transport (to fetch the Trust
 //! Service List and intermediates), so it is *injected* as a closure rather than
@@ -50,11 +51,12 @@ pub struct VerificationResult {
 }
 
 impl VerificationResult {
-    /// Structural integrity: the CMS parses and the ByteRange hash matches the
-    /// expected or CMS-declared digest. This proves the signed bytes are intact
-    /// but NOT that the named signer produced the signature -- use [`valid`] for
-    /// the full cryptographic verdict. It is the right check for the post-sign
-    /// self-test, which only asks "did the splice preserve the signed bytes?".
+    /// Structural integrity: the CMS parses and the ByteRange hash matches both
+    /// the expected value (when one is supplied) and the digest the CMS itself
+    /// declares. This proves the signed bytes are intact but NOT that the named
+    /// signer produced the signature -- use [`valid`] for the full
+    /// cryptographic verdict. Reported on its own so a diagnostic view can say
+    /// *which* half failed; no workflow accepts a document on this alone.
     ///
     /// [`valid`]: VerificationResult::valid
     #[must_use]
@@ -198,8 +200,13 @@ fn check_cms_structure(cms_der: &[u8], details: &mut Vec<String>) -> bool {
     }
 }
 
-/// Verify the ByteRange hash, preferring an explicit expected value, else the
-/// algorithm and `messageDigest` declared in the CMS.
+/// Verify the ByteRange hash against an optional caller-supplied oracle *and*
+/// the digest the CMS itself declares.
+///
+/// Both must hold. Knowing the exact hash that was submitted for signing says
+/// nothing about what the returned CMS ended up binding, so the post-sign path
+/// checks the `messageDigest` too rather than treating the oracle as a
+/// substitute for it.
 fn verify_hash(
     signed_data: &[u8],
     cms_der: &[u8],
@@ -207,22 +214,22 @@ fn verify_hash(
     signature: SignatureStatus,
     details: &mut Vec<String>,
 ) -> bool {
+    let mut expected_ok = true;
     if let Some(expected) = expected_hash {
-        // Post-sign path: the exact SHA-1 sent to the appliance is known.
         let actual = DigestAlgorithm::Sha1.hash(signed_data);
-        if actual == expected {
+        expected_ok = actual == expected;
+        if expected_ok {
             details.push(format!(
                 "Hash OK -- SHA-1 matches expected: {}",
                 hex::encode(&actual)
             ));
-            return true;
+        } else {
+            details.push(format!(
+                "Hash MISMATCH!\n  ByteRange SHA-1: {}\n  Expected:        {}",
+                hex::encode(&actual),
+                hex::encode(expected)
+            ));
         }
-        details.push(format!(
-            "Hash MISMATCH!\n  ByteRange SHA-1: {}\n  Expected:        {}",
-            hex::encode(&actual),
-            hex::encode(expected)
-        ));
-        return false;
     }
 
     if let Some((algo, cms_digest)) = extract_digest_info(cms_der) {
@@ -233,7 +240,7 @@ fn verify_hash(
                 "Hash OK -- {algo_upper} matches CMS messageDigest: {}",
                 hex::encode(&actual)
             ));
-            return true;
+            return expected_ok;
         }
         details.push(format!(
             "Hash MISMATCH!\n  ByteRange {algo_upper}:   {}\n  CMS messageDigest:  {}",
@@ -243,7 +250,7 @@ fn verify_hash(
         return false;
     }
 
-    if !has_signed_attributes(cms_der) {
+    if has_signed_attributes(cms_der) == Some(false) {
         // RFC 5652 section 5.4: with no signed attributes there is no separate
         // messageDigest to compare -- the signature itself binds these bytes,
         // so integrity follows from the signature verdict alone.
@@ -251,18 +258,10 @@ fn verify_hash(
             "Integrity: signature covers the signed bytes directly (no signed attributes)"
                 .to_owned(),
         );
-        return signature.is_valid();
+        return expected_ok && signature.is_valid();
     }
 
-    if cms_der.len() >= MIN_CMS_SIZE && cms_der.first() == Some(&ASN1_SEQUENCE_TAG) {
-        let actual = DigestAlgorithm::Sha1.hash(signed_data);
-        details.push(format!(
-            "Hash computed -- SHA-1: {} (CMS digest info not available -- cannot verify)",
-            hex::encode(&actual)
-        ));
-    } else {
-        details.push("Hash: cannot verify without expected hash and CMS is suspect".to_owned());
-    }
+    details.push("Could not extract CMS messageDigest -- hash verification unavailable".to_owned());
     false
 }
 
@@ -421,7 +420,7 @@ pub fn verify_detached_signature(
             ));
             false
         }
-    } else if !has_signed_attributes(cms_der) {
+    } else if has_signed_attributes(cms_der) == Some(false) {
         // RFC 5652 section 5.4: the signature covers the content directly.
         details.push(
             "Integrity: signature covers the signed bytes directly (no signed attributes)"
@@ -472,7 +471,23 @@ mod tests {
     const CMS_LEAF: &[u8] = include_bytes!("../pki/testdata/cms_leaf_direct.der");
 
     /// Prepare + fake-sign a PDF, returning (signed_pdf, sha1_of_byterange).
+    /// Prepare a PDF and splice in a genuine signature over its ByteRange,
+    /// returning the signed PDF and the hash that was signed.
+    fn prepare_and_sign() -> (Vec<u8>, [u8; 20]) {
+        prepare_and_splice(crate::testutil::sign_cms_detached)
+    }
+
+    /// The same flow with filler bytes in place of a signature -- what a
+    /// compromised or impersonated signing service could return.
     fn prepare_and_fake_sign() -> (Vec<u8>, [u8; 20]) {
+        prepare_and_splice(|_| {
+            let mut cms = vec![0x30, 0x81, 0xC8];
+            cms.extend(std::iter::repeat_n(0xAB, 200));
+            cms
+        })
+    }
+
+    fn prepare_and_splice(make_cms: impl Fn(&[u8]) -> Vec<u8>) -> (Vec<u8>, [u8; 20]) {
         let opts = PrepareOptions {
             name: Some("Verify Test"),
             ..Default::default()
@@ -483,8 +498,10 @@ mod tests {
             contents_hex_len: hex_len,
         } = prepare_pdf_with_sig_field(BLANK_LETTER, &opts).unwrap();
         let hash = compute_byterange_hash(&prepared, hex_start, hex_len).unwrap();
-        let mut cms = vec![0x30, 0x81, 0xC8];
-        cms.extend(std::iter::repeat_n(0xAB, 200));
+        let mut byterange = Vec::with_capacity(prepared.len().saturating_sub(hex_len + 1));
+        byterange.extend_from_slice(&prepared[..hex_start]);
+        byterange.extend_from_slice(&prepared[hex_start + hex_len + 1..]);
+        let cms = make_cms(&byterange);
         let signed = insert_cms(&prepared, hex_start, hex_len, &cms).unwrap();
         (signed, hash)
     }
@@ -520,24 +537,40 @@ mod tests {
 
     #[test]
     fn verifies_with_expected_hash() {
-        let (signed, hash) = prepare_and_fake_sign();
+        let (signed, hash) = prepare_and_sign();
         let result = verify_embedded_signature(&signed, Some(&hash), None);
         assert!(result.structure_ok, "{:?}", result.details);
         assert!(result.hash_ok, "{:?}", result.details);
-        // The splice preserved the signed bytes: integrity holds.
-        assert!(result.integrity_ok());
-        // But the fake CMS carries no real signature, so full validity does not.
-        assert!(!result.valid());
-        assert!(matches!(
-            result.signature,
-            crate::cms::SignatureStatus::Unverifiable(_)
-        ));
+        assert!(result.integrity_ok(), "{:?}", result.details);
+        assert!(result.valid(), "{:?}", result.details);
+        assert_eq!(result.signature, crate::cms::SignatureStatus::Valid);
         assert!(result
             .details
             .iter()
             .any(|d| d.contains("Hash OK -- SHA-1")));
         // No chain validator supplied -> chain not attempted.
         assert_eq!(result.trust_status, Some(TrustStatus::Indeterminate));
+    }
+
+    #[test]
+    fn a_known_expected_hash_does_not_vouch_for_a_blob_that_is_not_a_signature() {
+        // Knowing the exact hash that was submitted proves the spliced bytes
+        // survived -- it says nothing about what came back. Filler bytes match
+        // no messageDigest, so neither integrity nor validity may hold.
+        let (signed, hash) = prepare_and_fake_sign();
+        let result = verify_embedded_signature(&signed, Some(&hash), None);
+        assert!(result.structure_ok, "{:?}", result.details);
+        assert!(!result.hash_ok, "{:?}", result.details);
+        assert!(!result.integrity_ok());
+        assert!(!result.valid());
+        assert!(result
+            .details
+            .iter()
+            .any(|d| d.contains("Hash OK -- SHA-1 matches expected")));
+        assert!(result
+            .details
+            .iter()
+            .any(|d| d.contains("Could not extract CMS messageDigest")));
     }
 
     #[test]

@@ -105,8 +105,8 @@ mod tests {
     const CMS_LEAF_DIRECT: &[u8] = include_bytes!("../pki/testdata/cms_leaf_direct.der");
     const ROOT_DER: &[u8] = include_bytes!("../pki/testdata/root.der");
 
-    /// Prepare + fake-sign a PDF, returning (signed_pdf, sha1_of_byterange).
-    fn prepare_and_fake_sign() -> (Vec<u8>, [u8; 20]) {
+    /// Prepare + sign a PDF, returning (signed_pdf, sha1_of_byterange).
+    fn prepare_and_sign() -> (Vec<u8>, [u8; 20]) {
         let opts = PrepareOptions {
             name: Some("Verify Wiring"),
             ..Default::default()
@@ -117,15 +117,17 @@ mod tests {
             contents_hex_len: hex_len,
         } = prepare_pdf_with_sig_field(BLANK_LETTER, &opts).unwrap();
         let hash = compute_byterange_hash(&prepared, hex_start, hex_len).unwrap();
-        let mut cms = vec![0x30, 0x81, 0xC8];
-        cms.extend(std::iter::repeat_n(0xAB, 200));
+        let mut byterange = Vec::with_capacity(prepared.len().saturating_sub(hex_len + 1));
+        byterange.extend_from_slice(&prepared[..hex_start]);
+        byterange.extend_from_slice(&prepared[hex_start + hex_len + 1..]);
+        let cms = crate::testutil::sign_cms_detached(&byterange);
         let signed = insert_cms(&prepared, hex_start, hex_len, &cms).unwrap();
         (signed, hash)
     }
 
     #[test]
     fn verify_pdf_without_tsl_is_offline_and_intact() {
-        let (signed, hash) = prepare_and_fake_sign();
+        let (signed, hash) = prepare_and_sign();
         let transport = Transport::new();
         let cache = TrustStoreCache::new();
         let result = verify_pdf(
@@ -135,17 +137,15 @@ mod tests {
             Some(&hash),
             &TrustAnchors::None,
         );
-        // The fake CMS has intact byte-range integrity, but no real signature,
-        // so full cryptographic validity does not hold.
         assert!(result.integrity_ok(), "{:?}", result.details);
-        assert!(!result.valid());
+        assert!(result.valid(), "{:?}", result.details);
         // No anchors -> chain not attempted.
         assert_eq!(result.trust_status, Some(TrustStatus::Indeterminate));
     }
 
     #[test]
     fn verify_pdf_all_without_tsl_returns_one_result() {
-        let (signed, _hash) = prepare_and_fake_sign();
+        let (signed, _hash) = prepare_and_sign();
         let transport = Transport::new();
         let cache = TrustStoreCache::new();
         let results = verify_pdf_all(&transport, &cache, &signed, &TrustAnchors::None).unwrap();

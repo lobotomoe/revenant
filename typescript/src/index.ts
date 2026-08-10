@@ -53,6 +53,7 @@ export {
   PDFError,
   RevenantError,
   ServerError,
+  SigningResponseError,
   TLSError,
 } from "./errors.js";
 // Logger

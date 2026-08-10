@@ -81,21 +81,22 @@ impl SignatureStatus {
     }
 }
 
-/// Whether the first `SignerInfo` carries signed attributes.
+/// Whether the first `SignerInfo` carries signed attributes, or `None` when the
+/// blob yields no `SignerInfo` to ask about.
 ///
 /// RFC 5652 section 5.4 makes them optional. Without them the signature covers
 /// the content itself, so there is no `messageDigest` attribute to compare
 /// against the signed bytes separately -- the signature is the only binding.
+///
+/// The `None` case is kept distinct from `Some(false)` on purpose: a blob that
+/// does not parse has not told us it lacks signed attributes, and reporting the
+/// two alike would let a corrupt response borrow the wording of a legitimate
+/// signature shape.
 #[must_use]
-pub fn has_signed_attributes(cms_der: &[u8]) -> bool {
-    signed_data_from_der(cms_der).is_ok_and(|signed_data| {
-        signed_data
-            .signer_infos
-            .0
-            .iter()
-            .next()
-            .is_some_and(|signer_info| signer_info.signed_attrs.is_some())
-    })
+pub fn has_signed_attributes(cms_der: &[u8]) -> Option<bool> {
+    let signed_data = signed_data_from_der(cms_der).ok()?;
+    let signer_info = signed_data.signer_infos.0.iter().next()?;
+    Some(signer_info.signed_attrs.is_some())
 }
 
 /// Verify the first `SignerInfo`'s signature in a CMS/PKCS#7 blob.
@@ -458,8 +459,11 @@ mod tests {
             verify_signer_signature(CMS_NO_ATTRS, None),
             SignatureStatus::Unverifiable(_)
         ));
-        assert!(!has_signed_attributes(CMS_NO_ATTRS));
-        assert!(has_signed_attributes(CMS_LEAF_DIRECT));
+        assert_eq!(has_signed_attributes(CMS_NO_ATTRS), Some(false));
+        assert_eq!(has_signed_attributes(CMS_LEAF_DIRECT), Some(true));
+        // A blob that does not parse must not be reported as "no attributes":
+        // that wording belongs to a CMS that actually said so.
+        assert_eq!(has_signed_attributes(&[0x30, 0x03, 0xAB, 0xAB, 0xAB]), None);
     }
 
     #[test]

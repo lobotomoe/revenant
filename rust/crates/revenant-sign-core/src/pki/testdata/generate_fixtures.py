@@ -15,6 +15,12 @@ Regenerate with:
 
 Pass ``--ess-only`` to update only the shared ESS CMS fixtures.
 Pass ``--identity-only`` to update only the signer-identity regression fixtures.
+Pass ``--signer-only`` to update only the runtime test signer material.
+
+``test_signer_key.der`` is a throwaway RSA key committed on purpose: the signing
+tests must produce real signatures over data computed during the test run, which
+no pre-built fixture can cover. It signs nothing outside this test suite, is not
+trusted by any profile, and must never be reused.
 """
 
 from __future__ import annotations
@@ -582,6 +588,30 @@ def build_no_signed_attrs_cms(
     ).dump()
 
 
+def write_test_signer_material() -> None:
+    """Write a signer certificate together with its private key.
+
+    Every other fixture here is a finished CMS blob, which is enough while the
+    signed bytes are fixed. The signing workflow tests are not: they sign a PDF
+    whose ByteRange is only known at test time, so the test transport has to
+    produce a real signature over data this script never sees. Shipping the key
+    lets it do that, and keeps the happy path a genuine signature rather than
+    filler bytes that merely look like DER.
+    """
+    root, root_key = make_root_ca("Test Signer Root")
+    signer, signer_key = make_leaf(root, root_key, "Test Runtime Signer")
+
+    write("test_signer_cert.der", to_der(signer))
+    write(
+        "test_signer_key.der",
+        signer_key.private_bytes(
+            encoding=serialization.Encoding.DER,
+            format=serialization.PrivateFormat.PKCS8,
+            encryption_algorithm=serialization.NoEncryption(),
+        ),
+    )
+
+
 def write_identity_hardening_fixtures() -> None:
     """Write CMS vectors for signer-certificate and identity regressions."""
     root, root_key = make_root_ca("Identity Test Root")
@@ -712,6 +742,7 @@ def main(*, ess_only: bool = False, identity_only: bool = False) -> None:
         )
         write("cms_with_archival.der", build_cms_with_archival(leaf_direct, leaf_direct_key))
         write_identity_hardening_fixtures()
+        write_test_signer_material()
 
 
 if __name__ == "__main__":
@@ -723,5 +754,13 @@ if __name__ == "__main__":
         action="store_true",
         help="write only signer identity hardening fixtures",
     )
+    group.add_argument(
+        "--signer-only",
+        action="store_true",
+        help="write only the runtime test signer certificate and key",
+    )
     args = parser.parse_args()
-    main(ess_only=args.ess_only, identity_only=args.identity_only)
+    if args.signer_only:
+        write_test_signer_material()
+    else:
+        main(ess_only=args.ess_only, identity_only=args.identity_only)
