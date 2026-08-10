@@ -56,6 +56,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   "the CMS did not parse".** It now returns `Option<bool>`; previously a
   corrupt blob borrowed the diagnostic wording of a legitimate
   no-`signedAttrs` signature.
+- **`sign_hash` now says what it actually does.** It signs the hash bytes
+  themselves. What a service does with a submitted digest is service-defined and
+  observed to vary: some sign it as a pre-computed digest, others hash it again
+  and sign it as ordinary content -- and only the first kind yields a signature
+  that can be attached to the document the hash came from. The response is
+  checked to be a genuine signature, and a warning is logged naming both digests
+  when it does not bind the one submitted. The operation is not failed over
+  this: the caller asked for those bytes to be signed, and they were. To sign a
+  document, pass the document to `sign_data`.
 
 ### Changed
 

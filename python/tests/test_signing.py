@@ -91,6 +91,15 @@ def test_sign_hash_rejects_unverifiable_response(mock_transport):
         sign_hash(b"\xab" * 20, mock_transport, "user", "pass", 120)
 
 
+def test_sign_hash_warns_when_the_response_binds_something_else(mock_transport, cms_signer, caplog):
+    """The appliance hashes a submitted digest again; the caller must hear it."""
+    fake_hash = b"\xab" * 20
+    mock_transport.sign_hash = Mock(return_value=cms_signer(fake_hash))
+    with caplog.at_level("WARNING"):
+        sign_hash(fake_hash, mock_transport, "user", "pass", 120)
+    assert "pre-computed digest" in caplog.text
+
+
 # ── sign_data validation ─────────────────────────────────────────────
 
 

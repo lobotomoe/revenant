@@ -15,7 +15,7 @@ use crate::pdf::{
     compute_byterange_hash, insert_cms, prepare_pdf_with_sig_field, verify_embedded_signature,
     PageSpec, Position, PrepareOptions, PreparedPdf, SIG_HEIGHT, SIG_WIDTH,
 };
-use crate::signing_response::check_signing_response;
+use crate::signing_response::{check_response_over_content, check_response_over_digest};
 use crate::{Result, RevenantError};
 
 /// Placement and appearance options for an embedded PDF signature.
@@ -101,16 +101,19 @@ pub fn sign_pdf_detached(
 ) -> Result<Vec<u8>> {
     validate_pdf(pdf)?;
     let cms_der = transport.sign_pdf_detached(pdf, username, password, timeout)?;
-    check_signing_response(&cms_der, Some(pdf), "sign_pdf_detached")?;
+    check_response_over_content(&cms_der, pdf, "sign_pdf_detached")?;
     Ok(cms_der)
 }
 
 /// Sign a pre-computed 20-byte SHA-1 hash.
 ///
-/// The returned signature is checked to be a genuine signature, but -- unlike
-/// the operations that submit content -- nothing here can tie it to the
-/// document the hash was taken from: what a service binds in response to a
-/// pre-computed digest is service-defined, and observed to vary.
+/// Signs the hash bytes themselves. What a service does with a submitted digest
+/// is service-defined and observed to vary: some sign it as a pre-computed
+/// digest, others hash it again and sign it as ordinary content. Only the first
+/// kind yields a signature that can be attached to the document the hash came
+/// from, so the response is checked to be a genuine signature and a warning is
+/// logged when it does not bind the submitted digest. To sign a document, pass
+/// the document to [`sign_data`].
 ///
 /// # Errors
 ///
@@ -132,7 +135,7 @@ pub fn sign_hash(
         )));
     }
     let cms_der = transport.sign_hash(hash, username, password, timeout)?;
-    check_signing_response(&cms_der, None, "sign_hash")?;
+    check_response_over_digest(&cms_der, hash, "sign_hash")?;
     Ok(cms_der)
 }
 
@@ -156,7 +159,7 @@ pub fn sign_data(
         return Err(RevenantError::Other("Cannot sign empty data.".to_owned()));
     }
     let cms_der = transport.sign_data(data, username, password, timeout)?;
-    check_signing_response(&cms_der, Some(data), "sign_data")?;
+    check_response_over_content(&cms_der, data, "sign_data")?;
     Ok(cms_der)
 }
 

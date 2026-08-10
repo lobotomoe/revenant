@@ -13,41 +13,43 @@
  * one worth trusting is a chain question, answered separately and reported
  * rather than enforced; binding the response to the request is the part that
  * has to hold for every profile, online or offline.
+ *
+ * Submitting a document and submitting its digest are different situations, so
+ * they are different functions. With the content in hand the binding can be
+ * proven. With only a digest it cannot: what a service signs in response to a
+ * pre-computed digest is service-defined, and services differ. That gap is
+ * reported rather than papered over.
  */
 
 import { SigningResponseError } from "../errors.js";
+import { logger } from "../logger.js";
+import { extractDigestInfo } from "./pdf/cms-info.js";
 import { verifySignerSignature } from "./pdf/cms-signature.js";
 import { verifyDetachedSignature } from "./pdf/verify.js";
 
+function toHex(bytes: Uint8Array): string {
+  return Array.from(bytes, (b) => b.toString(16).padStart(2, "0")).join("");
+}
+
+function equalBytes(a: Uint8Array, b: Uint8Array): boolean {
+  if (a.length !== b.length) {
+    return false;
+  }
+  return a.every((byte, i) => byte === b[i]);
+}
+
 /**
- * Reject a signing response that cannot be proven to be a usable signature.
- *
- * `signedContent` is the exact byte string submitted for signing, when the
- * request determines it; the response must then verify as a signature over
- * those bytes. `null` belongs only where the submitted material does not
- * determine the signed content -- the signature itself is still verified, but
- * nothing ties it to a particular document.
+ * Throw unless the response is a valid signature over exactly `content`.
  *
  * @throws SigningResponseError when the response is not a signature, or does
  *   not cover the submitted bytes.
  */
-export async function checkSigningResponse(
+export async function checkResponseOverContent(
   cmsDer: Uint8Array,
-  signedContent: Uint8Array | null,
+  content: Uint8Array,
   operation: string,
 ): Promise<void> {
-  if (signedContent === null) {
-    const signature = await verifySignerSignature(cmsDer, null);
-    if (signature.valid === true) {
-      return;
-    }
-    throw new SigningResponseError(
-      `${operation}: the signing service returned a response that is not a ` +
-        `verifiable signature (${signature.detail}). Nothing was saved.`,
-    );
-  }
-
-  const result = await verifyDetachedSignature(signedContent, cmsDer);
+  const result = await verifyDetachedSignature(content, cmsDer);
   if (result.valid) {
     return;
   }
@@ -55,6 +57,57 @@ export async function checkSigningResponse(
   const detailStr = result.details.join("\n  ");
   throw new SigningResponseError(
     `${operation}: the signing service's response is not a valid signature over ` +
-      `the ${signedContent.length} bytes submitted:\n  ${detailStr}\nNothing was saved.`,
+      `the ${content.length} bytes submitted:\n  ${detailStr}\nNothing was saved.`,
+  );
+}
+
+/**
+ * Throw unless the response is a genuine signature; report what it binds.
+ *
+ * Only a digest was submitted, so there is no content to verify the signature
+ * against and no way to prove the response covers the document that digest came
+ * from. What is provable — that the response is a real signature by the
+ * certificate it carries — is required. What is not provable is reported: if
+ * the signed `messageDigest` differs from the digest submitted, the service did
+ * not treat it as a pre-computed digest, and the signature must not be attached
+ * to the document it was taken from.
+ *
+ * @throws SigningResponseError when the response is not a verifiable signature.
+ */
+export async function checkResponseOverDigest(
+  cmsDer: Uint8Array,
+  digest: Uint8Array,
+  operation: string,
+): Promise<void> {
+  const signature = await verifySignerSignature(cmsDer, null);
+  if (signature.valid !== true) {
+    throw new SigningResponseError(
+      `${operation}: the signing service returned a response that is not a ` +
+        `verifiable signature (${signature.detail}). Nothing was saved.`,
+    );
+  }
+
+  // A signature that verified without content signed its signed attributes, and
+  // those must carry exactly one well-formed messageDigest — the verifier rejects
+  // them otherwise. Its absence here means two readings of the same CMS disagree,
+  // which is our bug, not a service quirk.
+  const digestInfo = extractDigestInfo(cmsDer);
+  if (digestInfo === null) {
+    throw new SigningResponseError(
+      `${operation}: the response verified as a signature but declares no ` +
+        "messageDigest; the CMS could not be read consistently. Nothing was saved.",
+    );
+  }
+
+  if (equalBytes(digestInfo.digest, digest)) {
+    return;
+  }
+
+  logger.warn(
+    `${operation}: the signing service signed the submitted digest as content ` +
+      "rather than treating it as a pre-computed digest -- the response binds " +
+      `${toHex(digestInfo.digest)}, not the ${toHex(digest)} that was submitted. ` +
+      "It is a valid signature, but not one that can be attached to the document " +
+      "that digest came from; use signData on the document itself for that.",
   );
 }
