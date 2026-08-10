@@ -36,6 +36,62 @@ pub struct ByteRange {
     pub len2: usize,
 }
 
+/// How much of a file one signature's `ByteRange` actually covers.
+///
+/// The hole between the two covered runs is the `/Contents` slot holding the
+/// signature itself, so it is not a gap in coverage. Anything at or after
+/// [`coverage_end`] lies outside this signature: in an incrementally updated PDF
+/// that is usually a later revision, which a subsequent signature may or may not
+/// cover.
+///
+/// [`coverage_end`]: ByteRangeCoverage::coverage_end
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
+pub struct ByteRangeCoverage {
+    /// Bytes the ByteRange actually covers.
+    pub covered_bytes: usize,
+    /// Size of the whole file.
+    pub total_bytes: usize,
+    /// First byte position past the signature's coverage.
+    pub coverage_end: usize,
+}
+
+impl ByteRangeCoverage {
+    /// Coverage for data signed in its entirety, with no surrounding file that
+    /// could carry unsigned bytes -- a detached signature, for instance.
+    #[must_use]
+    pub fn whole(size: usize) -> Self {
+        Self {
+            covered_bytes: size,
+            total_bytes: size,
+            coverage_end: size,
+        }
+    }
+
+    /// Whether the signature's coverage reaches the end of the file.
+    #[must_use]
+    pub fn covers_to_eof(self) -> bool {
+        self.coverage_end >= self.total_bytes
+    }
+
+    /// Bytes after this signature's coverage, if any.
+    #[must_use]
+    pub fn trailing_bytes(self) -> usize {
+        self.total_bytes.saturating_sub(self.coverage_end)
+    }
+}
+
+impl ByteRange {
+    /// Measure what portion of `pdf_bytes` this ByteRange covers.
+    #[must_use]
+    pub fn coverage(self, pdf_bytes: &[u8]) -> ByteRangeCoverage {
+        ByteRangeCoverage {
+            covered_bytes: self.len1 + self.len2,
+            total_bytes: pdf_bytes.len(),
+            coverage_end: self.off2 + self.len2,
+        }
+    }
+}
+
 /// Every `/ByteRange` array in the file, in document order.
 ///
 /// For a multiply-signed PDF the last entry is the most recent signature.

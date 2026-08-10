@@ -15,6 +15,7 @@ import { bytesToHex } from "../../utils.js";
 import { ASN1_SEQUENCE_TAG, MIN_CMS_SIZE } from "./asn1.js";
 import {
   type ByteRangeMatch,
+  byteRangeCoverage,
   extractSignatureDataFromMatch,
   findByteRanges,
 } from "./cms-extraction.js";
@@ -22,6 +23,16 @@ import { extractDigestInfo, extractSignerInfo, type SignerInfo } from "./cms-inf
 import { type SignatureVerification, verifySignerSignature } from "./cms-signature.js";
 
 // -- Types --------------------------------------------------------------------
+
+/** How much of the file one signature covers. */
+export interface SignatureCoverage {
+  /** ByteRange reaches EOF; false = bytes follow it. */
+  coversWholeFile: boolean;
+  /** Bytes the ByteRange actually covers. */
+  coveredBytes: number;
+  /** Size of the whole file. */
+  totalBytes: number;
+}
 
 export interface VerificationResult {
   /** Overall verification result. */
@@ -32,6 +43,8 @@ export interface VerificationResult {
   hashOk: boolean;
   /** Cryptographic signer signature result (null = verification unavailable). */
   signatureValid: boolean | null;
+  /** How much of the file this signature covers. */
+  coverage: SignatureCoverage;
   /** Contains embedded revocation data. */
   ltvEnabled: boolean;
   /** Human-readable messages. */
@@ -167,6 +180,7 @@ async function verifySignatureMatch(
       structureOk: false,
       hashOk: false,
       signatureValid: null,
+      coverage: { coversWholeFile: false, coveredBytes: 0, totalBytes: 0 },
       ltvEnabled: false,
       details: [`Structure error: ${msg}`],
       signer: null,
@@ -175,6 +189,18 @@ async function verifySignatureMatch(
       trustStatus: null,
     };
   }
+
+  // 2a. Signature coverage. Bytes past the ByteRange are not signed by this
+  // signature. In an incrementally updated PDF they are usually a later
+  // revision -- possibly another signature, possibly an unsigned change.
+  // Reported, never inferred.
+  const coverage = byteRangeCoverage(pdfBytes, brMatch);
+  details.push(
+    coverage.coversToEof
+      ? `Coverage: whole file (${coverage.coveredBytes} of ${coverage.totalBytes} bytes)`
+      : `Coverage: partial -- ${coverage.trailingBytes} of ${coverage.totalBytes} bytes ` +
+          "follow this signature and are outside it",
+  );
 
   // 2. CMS structure check
   if (cmsDer.length < MIN_CMS_SIZE) {
@@ -229,6 +255,11 @@ async function verifySignatureMatch(
     structureOk,
     hashOk,
     signatureValid: signature.valid,
+    coverage: {
+      coversWholeFile: coverage.coversToEof,
+      coveredBytes: coverage.coveredBytes,
+      totalBytes: coverage.totalBytes,
+    },
     ltvEnabled: ltv.ltvEnabled,
     details,
     signer,
@@ -260,6 +291,7 @@ export async function verifyEmbeddedSignature(
       structureOk: false,
       hashOk: false,
       signatureValid: null,
+      coverage: { coversWholeFile: false, coveredBytes: 0, totalBytes: 0 },
       ltvEnabled: false,
       details: ["Structure error: No /ByteRange found in PDF -- not a signed PDF?"],
       signer: null,
@@ -276,6 +308,7 @@ export async function verifyEmbeddedSignature(
       structureOk: false,
       hashOk: false,
       signatureValid: null,
+      coverage: { coversWholeFile: false, coveredBytes: 0, totalBytes: 0 },
       ltvEnabled: false,
       details: ["Structure error: No /ByteRange found in PDF -- not a signed PDF?"],
       signer: null,
@@ -334,6 +367,20 @@ export async function verifyAllEmbeddedSignatures(
     const result = await verifySignatureMatch(pdfBytes, brMatch, null, tslUrl);
     result.details.push(pdfLibDetail);
     results.push(result);
+  }
+
+  // One signature covering an earlier revision is expected -- a later signature
+  // covers the rest. Bytes past *every* signature are signed by nobody, which is
+  // decided by arithmetic alone, without inspecting what they contain.
+  const lastResult = results[results.length - 1];
+  if (lastResult !== undefined && !results.some((r) => r.coverage.coversWholeFile)) {
+    const furthest = Math.max(
+      ...brMatches.map((br) => byteRangeCoverage(pdfBytes, br).coverageEnd),
+    );
+    const unsigned = pdfBytes.length - furthest;
+    lastResult.details.push(
+      `WARNING: ${unsigned} trailing bytes are covered by no signature in this document`,
+    );
   }
 
   return results;
@@ -408,6 +455,13 @@ export async function verifyDetachedSignature(
     structureOk,
     hashOk,
     signatureValid: signature.valid,
+    // A detached signature covers exactly the data it was handed; there is no
+    // surrounding file that could carry unsigned bytes.
+    coverage: {
+      coversWholeFile: true,
+      coveredBytes: dataBytes.length,
+      totalBytes: dataBytes.length,
+    },
     ltvEnabled: ltv.ltvEnabled,
     details,
     signer,

@@ -16,6 +16,38 @@ export interface ByteRangeMatch {
   len2: number;
 }
 
+/** How much of a file one signature's ByteRange actually covers. */
+export interface ByteRangeCoverage {
+  coveredBytes: number;
+  totalBytes: number;
+  /** First byte position past the signature's coverage. */
+  coverageEnd: number;
+  coversToEof: boolean;
+  /** Bytes after this signature's coverage, if any. */
+  trailingBytes: number;
+}
+
+/**
+ * Measure what portion of the file a ByteRange covers.
+ *
+ * A ByteRange `[a b c d]` covers `[a, a+b)` and `[c, c+d)`. The hole between
+ * them is the `/Contents` slot holding the signature itself, so it is not a gap
+ * in coverage. Anything at or after `c + d` lies outside this signature: in an
+ * incrementally updated PDF that is usually a later revision, which a
+ * subsequent signature may or may not cover.
+ */
+export function byteRangeCoverage(pdfBytes: Uint8Array, br: ByteRangeMatch): ByteRangeCoverage {
+  const totalBytes = pdfBytes.length;
+  const coverageEnd = br.off2 + br.len2;
+  return {
+    coveredBytes: br.len1 + br.len2,
+    totalBytes,
+    coverageEnd,
+    coversToEof: coverageEnd >= totalBytes,
+    trailingBytes: Math.max(totalBytes - coverageEnd, 0),
+  };
+}
+
 /**
  * Find all ByteRange matches in PDF bytes.
  */

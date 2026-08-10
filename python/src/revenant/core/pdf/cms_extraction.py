@@ -4,12 +4,50 @@
 from __future__ import annotations
 
 import re
+from typing import NamedTuple
 
 from ...errors import PDFError
 from .asn1 import extract_der_from_padded_hex
 
 # Regex pattern to find ByteRange arrays in PDF
 BYTERANGE_PATTERN = rb"/ByteRange\s*\[\s*(\d+)\s+(\d+)\s+(\d+)\s+(\d+)\s*\]"
+
+
+class ByteRangeCoverage(NamedTuple):
+    """How much of a file one signature's ByteRange actually covers.
+
+    A ByteRange ``[a b c d]`` covers ``[a, a+b)`` and ``[c, c+d)``. The hole
+    between them is the ``/Contents`` slot holding the signature itself, so it
+    is not a gap in coverage. Anything at or after ``c + d`` lies outside this
+    signature entirely: in an incrementally updated PDF that is usually a later
+    revision, which a subsequent signature may or may not cover.
+    """
+
+    covered_bytes: int
+    total_bytes: int
+    coverage_end: int
+
+    @property
+    def covers_to_eof(self) -> bool:
+        """Whether the signature's coverage reaches the end of the file."""
+        return self.coverage_end >= self.total_bytes
+
+    @property
+    def trailing_bytes(self) -> int:
+        """Bytes after this signature's coverage, if any."""
+        return max(self.total_bytes - self.coverage_end, 0)
+
+
+def byterange_coverage(pdf_bytes: bytes, br_match: re.Match[bytes]) -> ByteRangeCoverage:
+    """Measure what portion of the file a ByteRange covers."""
+    len1 = int(br_match.group(2))
+    off2 = int(br_match.group(3))
+    len2 = int(br_match.group(4))
+    return ByteRangeCoverage(
+        covered_bytes=len1 + len2,
+        total_bytes=len(pdf_bytes),
+        coverage_end=off2 + len2,
+    )
 
 
 def extract_cms_from_byterange(

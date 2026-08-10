@@ -102,7 +102,7 @@ pub fn has_signed_attributes(cms_der: &[u8]) -> bool {
 ///
 /// `content` is the detached content the signature covers. It is consulted only
 /// when the CMS carries no signed attributes and embeds no content of its own;
-/// EKENG issues its credential documents in exactly that shape.
+/// signers do issue documents in exactly that shape.
 #[must_use]
 pub fn verify_signer_signature(cms_der: &[u8], content: Option<&[u8]>) -> SignatureStatus {
     match signed_data_from_der(cms_der) {

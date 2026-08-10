@@ -51,6 +51,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   reported as unverifiable, and therefore invalid, rather than accepted.
 ### Added
 
+- **Signature coverage is now measured and reported.** A signature covers only
+  the bytes named by its `/ByteRange`; anything after it belongs to a later
+  incremental revision that the signature does not protect. Results gain
+  `covers_whole_file`, `covered_bytes` and `total_bytes`, and each signature
+  reports whether it covers the whole file or only part of it. When *no*
+  signature in a document reaches the end of the file, the trailing region is
+  signed by nobody and is called out explicitly. This is decided by arithmetic
+  over the ByteRange alone -- the content of the unsigned region is never
+  inspected or guessed at. Partial coverage does not by itself invalidate a
+  signature: in a sequentially signed document every signature but the last
+  legitimately covers an earlier revision.
 - **CMS without signed attributes is now verified.** RFC 5652 section 5.4 makes
   `signedAttrs` optional and puts the signature over the content itself when it
   is absent. EKENG issues its credential documents in exactly that shape, so all
