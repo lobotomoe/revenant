@@ -28,6 +28,17 @@ describe("BUILTIN_PROFILES", () => {
     }
   });
 
+  it("every profile that declares legacy TLS pins the key it expects", () => {
+    for (const [, profile] of BUILTIN_PROFILES) {
+      if (profile.legacyTls) {
+        expect(profile.tlsPins.length).toBeGreaterThan(0);
+        for (const pin of profile.tlsPins) {
+          expect(pin).toMatch(/^[0-9a-f]{64}$/);
+        }
+      }
+    }
+  });
+
   it("ekeng profile exists with expected properties", () => {
     const ekeng = BUILTIN_PROFILES.get("ekeng");
     expect(ekeng).toBeDefined();
@@ -117,6 +128,23 @@ describe("makeCustomProfile", () => {
   it("sets legacyTls to false for custom profiles", () => {
     const profile = makeCustomProfile("https://example.com/api");
     expect(profile.legacyTls).toBe(false);
+  });
+
+  it("rejects legacy TLS without a pinned key", () => {
+    // Legacy TLS cannot authenticate a server, so it may not be declared blind.
+    expect(() =>
+      makeCustomProfile("https://appliance.example/api", 60, { legacyTls: true }),
+    ).toThrow(/needs a pinned server key/);
+  });
+
+  it("accepts legacy TLS with a pinned key", () => {
+    const pin = "ab".repeat(32);
+    const profile = makeCustomProfile("https://appliance.example/api", 60, {
+      legacyTls: true,
+      tlsPins: [pin],
+    });
+    expect(profile.legacyTls).toBe(true);
+    expect(profile.tlsPins).toEqual([pin]);
   });
 
   it("rejects HTTP URLs", () => {

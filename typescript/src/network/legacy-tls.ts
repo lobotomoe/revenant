@@ -21,6 +21,7 @@ const forge =
 import { BYTES_PER_MB, DEFAULT_TIMEOUT_LEGACY_TLS, MAX_RESPONSE_SIZE } from "../constants.js";
 import { isNodeError, RevenantError, TLSError } from "../errors.js";
 import { logger } from "../logger.js";
+import { checkServerPin } from "./tls-pinning.js";
 
 const STANDARD_PORTS = new Set([80, 443]);
 
@@ -36,6 +37,19 @@ function parseStatusCode(statusLine: string): number {
   throw new TLSError(`Cannot parse HTTP status line: ${JSON.stringify(statusLine)}`);
 }
 
+/**
+ * Re-encode a certificate's public key as a DER SubjectPublicKeyInfo.
+ *
+ * node-forge exposes the parsed key rather than the original bytes, so this
+ * writes the structure back out. SubjectPublicKeyInfo has one valid DER
+ * encoding, which is why the digest still matches one taken from the wire.
+ */
+function subjectPublicKeyInfoDer(cert: forgeNamespace.pki.Certificate): Uint8Array {
+  const spki = forge.pki.publicKeyToAsn1(cert.publicKey);
+  const der = forge.asn1.toDer(spki).getBytes();
+  return Uint8Array.from(der, (ch) => ch.charCodeAt(0));
+}
+
 function validateHeaderValue(name: string, value: string): string {
   if (value.includes("\r") || value.includes("\n")) {
     throw new TLSError(`HTTP header '${name}' contains invalid CR/LF characters`);
@@ -46,10 +60,16 @@ function validateHeaderValue(name: string, value: string): string {
 export async function legacyRequest(
   method: "GET" | "POST",
   url: string,
-  options?: {
+  options: {
     body?: Uint8Array;
     headers?: Record<string, string>;
     timeout?: number;
+    /**
+     * Accepted server keys. Checked as soon as the certificate arrives and
+     * before anything is sent; an empty list is refused rather than treated
+     * as "any key".
+     */
+    pins: readonly string[];
   },
 ): Promise<Uint8Array> {
   const parsed = new URL(url);
@@ -64,11 +84,16 @@ export async function legacyRequest(
     throw new TLSError(`Invalid URL: ${url}`);
   }
 
-  const timeout = options?.timeout ?? DEFAULT_TIMEOUT_LEGACY_TLS;
-  const body = options?.body;
-  const extraHeaders = options?.headers;
+  const timeout = options.timeout ?? DEFAULT_TIMEOUT_LEGACY_TLS;
+  const body = options.body;
+  const extraHeaders = options.headers;
+  const pins = options.pins;
 
   return new Promise<Uint8Array>((resolve, reject) => {
+    // The pin check runs inside node-forge's verify callback, which can only
+    // answer yes or no. The reason is kept here so the rejection says why.
+    let pinFailure: Error | null = null;
+
     const timer = setTimeout(() => {
       socket.destroy();
       reject(
@@ -82,12 +107,33 @@ export async function legacyRequest(
       // Socket connected, start TLS handshake
       const tls = forge.tls.createConnection({
         server: false,
-        verify: () => true, // Accept all certificates (legacy compat)
+        verify: (_connection, _verified, depth, certs) => {
+          // The chain cannot be validated -- these appliances present a
+          // self-signed certificate no authority vouches for -- so the
+          // pinned key stands in for the whole of PKI. certs[0] is the
+          // end-entity certificate at every depth; check it once.
+          if (depth !== 0) {
+            return true;
+          }
+          const leaf = certs[0];
+          if (leaf === undefined) {
+            pinFailure = new TLSError(
+              `${host}:${port} completed a handshake without presenting a certificate`,
+            );
+            return { message: pinFailure.message };
+          }
+          try {
+            checkServerPin(subjectPublicKeyInfoDer(leaf), pins, host, port);
+          } catch (err) {
+            pinFailure = err instanceof Error ? err : new TLSError(String(err));
+            return { message: pinFailure.message };
+          }
+          return true;
+        },
         connected: (connection) => {
           // TLS handshake complete, send HTTP request
-          logger.warn(
-            `Using legacy TLS (TLS 1.0 + RC4) for ${host}:${port}. ` +
-              "This cipher suite is deprecated and only used for backward compatibility.",
+          logger.info(
+            `Legacy TLS (TLS 1.0 + RC4) established with ${host}:${port} against a pinned key`,
           );
 
           const hostHeader = STANDARD_PORTS.has(port) ? host : `${host}:${port}`;
@@ -147,7 +193,9 @@ export async function legacyRequest(
         error: (_connection, error) => {
           clearTimeout(timer);
           socket.destroy();
-          reject(new TLSError(`TLS error with ${host}:${port}: ${error.message}`));
+          // A rejected pin surfaces here as a generic bad-certificate alert;
+          // report what actually went wrong instead.
+          reject(pinFailure ?? new TLSError(`TLS error with ${host}:${port}: ${error.message}`));
         },
       });
 

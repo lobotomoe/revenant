@@ -9,8 +9,6 @@ this package directly.
 
 from __future__ import annotations
 
-import logging
-
 # Server configuration
 from .config import (
     CONFIG_FILE,
@@ -51,8 +49,6 @@ from .profiles import (
     make_custom_profile,
 )
 
-_logger = logging.getLogger(__name__)
-
 
 def register_profile_tls_mode(profile: ServerProfile) -> None:
     """
@@ -70,10 +66,7 @@ def register_profile_tls_mode(profile: ServerProfile) -> None:
 
     host = urlparse(profile.url).hostname
     if host:
-        register_host_tls(host, profile.legacy_tls)
-        _logger.debug(
-            "Registered TLS mode for %s: %s", host, "legacy" if profile.legacy_tls else "standard"
-        )
+        register_host_tls(host, profile.legacy_tls, profile.tls_pins)
 
 
 def register_active_profile_tls() -> None:

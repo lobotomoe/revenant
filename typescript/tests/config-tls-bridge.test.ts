@@ -49,7 +49,7 @@ describe("registerProfileTlsMode", () => {
 
     await registerProfileTlsMode(profile);
 
-    expect(registerHostTls).toHaveBeenCalledWith("example.com", false);
+    expect(registerHostTls).toHaveBeenCalledWith("example.com", false, []);
   });
 
   it("calls registerHostTls with legacyTls=true for ekeng profile", async () => {
@@ -61,7 +61,7 @@ describe("registerProfileTlsMode", () => {
 
     await registerProfileTlsMode(ekeng);
 
-    expect(registerHostTls).toHaveBeenCalledWith("ca.gov.am", true);
+    expect(registerHostTls).toHaveBeenCalledWith("ca.gov.am", true, ekeng.tlsPins);
   });
 });
 
@@ -77,7 +77,11 @@ describe("registerActiveProfileTls", () => {
 
     await registerActiveProfileTls();
 
-    expect(registerHostTls).toHaveBeenCalledWith("ca.gov.am", true);
+    expect(registerHostTls).toHaveBeenCalledWith(
+      "ca.gov.am",
+      true,
+      BUILTIN_PROFILES.get("ekeng")?.tlsPins,
+    );
   });
 
   it("does nothing when no active profile exists", async () => {
@@ -93,6 +97,6 @@ describe("registerActiveProfileTls", () => {
 
     await registerActiveProfileTls();
 
-    expect(registerHostTls).toHaveBeenCalledWith("custom.example.com", false);
+    expect(registerHostTls).toHaveBeenCalledWith("custom.example.com", false, []);
   });
 });

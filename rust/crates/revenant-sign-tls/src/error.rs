@@ -43,6 +43,14 @@ pub enum TlsError {
     #[error("cannot parse server certificate: {0}")]
     Certificate(String),
 
+    /// The peer's key is not one of the pinned keys, or no pin was given.
+    ///
+    /// Distinct from [`Certificate`](TlsError::Certificate): the certificate
+    /// was read without trouble, it is simply not the one this connection was
+    /// told to expect. Raised before any request data is sent.
+    #[error("{0}")]
+    Pin(String),
+
     /// The response exceeded the configured size limit.
     #[error("response from {host}:{port} exceeds {limit} byte limit")]
     ResponseTooLarge {

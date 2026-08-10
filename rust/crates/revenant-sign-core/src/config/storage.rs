@@ -32,6 +32,8 @@ const CONFIG_FILE_NAME: &str = "config.json";
 pub(crate) const KEY_PROFILE: &str = "profile";
 pub(crate) const KEY_URL: &str = "url";
 pub(crate) const KEY_TIMEOUT: &str = "timeout";
+pub(crate) const KEY_LEGACY_TLS: &str = "legacy_tls";
+pub(crate) const KEY_TLS_PINS: &str = "tls_pins";
 pub(crate) const KEY_USERNAME: &str = "username";
 pub(crate) const KEY_PASSWORD: &str = "password";
 pub(crate) const KEY_NAME: &str = "name";
@@ -62,6 +64,8 @@ pub(crate) struct TypedConfig {
     pub profile: Option<String>,
     pub url: Option<String>,
     pub timeout: Option<u32>,
+    pub legacy_tls: bool,
+    pub tls_pins: Vec<String>,
     pub username: Option<String>,
     pub password: Option<Secret>,
     pub name: Option<String>,
@@ -187,6 +191,11 @@ impl Storage {
             profile: pick_str(&raw, KEY_PROFILE),
             url: pick_str(&raw, KEY_URL),
             timeout: pick_timeout(&raw),
+            legacy_tls: raw
+                .get(KEY_LEGACY_TLS)
+                .and_then(Value::as_bool)
+                .unwrap_or(false),
+            tls_pins: pick_str_list(&raw, KEY_TLS_PINS),
             username: pick_str(&raw, KEY_USERNAME),
             password: pick_str(&raw, KEY_PASSWORD).map(Secret::new),
             name: pick_str(&raw, KEY_NAME),
@@ -251,6 +260,17 @@ impl Storage {
 /// Return `map[key]` when it is a JSON string, else `None`.
 fn pick_str(map: &Map<String, Value>, key: &str) -> Option<String> {
     map.get(key).and_then(Value::as_str).map(str::to_owned)
+}
+
+/// Return `map[key]` as the string elements of an array, ignoring anything else.
+fn pick_str_list(map: &Map<String, Value>, key: &str) -> Vec<String> {
+    let Some(Value::Array(items)) = map.get(key) else {
+        return Vec::new();
+    };
+    items
+        .iter()
+        .filter_map(|item| item.as_str().map(str::to_owned))
+        .collect()
 }
 
 /// Return `map["timeout"]` when it is an integer within the allowed range.

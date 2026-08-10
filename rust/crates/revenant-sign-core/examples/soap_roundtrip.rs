@@ -34,9 +34,11 @@ fn main() -> ExitCode {
         .and_then(|u| u.host_str().map(str::to_owned))
         .unwrap_or_else(|| "127.0.0.1".to_owned());
 
-    // Pin the harness host to the legacy (TLS 1.0 + RC4) path.
+    // Route the harness host over the legacy (TLS 1.0 + RC4) path. The
+    // harness key fingerprint comes from argv[2].
+    let pins: Vec<String> = std::env::args().nth(2).into_iter().collect();
     let transport = Arc::new(Transport::new());
-    transport.register_host_tls(&host, TlsMode::Legacy);
+    transport.register_host_tls(&host, TlsMode::legacy(pins).expect("harness pin required"));
     let signer = SoapSigningTransport::new(Arc::clone(&transport), url.clone());
 
     let mut failures = 0u32;

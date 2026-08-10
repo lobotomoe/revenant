@@ -2,15 +2,18 @@
 """
 HTTP transport for CoSign.
 
-Some CoSign appliances (notably EKENG's ca.gov.am) require TLSv1.0 with
-RC4-MD5 -- a cipher suite removed from OpenSSL 3.x.  This module auto-detects
-the TLS mode for each host on first contact:
+Some CoSign appliances require TLSv1.0 with RC4-MD5 -- a cipher suite removed
+from OpenSSL 3.x -- and are reached through ``tlslite-ng`` instead of the
+system SSL stack.  Everything else goes over standard HTTPS via
+``urllib.request``.
 
-- **Standard HTTPS** via ``urllib.request`` (fast, uses system SSL).
-- **Legacy TLS** via ``tlslite-ng`` (pure-Python, supports RC4).
-
-TLS mode can be pre-registered via config.register_active_profile_tls() to
-skip the auto-detection probe.
+Which of the two a host gets is declared, never inferred.  A profile that
+needs the legacy transport says so and names the server's pinned key; a host
+nobody declared is reached over standard HTTPS or not at all.  Falling back to
+the legacy transport when standard HTTPS fails would mean answering a failed
+certificate check -- the one signal that something is wrong -- by switching to
+a transport that performs no certificate check, which is why no such fallback
+exists.
 
 Public API:
 - http_get / http_post for HTTP requests
@@ -51,18 +54,18 @@ _T = TypeVar("_T")
 _logger = logging.getLogger(__name__)
 
 
-# ── Per-host TLS mode cache ──────────────────────────────────────────
+# ── Per-host TLS mode registry ───────────────────────────────────────
 #
-# Maps hostname -> True (legacy TLS needed) or False (standard HTTPS).
-# Populated either by register_host_tls() for known servers, or by
-# auto-detection in http_get() on first contact with an unknown host.
+# Maps hostname -> the pinned keys the legacy transport must see there.
+# A host is present only because a profile declared it; absence means
+# standard HTTPS.
 
-_host_legacy_tls: dict[str, bool] = {}
+_host_legacy_pins: dict[str, tuple[str, ...]] = {}
 
 
-def register_host_tls(host: str, legacy: bool) -> None:
+def register_host_tls(host: str, legacy: bool, pins: tuple[str, ...] = ()) -> None:
     """
-    Pre-register a host's TLS requirement.
+    Register a host's declared TLS requirement.
 
     This is a low-level function used by the config layer. UI code should
     call config.register_active_profile_tls() instead.
@@ -71,22 +74,36 @@ def register_host_tls(host: str, legacy: bool) -> None:
         host: Hostname (e.g. "ca.gov.am").
         legacy: True if the host requires legacy TLS (tlslite-ng),
             False for standard HTTPS.
+        pins: Accepted server keys for the legacy transport.
+
+    Raises:
+        TLSError: If legacy TLS is declared without a pinned key.
     """
-    _host_legacy_tls[host] = legacy
-    _logger.debug("Registered TLS mode for %s: %s", host, "legacy" if legacy else "standard")
+    if not legacy:
+        _host_legacy_pins.pop(host, None)
+        _logger.debug("Registered TLS mode for %s: standard", host)
+        return
+    if not pins:
+        raise TLSError(
+            f"Legacy TLS was declared for {host} without a pinned server key. "
+            "That transport cannot authenticate the server on its own, so a "
+            "pin is required."
+        )
+    _host_legacy_pins[host] = pins
+    _logger.debug("Registered TLS mode for %s: legacy, %d pinned key(s)", host, len(pins))
 
 
-def get_host_tls_info(host: str) -> str | None:
+def get_host_tls_info(host: str) -> str:
     """
     Get a human-readable TLS mode description for a host.
 
     Returns:
-        "Legacy TLS (RC4)", "Standard HTTPS", or None if not yet detected.
+        "Legacy TLS (RC4, pinned key)" for a declared legacy host,
+        "Standard HTTPS" otherwise.
     """
-    mode = _host_legacy_tls.get(host)
-    if mode is None:
-        return None
-    return "Legacy TLS (RC4)" if mode else "Standard HTTPS"
+    if host in _host_legacy_pins:
+        return "Legacy TLS (RC4, pinned key)"
+    return "Standard HTTPS"
 
 
 def _resolve_host(url: str) -> str:
@@ -288,69 +305,6 @@ def _urllib_post(
         ) from exc
 
 
-# ── Auto-detection ───────────────────────────────────────────────────
-
-
-def _auto_detect_get(url: str, host: str, timeout: int) -> bytes:
-    """
-    Try standard HTTPS first; if SSL fails, fall back to legacy TLS.
-
-    Only falls back on connection/TLS errors. Auth and server errors
-    are propagated immediately -- falling back to a different transport
-    won't fix bad credentials or server-side rejections.
-
-    Caches the result for future requests to the same host.
-    """
-    try:
-        result = _urllib_get(url, timeout=timeout)
-    except TLSError:
-        _logger.warning("Standard HTTPS failed for %s, trying legacy TLS...", host)
-    except RevenantError:
-        # Non-TLS errors (HTTP 4xx/5xx, auth errors, etc.) -- don't fall back.
-        # If standard HTTPS connected but the server rejected the request,
-        # legacy TLS won't help.
-        raise
-    else:
-        _host_legacy_tls[host] = False
-        _logger.info("Auto-detected TLS for %s: standard HTTPS", host)
-        return result
-
-    result = legacy_request("GET", url, timeout=timeout)
-    _host_legacy_tls[host] = True
-    _logger.warning("Auto-detected legacy TLS (RC4) for %s", host)
-    return result
-
-
-def _auto_detect_post(
-    url: str,
-    host: str,
-    body: bytes,
-    headers: dict[str, str] | None,
-    timeout: int,
-) -> bytes:
-    """
-    Try standard HTTPS POST first; if SSL fails, fall back to legacy TLS.
-
-    Same logic as _auto_detect_get but for POST requests.
-    Caches the result for future requests to the same host.
-    """
-    try:
-        result = _urllib_post(url, body, headers=headers, timeout=timeout)
-    except TLSError:
-        _logger.warning("Standard HTTPS failed for %s, trying legacy TLS...", host)
-    except RevenantError:
-        raise
-    else:
-        _host_legacy_tls[host] = False
-        _logger.info("Auto-detected TLS for %s: standard HTTPS", host)
-        return result
-
-    result = legacy_request("POST", url, body=body, headers=headers, timeout=timeout)
-    _host_legacy_tls[host] = True
-    _logger.warning("Auto-detected legacy TLS (RC4) for %s", host)
-    return result
-
-
 # ── Public API ───────────────────────────────────────────────────────
 
 
@@ -361,10 +315,11 @@ def http_get(
     max_retries: int = DEFAULT_MAX_RETRIES,
 ) -> bytes:
     """
-    Fetch a URL with automatic TLS mode detection and retry.
+    Fetch a URL over the transport its host was registered with.
 
-    TLS mode is resolved per-host: pre-registered hosts use their known
-    mode; unknown hosts are probed (standard HTTPS first, then legacy).
+    Hosts a profile declared as legacy use tlslite-ng against their pinned
+    key; every other host uses standard HTTPS. A standard HTTPS failure is
+    reported, never answered by retrying without certificate validation.
 
     Args:
         url: Target URL.
@@ -375,30 +330,17 @@ def http_get(
         Response body as bytes.
 
     Raises:
-        TLSError: On connection/TLS issues.
+        TLSError: On connection/TLS issues, or if a pinned key does not match.
         RevenantError: On HTTP failures.
     """
     _require_https_url(url)
     host = _resolve_host(url)
-    legacy = _host_legacy_tls.get(host)
+    pins = _host_legacy_pins.get(host)
 
-    # Unknown host -- auto-detect on first request
-    if legacy is None:
-        return _auto_detect_get(url, host, timeout)
-
-    # Known standard host -- with retry on transient failures
-    if not legacy:
-
-        def _do_std_get() -> bytes:
-            return _urllib_get(url, timeout=timeout)
-
-        if max_retries > 0:
-            return _with_retry(_do_std_get, max_retries=max_retries, operation=f"GET {url}")
-        return _do_std_get()
-
-    # Known legacy host -- with retry
     def _do_get() -> bytes:
-        return legacy_request("GET", url, timeout=timeout)
+        if pins is None:
+            return _urllib_get(url, timeout=timeout)
+        return legacy_request("GET", url, timeout=timeout, pins=pins)
 
     if max_retries > 0:
         return _with_retry(_do_get, max_retries=max_retries, operation=f"GET {url}")
@@ -414,10 +356,11 @@ def http_post(
     max_retries: int = DEFAULT_MAX_RETRIES,
 ) -> bytes:
     """
-    Send an HTTP POST with automatic TLS mode detection and retry.
+    Send an HTTP POST over the transport its host was registered with.
 
-    TLS mode is resolved per-host: pre-registered hosts use their known
-    mode; unknown hosts are probed (standard HTTPS first, then legacy).
+    Hosts a profile declared as legacy use tlslite-ng against their pinned
+    key; every other host uses standard HTTPS. A standard HTTPS failure is
+    reported, never answered by retrying without certificate validation.
 
     Args:
         url: Target URL.
@@ -430,21 +373,17 @@ def http_post(
         Response body as bytes.
 
     Raises:
-        TLSError: On connection/TLS issues.
+        TLSError: On connection/TLS issues, or if a pinned key does not match.
         RevenantError: On HTTP failures.
     """
     _require_https_url(url)
     host = _resolve_host(url)
-    legacy = _host_legacy_tls.get(host)
-
-    # Unknown host -- auto-detect on first request
-    if legacy is None:
-        return _auto_detect_post(url, host, body, headers, timeout)
+    pins = _host_legacy_pins.get(host)
 
     def _do_post() -> bytes:
-        if not legacy:
+        if pins is None:
             return _urllib_post(url, body, headers=headers, timeout=timeout)
-        return legacy_request("POST", url, body=body, headers=headers, timeout=timeout)
+        return legacy_request("POST", url, body=body, headers=headers, timeout=timeout, pins=pins)
 
     if max_retries > 0:
         return _with_retry(_do_post, max_retries=max_retries, operation=f"POST {url}")

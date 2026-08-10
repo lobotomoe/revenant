@@ -67,6 +67,21 @@ describe("saveServerConfig + getServerConfig", () => {
     expect(config.profileName).toBe("custom");
   });
 
+  it("keeps a custom legacy declaration across a save and load", () => {
+    // A declaration that is not persisted would silently become standard HTTPS.
+    const pin = "cd".repeat(32);
+    const profile = makeCustomProfile("https://appliance.example/DSS.asmx", 90, {
+      legacyTls: true,
+      tlsPins: [pin],
+    });
+    saveServerConfig(profile);
+
+    const restored = getActiveProfile();
+    expect(restored).not.toBeNull();
+    expect(restored?.legacyTls).toBe(true);
+    expect(restored?.tlsPins).toEqual([pin]);
+  });
+
   it("returns nulls when no server config is saved", () => {
     const config = getServerConfig();
     expect(config.url).toBeNull();

@@ -2,8 +2,16 @@
 /**
  * HTTP transport for CoSign.
  *
- * Auto-detects TLS mode per host: standard HTTPS via Node's https module,
- * or legacy TLS via node-forge for hosts requiring RC4.
+ * Standard HTTPS via Node's fetch, or legacy TLS via node-forge for
+ * appliances that require RC4.
+ *
+ * Which of the two a host gets is declared, never inferred. A profile that
+ * needs the legacy transport says so and names the server's pinned key; a
+ * host nobody declared is reached over standard HTTPS or not at all. Falling
+ * back to the legacy transport when standard HTTPS fails would mean answering
+ * a failed certificate check -- the one signal that something is wrong -- by
+ * switching to a transport that performs no certificate check, which is why
+ * no such fallback exists.
  */
 
 import {
@@ -19,18 +27,35 @@ import { RevenantError, TLSError } from "../errors.js";
 import { logger } from "../logger.js";
 import { legacyRequest } from "./legacy-tls.js";
 
-// -- Per-host TLS mode cache -------------------------------------------------
+// -- Per-host TLS mode registry ----------------------------------------------
+//
+// Maps hostname -> the pinned keys the legacy transport must see there.
+// A host is present only because a profile declared it; absence means
+// standard HTTPS.
 
-const hostLegacyTls = new Map<string, boolean>();
+const hostLegacyPins = new Map<string, readonly string[]>();
 
-export function registerHostTls(host: string, legacy: boolean): void {
-  hostLegacyTls.set(host, legacy);
+/**
+ * Register a host's declared TLS requirement.
+ *
+ * @throws TLSError If legacy TLS is declared without a pinned key.
+ */
+export function registerHostTls(host: string, legacy: boolean, pins: readonly string[] = []): void {
+  if (!legacy) {
+    hostLegacyPins.delete(host);
+    return;
+  }
+  if (pins.length === 0) {
+    throw new TLSError(
+      `Legacy TLS was declared for ${host} without a pinned server key. ` +
+        "That transport cannot authenticate the server on its own, so a pin is required.",
+    );
+  }
+  hostLegacyPins.set(host, pins);
 }
 
-export function getHostTlsInfo(host: string): string | null {
-  const mode = hostLegacyTls.get(host);
-  if (mode === undefined) return null;
-  return mode ? "Legacy TLS (RC4)" : "Standard HTTPS";
+export function getHostTlsInfo(host: string): string {
+  return hostLegacyPins.has(host) ? "Legacy TLS (RC4, pinned key)" : "Standard HTTPS";
 }
 
 function resolveHost(url: string): string {
@@ -180,52 +205,6 @@ async function stdPost(
   return fetchWithLimit(url, init, timeout);
 }
 
-// -- Auto-detection ----------------------------------------------------------
-
-async function autoDetectGet(url: string, host: string, timeout: number): Promise<Uint8Array> {
-  try {
-    const result = await stdGet(url, timeout);
-    hostLegacyTls.set(host, false);
-    return result;
-  } catch (err) {
-    if (err instanceof TLSError) {
-      logger.warn(`Standard HTTPS failed for ${host}, trying legacy TLS...`);
-    } else {
-      throw err;
-    }
-  }
-
-  const result = await legacyRequest("GET", url, { timeout });
-  hostLegacyTls.set(host, true);
-  logger.warn(`Auto-detected legacy TLS (RC4) for ${host}`);
-  return result;
-}
-
-async function autoDetectPost(
-  url: string,
-  host: string,
-  body: Uint8Array,
-  headers: Record<string, string> | undefined,
-  timeout: number,
-): Promise<Uint8Array> {
-  try {
-    const result = await stdPost(url, body, headers, timeout);
-    hostLegacyTls.set(host, false);
-    return result;
-  } catch (err) {
-    if (err instanceof TLSError) {
-      logger.warn(`Standard HTTPS failed for ${host}, trying legacy TLS...`);
-    } else {
-      throw err;
-    }
-  }
-
-  const result = await legacyRequest("POST", url, { body, headers, timeout });
-  hostLegacyTls.set(host, true);
-  logger.warn(`Auto-detected legacy TLS (RC4) for ${host}`);
-  return result;
-}
-
 // -- Public API --------------------------------------------------------------
 
 export async function httpGet(
@@ -239,20 +218,10 @@ export async function httpGet(
   const host = resolveHost(url);
   const timeout = options?.timeout ?? DEFAULT_TIMEOUT_HTTP_GET;
   const maxRetries = options?.maxRetries ?? DEFAULT_MAX_RETRIES;
-  const legacy = hostLegacyTls.get(host);
+  const pins = hostLegacyPins.get(host);
 
-  if (legacy === undefined) {
-    return autoDetectGet(url, host, timeout);
-  }
-
-  if (!legacy) {
-    const doGet = () => stdGet(url, timeout);
-    return maxRetries > 0
-      ? withRetry(doGet, maxRetries, DEFAULT_RETRY_DELAY, DEFAULT_RETRY_BACKOFF, `GET ${url}`)
-      : doGet();
-  }
-
-  const doGet = () => legacyRequest("GET", url, { timeout });
+  const doGet = () =>
+    pins === undefined ? stdGet(url, timeout) : legacyRequest("GET", url, { timeout, pins });
   return maxRetries > 0
     ? withRetry(doGet, maxRetries, DEFAULT_RETRY_DELAY, DEFAULT_RETRY_BACKOFF, `GET ${url}`)
     : doGet();
@@ -271,21 +240,17 @@ export async function httpPost(
   const host = resolveHost(url);
   const timeout = options?.timeout ?? DEFAULT_TIMEOUT_HTTP_POST;
   const maxRetries = options?.maxRetries ?? DEFAULT_MAX_RETRIES;
-  const legacy = hostLegacyTls.get(host);
-
-  // Unknown host -- auto-detect on first request
-  if (legacy === undefined) {
-    return autoDetectPost(url, host, body, options?.headers, timeout);
-  }
+  const pins = hostLegacyPins.get(host);
 
   const doPost = () => {
-    if (!legacy) {
+    if (pins === undefined) {
       return stdPost(url, body, options?.headers, timeout);
     }
     return legacyRequest("POST", url, {
       body,
       headers: options?.headers,
       timeout,
+      pins,
     });
   };
 

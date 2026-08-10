@@ -12,10 +12,12 @@ use crate::constants::{
     DEFAULT_TIMEOUT_SOAP_SECS, ENV_TIMEOUT, ENV_URL, MAX_TIMEOUT_SECS, MIN_TIMEOUT_SECS,
 };
 use crate::error::RevenantError;
+use crate::net::TlsMode;
 
 use super::profiles::{ServerProfile, BUILTIN_PROFILES};
 use super::storage::{
-    TypedConfig, IDENTITY_KEYS, KEY_LANGUAGE, KEY_NAME, KEY_PROFILE, KEY_TIMEOUT, KEY_URL,
+    TypedConfig, IDENTITY_KEYS, KEY_LANGUAGE, KEY_LEGACY_TLS, KEY_NAME, KEY_PROFILE, KEY_TIMEOUT,
+    KEY_TLS_PINS, KEY_URL,
 };
 use super::ConfigStore;
 
@@ -135,7 +137,18 @@ impl ConfigStore {
         }
         let url = config.url?;
         let timeout = config.timeout.unwrap_or(DEFAULT_TIMEOUT_SOAP_SECS);
-        match ServerProfile::custom(&url, timeout) {
+        let tls_mode = if config.legacy_tls {
+            match TlsMode::legacy(config.tls_pins) {
+                Ok(mode) => mode,
+                Err(e) => {
+                    log::warn!("Saved legacy TLS declaration is unusable, ignoring profile: {e}");
+                    return None;
+                }
+            }
+        } else {
+            TlsMode::Standard
+        };
+        match ServerProfile::custom_with_tls(&url, timeout, tls_mode) {
             Ok(profile) => Some(profile),
             Err(e) => {
                 log::warn!("Saved custom URL is invalid, ignoring active profile: {e}");
@@ -153,6 +166,23 @@ impl ConfigStore {
         raw.insert(KEY_PROFILE.to_owned(), Value::String(profile.name.clone()));
         raw.insert(KEY_URL.to_owned(), Value::String(profile.url.clone()));
         raw.insert(KEY_TIMEOUT.to_owned(), Value::from(profile.timeout));
+        // Built-in profiles carry their own transport settings; only a custom
+        // server needs its declaration written down to survive a restart.
+        if !BUILTIN_PROFILES.contains_key(profile.name.as_str()) {
+            match &profile.tls_mode {
+                TlsMode::Standard => {
+                    raw.insert(KEY_LEGACY_TLS.to_owned(), Value::Bool(false));
+                    raw.insert(KEY_TLS_PINS.to_owned(), Value::Array(Vec::new()));
+                }
+                TlsMode::Legacy { pins } => {
+                    raw.insert(KEY_LEGACY_TLS.to_owned(), Value::Bool(true));
+                    raw.insert(
+                        KEY_TLS_PINS.to_owned(),
+                        Value::Array(pins.iter().map(|p| Value::String(p.clone())).collect()),
+                    );
+                }
+            }
+        }
         self.storage.save(&raw)
     }
 
@@ -322,6 +352,39 @@ mod tests {
     }
 
     #[test]
+    fn saved_custom_legacy_declaration_survives_a_round_trip() {
+        // A declaration that is not persisted would silently become standard HTTPS.
+        let (_dir, store) = test_store();
+        let pin = "cd".repeat(32);
+        let mode = TlsMode::legacy(vec![pin.clone()]).unwrap();
+        let custom =
+            ServerProfile::custom_with_tls("https://appliance.example/DSS.asmx", 90, mode).unwrap();
+        store.save_server_config(&custom).unwrap();
+
+        let restored = store.active_profile().expect("configured");
+        let TlsMode::Legacy { pins } = &restored.tls_mode else {
+            panic!("the legacy declaration must survive");
+        };
+        assert_eq!(pins, &vec![pin]);
+    }
+
+    #[test]
+    fn a_saved_custom_standard_profile_stays_standard() {
+        let (_dir, store) = test_store();
+        let custom = ServerProfile::custom_default("https://example.com/DSS.asmx").unwrap();
+        store.save_server_config(&custom).unwrap();
+
+        let restored = store.active_profile().expect("configured");
+        assert_eq!(restored.tls_mode, TlsMode::Standard);
+    }
+
+    #[test]
+    fn legacy_tls_cannot_be_declared_without_a_pin() {
+        let err = TlsMode::legacy(Vec::new()).expect_err("an empty pin list is not 'any key'");
+        assert!(err.to_string().contains("needs a pinned server key"));
+    }
+
+    #[test]
     fn saved_ekeng_profile_resolves() {
         let (_dir, store) = test_store();
         let ekeng = ServerProfile::builtin("ekeng").unwrap();
@@ -335,7 +398,10 @@ mod tests {
 
         let active = store.active_profile().expect("active");
         assert_eq!(active.name, "ekeng");
-        assert_eq!(active.tls_mode, crate::net::TlsMode::Legacy);
+        assert!(matches!(
+            active.tls_mode,
+            crate::net::TlsMode::Legacy { .. }
+        ));
     }
 
     #[test]

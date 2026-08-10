@@ -248,45 +248,37 @@ describe("httpGet with retry on standard HTTPS", () => {
   });
 });
 
-// -- auto-detect TLS mode (no pre-registration) -------------------------------
+// -- undeclared hosts never reach the legacy transport ------------------------
 
-describe("httpGet auto-detect TLS mode", () => {
-  it("sets host to standard HTTPS on successful fetch", async () => {
-    const url = "https://auto-detect-fresh.example.com/api";
+describe("httpGet for an undeclared host", () => {
+  it("uses standard HTTPS", async () => {
+    const url = "https://undeclared-fresh.example.com/api";
     const body = new Uint8Array([1, 2, 3]);
     mockFetch.mockResolvedValueOnce(createMockResponse(body));
 
     const result = await httpGet(url, { maxRetries: 0 });
     expect(result).toEqual(Buffer.from(body));
+    expect(mockLegacyRequest).not.toHaveBeenCalled();
   });
 
-  it("falls back to legacy TLS on connection failure", async () => {
-    const url = "https://auto-detect-legacy.example.com/api";
-    const legacyResponse = new Uint8Array([7, 8, 9]);
+  it("reports a connection failure instead of downgrading", async () => {
+    const url = "https://undeclared-legacy.example.com/api";
     mockFetch.mockRejectedValueOnce(new Error("fetch failed"));
-    mockLegacyRequest.mockResolvedValueOnce(legacyResponse);
 
-    const result = await httpGet(url, { maxRetries: 0 });
-    expect(result).toEqual(legacyResponse);
-    expect(mockLegacyRequest).toHaveBeenCalledWith(
-      "GET",
-      url,
-      expect.objectContaining({ timeout: expect.any(Number) }),
-    );
+    await expect(httpGet(url, { maxRetries: 0 })).rejects.toThrow(/Connection failed/);
+    expect(mockLegacyRequest).not.toHaveBeenCalled();
   });
 
-  it("falls back to legacy TLS on SSL error", async () => {
-    const url = "https://auto-detect-ssl.example.com/api";
-    const legacyResponse = new Uint8Array([4, 5, 6]);
+  it("does not answer a failed certificate check by dropping certificate checks", async () => {
+    const url = "https://undeclared-ssl.example.com/api";
     mockFetch.mockRejectedValueOnce(new Error("ERR_TLS_CERT_INVALID"));
-    mockLegacyRequest.mockResolvedValueOnce(legacyResponse);
 
-    const result = await httpGet(url, { maxRetries: 0 });
-    expect(result).toEqual(legacyResponse);
+    await expect(httpGet(url, { maxRetries: 0 })).rejects.toThrow(/SSL error/);
+    expect(mockLegacyRequest).not.toHaveBeenCalled();
   });
 
-  it("propagates non-TLS errors without fallback", async () => {
-    const url = "https://auto-detect-err.example.com/api";
+  it("propagates non-TLS errors", async () => {
+    const url = "https://undeclared-err.example.com/api";
     mockFetch.mockResolvedValueOnce({
       ok: false,
       status: 403,
@@ -299,11 +291,11 @@ describe("httpGet auto-detect TLS mode", () => {
   });
 });
 
-// -- auto-detect TLS mode for POST -------------------------------------------
+// -- undeclared hosts never reach the legacy transport, POST ------------------
 
-describe("httpPost auto-detect TLS mode", () => {
-  it("uses standard HTTPS for unknown host on success", async () => {
-    const url = "https://auto-post-std.example.com/api";
+describe("httpPost for an undeclared host", () => {
+  it("uses standard HTTPS", async () => {
+    const url = "https://undeclared-post-std.example.com/api";
     const responseBody = new Uint8Array([10, 20]);
     mockFetch.mockResolvedValueOnce(createMockResponse(responseBody));
 
@@ -313,21 +305,16 @@ describe("httpPost auto-detect TLS mode", () => {
     expect(mockLegacyRequest).not.toHaveBeenCalled();
   });
 
-  it("falls back to legacy TLS on connection failure", async () => {
-    const url = "https://auto-post-legacy.example.com/api";
-    const legacyResponse = new Uint8Array([30, 40]);
-    mockFetch.mockRejectedValueOnce(new Error("fetch failed"));
-    mockLegacyRequest.mockResolvedValueOnce(legacyResponse);
+  it("reports a connection failure instead of downgrading", async () => {
+    const url = "https://undeclared-post-legacy.example.com/api";
+    mockFetch.mockRejectedValue(new Error("fetch failed"));
 
     const postBody = new Uint8Array([1, 2, 3]);
     const headers = { "Content-Type": "text/xml" };
-    const result = await httpPost(url, postBody, { headers });
-    expect(result).toEqual(legacyResponse);
-    expect(mockLegacyRequest).toHaveBeenCalledWith(
-      "POST",
-      url,
-      expect.objectContaining({ body: postBody, headers }),
+    await expect(httpPost(url, postBody, { headers, maxRetries: 0 })).rejects.toThrow(
+      /Connection failed/,
     );
+    expect(mockLegacyRequest).not.toHaveBeenCalled();
   });
 });
 

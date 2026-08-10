@@ -21,12 +21,13 @@ const MAX_RESPONSE_SIZE: usize = 50 * 1024 * 1024;
 const STANDARD_PORTS: [u16; 2] = [80, 443];
 
 /// Perform one HTTP request over a freshly established legacy TLS connection.
-pub(crate) fn request(
+pub(crate) fn request<P: AsRef<str>>(
     method: Method,
     url: &str,
     body: Option<&[u8]>,
     extra_headers: &[(&str, &str)],
     timeout: Duration,
+    pins: &[P],
 ) -> Result<HttpResponse, TlsError> {
     let target = Target::parse(url)?;
     let timeout_secs = timeout.as_secs().max(1);
@@ -39,7 +40,7 @@ pub(crate) fn request(
         target.host,
         target.port
     );
-    handshake::perform(&mut conn, timeout)?;
+    handshake::perform(&mut conn, timeout, pins)?;
     log::warn!(
         "using legacy TLS (TLS 1.0 + RC4) for {}:{}; this cipher suite is deprecated",
         target.host,

@@ -79,7 +79,10 @@ export function getActiveProfile(): ServerProfile | null {
   const timeout = config.timeout ?? DEFAULT_TIMEOUT_SOAP;
 
   if (url) {
-    return makeCustomProfile(url, timeout);
+    return makeCustomProfile(url, timeout, {
+      legacyTls: config.legacyTls ?? false,
+      tlsPins: config.tlsPins ?? [],
+    });
   }
 
   return null;
@@ -90,6 +93,12 @@ export function saveServerConfig(profile: ServerProfile): void {
   config.profile = profile.name;
   config.url = profile.url;
   config.timeout = profile.timeout;
+  // Built-in profiles carry their own transport settings; only a custom
+  // server needs its declaration written down to survive a restart.
+  if (!BUILTIN_PROFILES.has(profile.name)) {
+    config.legacyTls = profile.legacyTls;
+    config.tlsPins = [...profile.tlsPins];
+  }
   saveConfig(config);
 }
 

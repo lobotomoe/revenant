@@ -74,6 +74,21 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   and the JPEG frame header, and refused there; `jpeg-js` is additionally given
   the same limit so that a frame the header scan did not reach cannot exceed it
   either. Python and Rust already checked dimensions before decoding.
+- **Legacy TLS now authenticates the server, and is never selected on its
+  own.** The TLS 1.0 + RC4 transport validated no certificate at all, and any
+  host could be pushed onto it: a standard-HTTPS failure -- including a failed
+  certificate check, the one signal that something is wrong -- made the client
+  retry over a transport that performs no certificate check. Two changes close
+  that. A profile now carries `tls_pins`, the SHA-256 of the server
+  certificate's `SubjectPublicKeyInfo`, checked the moment the certificate
+  arrives and before any request byte or premaster secret is sent; the `ekeng`
+  profile ships the key its appliance has presented since 2006. And the
+  transport no longer probes: a host reaches the legacy path only because a
+  profile declared it, and every other host is standard HTTPS or nothing.
+  Chain validation was never possible for these appliances -- they present a
+  self-signed factory certificate naming neither the host nor a checkable
+  authority -- so a pinned key is a stronger guarantee here than the public
+  PKI could have given.
 
 ### Changed
 
