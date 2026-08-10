@@ -2,7 +2,7 @@
 //!
 //! Thin, allocation-light helpers over `x509-cert`'s [`Certificate`] that pull
 //! out exactly what the certificate/chain logic needs: subject fields, a
-//! human-readable DN, validity as ISO 8601, and the SKI / AKI / AIA extensions.
+//! human-readable DN, validity as ISO 8601, and the SKI / AKI extensions.
 //!
 //! The one subtlety is directory-string decoding. EKENG's CA encodes the CN and
 //! O of its DNs as **BMPString** (UCS-2), which `x509-cert`'s own `Display`
@@ -22,10 +22,8 @@ use der::{Any, Decode, Encode, Tag, Tagged};
 use time::format_description::well_known::Rfc3339;
 use time::OffsetDateTime;
 use x509_cert::attr::AttributeTypeAndValue;
-use x509_cert::ext::pkix::name::GeneralName;
 use x509_cert::ext::pkix::{
-    AuthorityInfoAccessSyntax, AuthorityKeyIdentifier, BasicConstraints, KeyUsage,
-    SubjectKeyIdentifier,
+    AuthorityKeyIdentifier, BasicConstraints, KeyUsage, SubjectKeyIdentifier,
 };
 use x509_cert::name::RdnSequence;
 use x509_cert::time::Time;
@@ -37,8 +35,6 @@ use crate::{Result, RevenantError};
 const OID_CN: ObjectIdentifier = ObjectIdentifier::new_unwrap("2.5.4.3");
 const OID_EMAIL: ObjectIdentifier = ObjectIdentifier::new_unwrap("1.2.840.113549.1.9.1");
 const OID_ORG: ObjectIdentifier = ObjectIdentifier::new_unwrap("2.5.4.10");
-/// `id-ad-caIssuers`: the AIA access method whose location is an issuer cert URL.
-const OID_CA_ISSUERS: ObjectIdentifier = ObjectIdentifier::new_unwrap("1.3.6.1.5.5.7.48.2");
 
 /// Parse a DER-encoded X.509 certificate.
 ///
@@ -159,21 +155,6 @@ pub(crate) fn subject_key_identifier(cert: &Certificate) -> Option<Vec<u8>> {
 pub(crate) fn authority_key_id(cert: &Certificate) -> Option<Vec<u8>> {
     let aki = find_extension::<AuthorityKeyIdentifier>(cert)?;
     Some(aki.key_identifier?.as_bytes().to_vec())
-}
-
-/// CA-issuer URLs from the Authority Information Access (AIA) extension.
-pub(crate) fn aia_ca_issuer_urls(cert: &Certificate) -> Vec<String> {
-    let Some(aia) = find_extension::<AuthorityInfoAccessSyntax>(cert) else {
-        return Vec::new();
-    };
-    aia.0
-        .iter()
-        .filter(|desc| desc.access_method == OID_CA_ISSUERS)
-        .filter_map(|desc| match &desc.access_location {
-            GeneralName::UniformResourceIdentifier(uri) => Some(uri.as_str().to_owned()),
-            _ => None,
-        })
-        .collect()
 }
 
 /// Whether `now` falls within the certificate's validity window.
@@ -452,11 +433,10 @@ mod tests {
 
     #[test]
     fn absent_extensions_are_none() {
-        // This fixture carries only BasicConstraints -- no SKI/AKI/AIA.
+        // This fixture carries only BasicConstraints -- no SKI/AKI.
         let cert = test_ca();
         assert_eq!(subject_key_identifier(&cert), None);
         assert_eq!(authority_key_id(&cert), None);
-        assert!(aia_ca_issuer_urls(&cert).is_empty());
     }
 
     #[test]
@@ -473,12 +453,6 @@ mod tests {
         let leaf = parse_der(include_bytes!("testdata/leaf.der")).unwrap();
         let inter = parse_der(include_bytes!("testdata/intermediate.der")).unwrap();
         assert_eq!(authority_key_id(&leaf), subject_key_identifier(&inter));
-    }
-
-    #[test]
-    fn reads_aia_ca_issuer_urls() {
-        let leaf = parse_der(include_bytes!("testdata/leaf_aia.der")).unwrap();
-        assert_eq!(aia_ca_issuer_urls(&leaf), ["http://example.com/inter.crt"]);
     }
 
     #[test]

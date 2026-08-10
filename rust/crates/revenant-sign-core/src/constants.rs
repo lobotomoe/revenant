@@ -82,5 +82,3 @@ pub const TSL_CACHE_TTL: Duration = Duration::from_secs(86400);
 pub const TSL_MAX_STALE: Duration = Duration::from_secs(7 * 86400);
 /// TSL fetch timeout.
 pub const TSL_FETCH_TIMEOUT: Duration = Duration::from_secs(30);
-/// Maximum AIA intermediate certificate fetches per chain.
-pub const MAX_AIA_FETCHES: u32 = 5;

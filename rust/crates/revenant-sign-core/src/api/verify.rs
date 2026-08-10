@@ -34,7 +34,7 @@ fn with_chain_validator<R>(
         }
         TrustAnchors::Pinned(certs) if !certs.is_empty() => {
             let store = TrustStore::from_pinned_cas(certs);
-            let validator = move |cms: &[u8]| Some(validate_chain(transport, cms, &store));
+            let validator = move |cms: &[u8]| Some(validate_chain(cms, &store));
             f(Some(&validator))
         }
         // No anchors, or an empty pinned set: offline checks only (indeterminate).

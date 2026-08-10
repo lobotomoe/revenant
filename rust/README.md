@@ -272,8 +272,9 @@ Notable design points, all held to the behavior of the Python source of truth:
   did not parse, or an anchor matched by key id but the signatures could not be
   verified). It never aborts the surrounding signature verification.
 - **The chain is built here, then verified per link.** The signer's chain is
-  assembled by SKI/AKI matching (fetching missing intermediates via AIA), then
-  each adjacent link's signature is checked with
+  assembled offline by SKI/AKI matching -- `validate_chain` takes no transport,
+  so the AIA URLs printed inside a certificate cannot be dialed by the document
+  being verified -- then each adjacent link's signature is checked with
   [`x509-verify`](https://crates.io/crates/x509-verify). A TLS-oriented path
   validator (webpki) would reject these document-signing certs for lacking a
   serverAuth EKU; per-link verification does not, so a legitimately-chained

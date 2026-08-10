@@ -1,9 +1,14 @@
 //! PKI certificate chain validation against a Trust Service List.
 //!
 //! Extracts every certificate from a CMS SignedData blob, builds the chain from
-//! the signer up (SKI/AKI matching, fetching missing intermediates via AIA),
-//! and checks it against the trust anchors from a TSL. The chain-construction
-//! and verification mechanics live in [`steps`]; this file is the orchestration.
+//! the signer up (SKI/AKI matching), and checks it against the trust anchors
+//! from a TSL. The chain-construction and verification mechanics live in
+//! [`steps`]; this file is the orchestration.
+//!
+//! Chain building is offline: [`validate_chain`] takes no transport, so the
+//! Authority Information Access URLs printed inside a certificate cannot be
+//! dialed. Only [`validate_chain_for_profile`] reaches the network, and only for
+//! the TSL URL its own profile configured.
 //!
 //! The result is deliberately tri-state ([`TrustStatus`]): `Trusted` (a trusted
 //! anchor and the signatures verify), `Untrusted` (no trusted anchor in the
@@ -19,7 +24,7 @@ use super::cert;
 use super::tsl::{TrustStore, TrustStoreCache};
 use crate::constants::TSL_CACHE_TTL;
 use crate::net::Transport;
-use steps::{build_chain, fetch_intermediate, find_matching_anchor, verify_chain_crypto};
+use steps::{build_chain, find_matching_anchor, verify_chain_crypto};
 
 /// The trust verdict for a certificate chain.
 ///
@@ -58,18 +63,11 @@ impl ChainResult {
 }
 
 /// Validate the certificate chain in a CMS blob against a trust store.
+///
+/// Offline: every certificate considered comes from `cms_der` or `trust_store`.
 #[must_use]
-pub fn validate_chain(
-    transport: &Transport,
-    cms_der: &[u8],
-    trust_store: &TrustStore,
-) -> ChainResult {
-    validate_chain_inner(
-        cms_der,
-        trust_store,
-        |url| fetch_intermediate(transport, url),
-        verify_chain_crypto,
-    )
+pub fn validate_chain(cms_der: &[u8], trust_store: &TrustStore) -> ChainResult {
+    validate_chain_inner(cms_der, trust_store, verify_chain_crypto)
 }
 
 /// High-level: fetch the trust store for a profile's TSL URL, then validate.
@@ -81,26 +79,21 @@ pub fn validate_chain_for_profile(
     tsl_url: &str,
 ) -> ChainResult {
     let store = cache.get_or_fetch(transport, tsl_url, TSL_CACHE_TTL);
-    chain_result_for_store(transport, cms_der, store.as_ref())
+    chain_result_for_store(cms_der, store.as_ref())
 }
 
-fn chain_result_for_store(
-    transport: &Transport,
-    cms_der: &[u8],
-    store: Option<&TrustStore>,
-) -> ChainResult {
+fn chain_result_for_store(cms_der: &[u8], store: Option<&TrustStore>) -> ChainResult {
     match store {
-        Some(store) => validate_chain(transport, cms_der, store),
+        Some(store) => validate_chain(cms_der, store),
         None => ChainResult::indeterminate("Chain: trust store unavailable"),
     }
 }
 
-/// The validation pipeline, with the network fetch and the cryptographic
-/// verifier injected so every branch is unit-tested without a live transport.
+/// The validation pipeline, with the cryptographic verifier injected so every
+/// branch is unit-tested.
 fn validate_chain_inner(
     cms_der: &[u8],
     trust_store: &TrustStore,
-    fetch: impl Fn(&str) -> Option<Certificate>,
     verify: impl Fn(&[Certificate], &[Certificate]) -> Result<(), String>,
 ) -> ChainResult {
     let Ok(cms_certs) = cert::all_certs_from_cms(cms_der) else {
@@ -121,7 +114,7 @@ fn validate_chain_inner(
             .filter_map(|anchor| cert::parse_der(&anchor.cert_der).ok()),
     );
 
-    let chain = build_chain(pool, &fetch);
+    let chain = build_chain(&pool);
     let chain_depth = chain.len();
     if chain_depth > 1 {
         let subjects: Vec<String> = chain.iter().map(cert::subject_dn).collect();
@@ -187,6 +180,7 @@ mod tests {
     const CMS_LEAF_DIRECT: &[u8] = include_bytes!("../testdata/cms_leaf_direct.der");
     const CMS_LEAF_ROOT2: &[u8] = include_bytes!("../testdata/cms_leaf_root2.der");
     const CMS_CHAIN3: &[u8] = include_bytes!("../testdata/cms_chain3.der");
+    const CMS_LEAF_AIA: &[u8] = include_bytes!("../testdata/cms_leaf_aia.der");
     const ROOT_DER: &[u8] = include_bytes!("../testdata/root.der");
 
     fn trust_store_with(anchor_der: &[u8], subject_name: &str, service_name: &str) -> TrustStore {
@@ -215,7 +209,7 @@ mod tests {
     #[test]
     fn validate_chain_trusted() {
         let store = trust_store_with(ROOT_DER, "CN=Test Root CA", "TestRootCA");
-        let result = validate_chain(&Transport::new(), CMS_LEAF_DIRECT, &store);
+        let result = validate_chain(CMS_LEAF_DIRECT, &store);
         assert_eq!(result.trust, TrustStatus::Trusted);
         assert_eq!(result.trust_anchor.as_deref(), Some("TestRootCA"));
         assert!(result.chain_depth >= 2);
@@ -225,7 +219,7 @@ mod tests {
     fn validate_chain_untrusted() {
         // Signed by root2, but the store only trusts root.
         let store = trust_store_with(ROOT_DER, "CN=Test Root CA", "TestRootCA");
-        let result = validate_chain(&Transport::new(), CMS_LEAF_ROOT2, &store);
+        let result = validate_chain(CMS_LEAF_ROOT2, &store);
         assert_eq!(result.trust, TrustStatus::Untrusted);
         assert_eq!(result.trust_anchor, None);
     }
@@ -233,7 +227,7 @@ mod tests {
     #[test]
     fn validate_chain_no_certs_is_indeterminate() {
         let store = trust_store_with(ROOT_DER, "CN=Test Root CA", "TestRootCA");
-        let result = validate_chain(&Transport::new(), b"\x30\x00", &store);
+        let result = validate_chain(b"\x30\x00", &store);
         assert_eq!(result.trust, TrustStatus::Indeterminate);
         assert_eq!(result.chain_depth, 0);
     }
@@ -241,7 +235,7 @@ mod tests {
     #[test]
     fn validate_chain_parse_failure_is_indeterminate() {
         let store = trust_store_with(ROOT_DER, "CN=Test Root CA", "TestRootCA");
-        let result = validate_chain(&Transport::new(), b"not cms at all", &store);
+        let result = validate_chain(b"not cms at all", &store);
         assert_eq!(result.trust, TrustStatus::Indeterminate);
         assert!(result.details[0].to_lowercase().contains("failed to parse"));
     }
@@ -249,12 +243,9 @@ mod tests {
     #[test]
     fn crypto_failure_falls_back_to_indeterminate() {
         let store = trust_store_with(ROOT_DER, "CN=Test Root CA", "TestRootCA");
-        let result = validate_chain_inner(
-            CMS_LEAF_DIRECT,
-            &store,
-            |_| None,
-            |_chain, _anchors| Err("forced failure".to_owned()),
-        );
+        let result = validate_chain_inner(CMS_LEAF_DIRECT, &store, |_chain, _anchors| {
+            Err("forced failure".to_owned())
+        });
         assert_eq!(result.trust, TrustStatus::Indeterminate); // fallback, not trusted
         assert_eq!(result.trust_anchor.as_deref(), Some("TestRootCA"));
         assert!(result
@@ -264,8 +255,19 @@ mod tests {
     }
 
     #[test]
+    fn aia_urls_are_never_followed() {
+        // The signer's issuer is named only by an AIA URL and is absent from
+        // both the blob and the store. `validate_chain` has no transport to
+        // dial it with, so the chain stops at the signer.
+        let store = trust_store_with(ROOT_DER, "CN=Test Root CA", "TestRootCA");
+        let result = validate_chain(CMS_LEAF_AIA, &store);
+        assert_eq!(result.chain_depth, 1);
+        assert_eq!(result.trust, TrustStatus::Untrusted);
+    }
+
+    #[test]
     fn chain_result_for_missing_store_is_indeterminate() {
-        let result = chain_result_for_store(&Transport::new(), b"\x30\x00", None);
+        let result = chain_result_for_store(b"\x30\x00", None);
         assert_eq!(result.trust, TrustStatus::Indeterminate);
         assert!(result.details[0].contains("unavailable"));
     }

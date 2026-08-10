@@ -15,6 +15,7 @@ Regenerate with:
 
 Pass ``--ess-only`` to update only the shared ESS CMS fixtures.
 Pass ``--identity-only`` to update only the signer-identity regression fixtures.
+Pass ``--aia-only`` to update only the AIA chain-building regression fixture.
 Pass ``--signer-only`` to update only the runtime test signer material.
 
 ``test_signer_key.der`` is a throwaway RSA key committed on purpose: the signing
@@ -636,6 +637,20 @@ def write_identity_hardening_fixtures() -> None:
     )
 
 
+def write_aia_fixture() -> None:
+    """Write a CMS whose signer certificate carries an AIA caIssuers URL.
+
+    The issuing CA is deliberately left out of the blob, so the only way to
+    reach it is the URL printed inside the certificate -- the shape that makes
+    an implementation following AIA dial a host the document chose. The URL uses
+    the reserved .invalid TLD (RFC 2606) so a regression cannot reach anything
+    real. Chain building must stop at the missing issuer instead.
+    """
+    root, root_key = make_root_ca("AIA Test Root")
+    signer, signer_key = make_leaf(root, root_key, "AIA Signer", "https://aia.invalid/inter.crt")
+    write("cms_leaf_aia.der", build_cms(signer, signer_key))
+
+
 def build_cms_with_crl(
     signer: x509.Certificate,
     signer_key: rsa.RSAPrivateKey,
@@ -680,9 +695,12 @@ def write(name: str, data: bytes) -> None:
     print(f"wrote {name} ({len(data)} bytes)")
 
 
-def main(*, ess_only: bool = False, identity_only: bool = False) -> None:
+def main(*, ess_only: bool = False, identity_only: bool = False, aia_only: bool = False) -> None:
     if identity_only:
         write_identity_hardening_fixtures()
+        return
+    if aia_only:
+        write_aia_fixture()
         return
 
     root, root_key = make_root_ca("Test Root CA")
@@ -710,6 +728,7 @@ def main(*, ess_only: bool = False, identity_only: bool = False) -> None:
         write("cms_leaf_direct.der", build_cms(leaf_direct, leaf_direct_key))
         write("cms_leaf_root2.der", build_cms(leaf_root2, leaf_root2_key))
         write("cms_chain3.der", build_cms(leaf, leaf_key, [inter, root]))
+        write_aia_fixture()
 
     ess_v1 = build_ess_bound_cms(leaf_direct, leaf_direct_key, "v1")
     ess_v2 = build_ess_bound_cms(leaf_direct, leaf_direct_key, "v2")
@@ -755,6 +774,11 @@ if __name__ == "__main__":
         help="write only signer identity hardening fixtures",
     )
     group.add_argument(
+        "--aia-only",
+        action="store_true",
+        help="write only the AIA chain-building regression fixture",
+    )
+    group.add_argument(
         "--signer-only",
         action="store_true",
         help="write only the runtime test signer certificate and key",
@@ -763,4 +787,8 @@ if __name__ == "__main__":
     if args.signer_only:
         write_test_signer_material()
     else:
-        main(ess_only=args.ess_only, identity_only=args.identity_only)
+        main(
+            ess_only=args.ess_only,
+            identity_only=args.identity_only,
+            aia_only=args.aia_only,
+        )
