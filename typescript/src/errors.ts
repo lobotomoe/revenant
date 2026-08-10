@@ -71,3 +71,18 @@ export class CertificateError extends RevenantError {
     this.name = "CertificateError";
   }
 }
+
+/**
+ * The signing service answered, but its response is not a usable signature.
+ *
+ * Distinct from ServerError: the request succeeded at the protocol level, so
+ * retrying it is pointless -- what came back could not be proven to be a
+ * signature over what was submitted, and nothing should be saved or
+ * distributed.
+ */
+export class SigningResponseError extends RevenantError {
+  constructor(message: string) {
+    super(message);
+    this.name = "SigningResponseError";
+  }
+}

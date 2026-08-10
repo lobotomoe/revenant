@@ -31,6 +31,7 @@ from .errors import (
     PDFError,
     RevenantError,
     ServerError,
+    SigningResponseError,
     TLSError,
 )
 
@@ -43,6 +44,7 @@ __all__ = [
     "PDFError",
     "RevenantError",
     "ServerError",
+    "SigningResponseError",
     "TLSError",
     "__version__",
     "get_signer_name",

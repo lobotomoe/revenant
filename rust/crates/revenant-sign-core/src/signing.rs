@@ -15,6 +15,7 @@ use crate::pdf::{
     compute_byterange_hash, insert_cms, prepare_pdf_with_sig_field, verify_embedded_signature,
     PageSpec, Position, PrepareOptions, PreparedPdf, SIG_HEIGHT, SIG_WIDTH,
 };
+use crate::signing_response::check_signing_response;
 use crate::{Result, RevenantError};
 
 /// Placement and appearance options for an embedded PDF signature.
@@ -83,10 +84,14 @@ fn validate_pdf(pdf: &[u8]) -> Result<()> {
 
 /// Sign a PDF and return a detached CMS/PKCS#7 signature.
 ///
+/// The response is verified against the submitted bytes before it is returned:
+/// a signature nobody could check is not a result worth handing back.
+///
 /// # Errors
 ///
-/// Returns [`RevenantError::Pdf`] if the input is not a PDF, or a transport
-/// error (auth, server, TLS) from the signing service.
+/// Returns [`RevenantError::Pdf`] if the input is not a PDF,
+/// [`RevenantError::SigningResponse`] if the response is not a signature over
+/// `pdf`, or a transport error (auth, server, TLS) from the signing service.
 pub fn sign_pdf_detached(
     pdf: &[u8],
     transport: &dyn SigningTransport,
@@ -95,15 +100,24 @@ pub fn sign_pdf_detached(
     timeout: Duration,
 ) -> Result<Vec<u8>> {
     validate_pdf(pdf)?;
-    transport.sign_pdf_detached(pdf, username, password, timeout)
+    let cms_der = transport.sign_pdf_detached(pdf, username, password, timeout)?;
+    check_signing_response(&cms_der, Some(pdf), "sign_pdf_detached")?;
+    Ok(cms_der)
 }
 
 /// Sign a pre-computed 20-byte SHA-1 hash.
 ///
+/// The returned signature is checked to be a genuine signature, but -- unlike
+/// the operations that submit content -- nothing here can tie it to the
+/// document the hash was taken from: what a service binds in response to a
+/// pre-computed digest is service-defined, and observed to vary.
+///
 /// # Errors
 ///
 /// Returns [`RevenantError::Other`] if the hash is not exactly
-/// [`SHA1_DIGEST_SIZE`] bytes, or a transport error from the signing service.
+/// [`SHA1_DIGEST_SIZE`] bytes, [`RevenantError::SigningResponse`] if the
+/// response is not a verifiable signature, or a transport error from the
+/// signing service.
 pub fn sign_hash(
     hash: &[u8],
     transport: &dyn SigningTransport,
@@ -117,15 +131,20 @@ pub fn sign_hash(
             hash.len()
         )));
     }
-    transport.sign_hash(hash, username, password, timeout)
+    let cms_der = transport.sign_hash(hash, username, password, timeout)?;
+    check_signing_response(&cms_der, None, "sign_hash")?;
+    Ok(cms_der)
 }
 
 /// Sign arbitrary data; the server hashes it and returns a CMS/PKCS#7 signature.
 ///
+/// The response is verified against `data` before it is returned.
+///
 /// # Errors
 ///
-/// Returns [`RevenantError::Other`] on empty input, or a transport error from
-/// the signing service.
+/// Returns [`RevenantError::Other`] on empty input,
+/// [`RevenantError::SigningResponse`] if the response is not a signature over
+/// `data`, or a transport error from the signing service.
 pub fn sign_data(
     data: &[u8],
     transport: &dyn SigningTransport,
@@ -136,7 +155,9 @@ pub fn sign_data(
     if data.is_empty() {
         return Err(RevenantError::Other("Cannot sign empty data.".to_owned()));
     }
-    transport.sign_data(data, username, password, timeout)
+    let cms_der = transport.sign_data(data, username, password, timeout)?;
+    check_signing_response(&cms_der, Some(data), "sign_data")?;
+    Ok(cms_der)
 }
 
 /// Sign a PDF with an embedded signature (hash-then-sign around the appliance).
@@ -247,14 +268,15 @@ pub fn sign_pdf_embedded(
         )));
     }
 
-    // Step 5: verify before returning -- never emit a corrupt signed PDF. This
-    // is an integrity self-test (did the splice preserve the signed byte range?),
-    // so it checks structure + hash, not the appliance's signature: the exact
-    // SHA-1 we sent is the oracle. Full cryptographic verification is what the
-    // `check`/verify path performs on an arbitrary signed PDF.
+    // Step 5: verify before returning -- never emit a PDF whose signature we
+    // have not proven. This is more than a splice self-test: the response came
+    // from the network, so it is checked the same way an arbitrary signed PDF
+    // would be. Structure and the ByteRange hash show the splice preserved the
+    // signed bytes; the signature check shows the appliance actually signed
+    // them, rather than returning something that merely hashes correctly.
     let br_hash = compute_byterange_hash(&prepared, hex_start, hex_len)?;
     let result = verify_embedded_signature(&signed, Some(&br_hash), None);
-    if !result.integrity_ok() {
+    if !result.valid() {
         let detail = result.details.join("\n  ");
         log::error!("Post-sign verification failed: {detail}");
         return Err(RevenantError::Pdf(format!(
@@ -270,6 +292,7 @@ pub fn sign_pdf_embedded(
 mod tests {
     use super::*;
     use crate::cms::{extract_signature_data, find_byteranges};
+    use crate::testutil::{sign_cms_detached, TestSigner};
 
     const BLANK_LETTER: &[u8] = include_bytes!("pdf/testdata/blank_letter.pdf");
 
@@ -277,7 +300,8 @@ mod tests {
         Duration::from_secs(30)
     }
 
-    /// A well-formed 203-byte DER SEQUENCE standing in for the appliance's CMS.
+    /// A well-formed 203-byte DER SEQUENCE that is not a signature at all --
+    /// the shape a compromised or impersonated service could return.
     fn fake_cms() -> Vec<u8> {
         let mut der = vec![0x30, 0x81, 0xC8];
         der.extend(std::iter::repeat_n(0xAB, 200));
@@ -301,8 +325,8 @@ mod tests {
         }
     }
 
-    fn signer() -> FakeSigner {
-        FakeSigner { cms: fake_cms() }
+    fn signer() -> TestSigner {
+        TestSigner
     }
 
     #[test]
@@ -314,10 +338,43 @@ mod tests {
         };
         let signed =
             sign_pdf_embedded(BLANK_LETTER, &signer(), "u", "p", timeout(), &opts).unwrap();
-        // The returned PDF carries exactly one signature whose CMS round-trips.
+        // The returned PDF carries exactly one signature, and the spliced CMS is
+        // the signature the transport produced over that PDF's ByteRange.
         assert_eq!(find_byteranges(&signed).unwrap().len(), 1);
-        let (_signed_data, cms) = extract_signature_data(&signed).unwrap();
-        assert_eq!(cms, fake_cms());
+        let (signed_data, cms) = extract_signature_data(&signed).unwrap();
+        assert_eq!(cms, sign_cms_detached(&signed_data));
+    }
+
+    #[test]
+    fn embedded_rejects_a_response_that_is_not_a_signature() {
+        // The advisory's own proof of concept: a transport that answers with
+        // filler bytes shaped like DER. It must not yield a "signed" PDF.
+        let transport = FakeSigner { cms: fake_cms() };
+        let opts = EmbeddedSignatureOptions {
+            name: Some("Jane Signer".to_owned()),
+            ..Default::default()
+        };
+        let err =
+            sign_pdf_embedded(BLANK_LETTER, &transport, "u", "p", timeout(), &opts).unwrap_err();
+        // Caught where the response arrives, before anything is spliced.
+        assert!(matches!(err, RevenantError::SigningResponse(_)), "{err}");
+    }
+
+    #[test]
+    fn embedded_rejects_a_signature_over_someone_elses_bytes() {
+        // A genuine signature -- over the wrong document. Structure and the
+        // signer's own key check out, so only binding the signature to the
+        // bytes we submitted catches it.
+        let transport = FakeSigner {
+            cms: sign_cms_detached(b"a different document entirely"),
+        };
+        let opts = EmbeddedSignatureOptions {
+            name: Some("Jane Signer".to_owned()),
+            ..Default::default()
+        };
+        let err =
+            sign_pdf_embedded(BLANK_LETTER, &transport, "u", "p", timeout(), &opts).unwrap_err();
+        assert!(matches!(err, RevenantError::SigningResponse(_)), "{err}");
     }
 
     #[test]
@@ -380,8 +437,7 @@ mod tests {
 
     #[test]
     fn embedded_fails_on_corrupt_cms() {
-        // Too-small CMS -> post-sign structure check fails -> the flow errors
-        // rather than returning a corrupt PDF.
+        // Too-small CMS -> rejected as a response, so no corrupt PDF is built.
         let transport = FakeSigner {
             cms: vec![0x30, 0x02, 0xAB, 0xCD],
         };
@@ -391,14 +447,33 @@ mod tests {
         };
         let err =
             sign_pdf_embedded(BLANK_LETTER, &transport, "u", "p", timeout(), &opts).unwrap_err();
-        assert!(matches!(err, RevenantError::Pdf(_)));
-        assert!(err.to_string().contains("Post-sign verification FAILED"));
+        assert!(matches!(err, RevenantError::SigningResponse(_)), "{err}");
+    }
+
+    #[test]
+    fn embedded_fails_when_the_splice_is_tampered_with() {
+        // The response itself is genuine, so the arrival-time gate passes; only
+        // the post-sign check can catch a PDF edited after the CMS went in.
+        let opts = EmbeddedSignatureOptions {
+            name: Some("Jane Signer".to_owned()),
+            ..Default::default()
+        };
+        let signed =
+            sign_pdf_embedded(BLANK_LETTER, &signer(), "u", "p", timeout(), &opts).unwrap();
+        let result = crate::pdf::verify_embedded_signature(&signed, None, None);
+        assert!(result.valid(), "{:?}", result.details);
+
+        let mut tampered = signed.clone();
+        let victim = tampered.len() / 2;
+        tampered[victim] ^= 0x01;
+        let after = crate::pdf::verify_embedded_signature(&tampered, None, None);
+        assert!(!after.valid(), "{:?}", after.details);
     }
 
     #[test]
     fn detached_signs_and_validates_input() {
         let cms = sign_pdf_detached(BLANK_LETTER, &signer(), "u", "p", timeout()).unwrap();
-        assert_eq!(cms, fake_cms());
+        assert_eq!(cms, sign_cms_detached(BLANK_LETTER));
         let err = sign_pdf_detached(b"nope", &signer(), "u", "p", timeout()).unwrap_err();
         assert!(matches!(err, RevenantError::Pdf(_)));
     }

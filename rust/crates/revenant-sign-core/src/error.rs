@@ -38,6 +38,15 @@ pub enum RevenantError {
     #[error("{0}")]
     Certificate(String),
 
+    /// The signing service answered, but its response could not be proven to be
+    /// a signature over what was submitted.
+    ///
+    /// Distinct from [`Server`](RevenantError::Server): the request succeeded at
+    /// the protocol level, so retrying it is pointless -- what came back is not
+    /// usable, and nothing should be saved or distributed.
+    #[error("{0}")]
+    SigningResponse(String),
+
     /// A general failure with no more specific kind (the base `RevenantError`).
     #[error("{0}")]
     Other(String),

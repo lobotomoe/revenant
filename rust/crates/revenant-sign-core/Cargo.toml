@@ -63,6 +63,14 @@ thiserror.workspace = true
 log.workspace = true
 
 [dev-dependencies]
+# The signing workflow refuses a response it cannot verify, so its tests have to
+# produce real signatures over data that only exists at test time (a prepared
+# PDF's ByteRange). `cms`'s builder plus the committed signer key/certificate
+# does that offline. Dev-only: resolver 2 keeps these features out of the
+# published library build.
+cms = { workspace = true, features = ["builder"] }
+rsa = { workspace = true, features = ["sha2"] }
+sha2 = { workspace = true, features = ["oid"] }
 
 [lints]
 workspace = true

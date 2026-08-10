@@ -19,6 +19,10 @@ pub mod pdf;
 pub mod pki;
 pub mod signing;
 
+mod signing_response;
 mod xml;
+
+#[cfg(test)]
+mod testutil;
 
 pub use error::{Result, RevenantError};

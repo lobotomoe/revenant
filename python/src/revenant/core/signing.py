@@ -31,6 +31,7 @@ from .pdf import (
     prepare_pdf_with_sig_field,
     verify_embedded_signature,
 )
+from .signing_response import check_signing_response
 
 if TYPE_CHECKING:
     from ..network.protocol import SigningTransport
@@ -142,11 +143,19 @@ def sign_pdf_detached(
         username, password: Revenant credentials.
         timeout: Request timeout in seconds.
 
+    The response is verified against the submitted bytes before it is
+    returned: a signature nobody could check is not a result worth handing back.
+
     Returns:
         Detached CMS/PKCS#7 signature (DER-encoded).
+
+    Raises:
+        SigningResponseError: If the response is not a signature over pdf_bytes.
     """
     _validate_pdf(pdf_bytes)
-    return transport.sign_pdf_detached(pdf_bytes, username, password, timeout)
+    cms_der = transport.sign_pdf_detached(pdf_bytes, username, password, timeout)
+    check_signing_response(cms_der, signed_content=pdf_bytes, operation="sign_pdf_detached")
+    return cms_der
 
 
 def sign_hash(
@@ -165,8 +174,16 @@ def sign_hash(
         username, password: Revenant credentials.
         timeout: Request timeout in seconds.
 
+    The returned signature is checked to be a genuine signature, but -- unlike
+    the operations that submit content -- nothing here can tie it to the
+    document the hash was taken from: what a service binds in response to a
+    pre-computed digest is service-defined, and observed to vary.
+
     Returns:
         CMS/PKCS#7 signature (DER-encoded) over the provided hash.
+
+    Raises:
+        SigningResponseError: If the response is not a verifiable signature.
     """
     from ..constants import SHA1_DIGEST_SIZE
 
@@ -174,7 +191,9 @@ def sign_hash(
         raise RevenantError(
             f"Expected {SHA1_DIGEST_SIZE}-byte SHA-1 hash, got {len(hash_bytes)} bytes."
         )
-    return transport.sign_hash(hash_bytes, username, password, timeout)
+    cms_der = transport.sign_hash(hash_bytes, username, password, timeout)
+    check_signing_response(cms_der, signed_content=None, operation="sign_hash")
+    return cms_der
 
 
 def sign_data(
@@ -196,12 +215,19 @@ def sign_data(
         username, password: Revenant credentials.
         timeout: Request timeout in seconds.
 
+    The response is verified against data_bytes before it is returned.
+
     Returns:
         CMS/PKCS#7 signature (DER-encoded) over the data.
+
+    Raises:
+        SigningResponseError: If the response is not a signature over data_bytes.
     """
     if not data_bytes:
         raise RevenantError("Cannot sign empty data.")
-    return transport.sign_data(data_bytes, username, password, timeout)
+    cms_der = transport.sign_data(data_bytes, username, password, timeout)
+    check_signing_response(cms_der, signed_content=data_bytes, operation="sign_data")
+    return cms_der
 
 
 def sign_pdf_embedded(

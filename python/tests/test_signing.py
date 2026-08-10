@@ -8,7 +8,7 @@ import pytest
 
 from revenant.constants import SHA1_DIGEST_SIZE
 from revenant.core.signing import sign_data, sign_hash, sign_pdf_detached
-from revenant.errors import PDFError, RevenantError
+from revenant.errors import PDFError, RevenantError, SigningResponseError
 
 from .conftest import FAKE_CMS
 
@@ -27,14 +27,33 @@ def test_sign_pdf_detached_empty(mock_transport):
         sign_pdf_detached(b"", mock_transport, "user", "pass", 120)
 
 
-def test_sign_pdf_detached_happy_path(mock_transport):
-    """Valid PDF should go through SOAP call and return CMS."""
+def test_sign_pdf_detached_happy_path(mock_transport, cms_signer):
+    """Valid PDF should go through SOAP call and return the verified CMS."""
     fake_pdf = b"%PDF-1.4\nfake content\n%%EOF\n"
-    fake_cms = b"\x30\x82\x01\x00"
+    signed_cms = cms_signer(fake_pdf)
 
-    mock_transport.sign_pdf_detached = Mock(return_value=fake_cms)
+    mock_transport.sign_pdf_detached = Mock(return_value=signed_cms)
     result = sign_pdf_detached(fake_pdf, mock_transport, "user", "pass", 120)
-    assert result == fake_cms
+    assert result == signed_cms
+
+
+def test_sign_pdf_detached_rejects_unverifiable_response(mock_transport):
+    """A response that is not a signature must not be handed back as one."""
+    fake_pdf = b"%PDF-1.4\nfake content\n%%EOF\n"
+
+    mock_transport.sign_pdf_detached = Mock(return_value=FAKE_CMS)
+    with pytest.raises(SigningResponseError, match="not a valid signature"):
+        sign_pdf_detached(fake_pdf, mock_transport, "user", "pass", 120)
+
+
+def test_sign_pdf_detached_rejects_signature_over_other_bytes(mock_transport, cms_signer):
+    """A genuine signature over the wrong document is still the wrong answer."""
+    fake_pdf = b"%PDF-1.4\nfake content\n%%EOF\n"
+    elsewhere = cms_signer(b"a different document entirely")
+
+    mock_transport.sign_pdf_detached = Mock(return_value=elsewhere)
+    with pytest.raises(SigningResponseError, match="not a valid signature"):
+        sign_pdf_detached(fake_pdf, mock_transport, "user", "pass", 120)
 
 
 # ── sign_hash validation ─────────────────────────────────────────────
@@ -55,14 +74,21 @@ def test_sha1_digest_size_constant():
     assert SHA1_DIGEST_SIZE == 20
 
 
-def test_sign_hash_happy_path(mock_transport):
-    """Valid 20-byte hash should go through SOAP call and return CMS."""
+def test_sign_hash_happy_path(mock_transport, cms_signer):
+    """Valid 20-byte hash should go through SOAP call and return the CMS."""
     fake_hash = b"\xab" * 20
-    fake_cms = b"\x30\x82\x01\x00"
+    signed_cms = cms_signer(fake_hash)
 
-    mock_transport.sign_hash = Mock(return_value=fake_cms)
+    mock_transport.sign_hash = Mock(return_value=signed_cms)
     result = sign_hash(fake_hash, mock_transport, "user", "pass", 120)
-    assert result == fake_cms
+    assert result == signed_cms
+
+
+def test_sign_hash_rejects_unverifiable_response(mock_transport):
+    """Submitting a digest still requires a response that is a signature."""
+    mock_transport.sign_hash = Mock(return_value=FAKE_CMS)
+    with pytest.raises(SigningResponseError, match="verifiable signature"):
+        sign_hash(b"\xab" * 20, mock_transport, "user", "pass", 120)
 
 
 # ── sign_data validation ─────────────────────────────────────────────
@@ -74,13 +100,20 @@ def test_sign_data_empty(mock_transport):
         sign_data(b"", mock_transport, "user", "pass", 120)
 
 
-def test_sign_data_happy_path(mock_transport):
-    """Valid data should go through SOAP call and return CMS."""
-    fake_cms = b"\x30\x82\x01\x00"
+def test_sign_data_happy_path(mock_transport, cms_signer):
+    """Valid data should go through SOAP call and return the verified CMS."""
+    signed_cms = cms_signer(b"hello world")
 
-    mock_transport.sign_data = Mock(return_value=fake_cms)
+    mock_transport.sign_data = Mock(return_value=signed_cms)
     result = sign_data(b"hello world", mock_transport, "user", "pass", 120)
-    assert result == fake_cms
+    assert result == signed_cms
+
+
+def test_sign_data_rejects_unverifiable_response(mock_transport):
+    """Filler bytes shaped like DER are not a signature over the data."""
+    mock_transport.sign_data = Mock(return_value=FAKE_CMS)
+    with pytest.raises(SigningResponseError, match="not a valid signature"):
+        sign_data(b"hello world", mock_transport, "user", "pass", 120)
 
 
 # ── sign_pdf_embedded ────────────────────────────────────────────────
@@ -161,8 +194,13 @@ def test_sign_pdf_embedded_with_fields(mock_transport, cms_signer):
     assert isinstance(result, bytes)
 
 
-def test_sign_pdf_embedded_verification_failure(mock_transport):
-    """Post-sign verification failure should raise RevenantError."""
+def test_sign_pdf_embedded_verification_failure(mock_transport, cms_signer):
+    """Post-sign verification failure should raise RevenantError.
+
+    The transport signs for real, so the response passes the arrival-time gate
+    and the post-sign check is what this exercises -- the splice, not the
+    answer.
+    """
     import io
 
     import pikepdf
@@ -175,7 +213,6 @@ def test_sign_pdf_embedded_verification_failure(mock_transport):
     pdf.save(buf)
     pdf_bytes = buf.getvalue()
 
-    fake_cms = FAKE_CMS
     bad_result = {
         "valid": False,
         "structure_ok": False,
@@ -183,7 +220,7 @@ def test_sign_pdf_embedded_verification_failure(mock_transport):
         "details": ["Hash MISMATCH"],
     }
 
-    mock_transport.sign_data = Mock(return_value=fake_cms)
+    mock_transport.sign_data = Mock(side_effect=cms_signer)
     with (
         patch("revenant.core.signing.verify_embedded_signature", return_value=bad_result),
         pytest.raises(PDFError, match="Post-sign verification FAILED"),

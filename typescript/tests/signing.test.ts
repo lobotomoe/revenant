@@ -11,8 +11,9 @@ import {
   signPdfDetachedWithTransport,
   signPdfEmbeddedWithTransport,
 } from "../src/core/signing.js";
-import { PDFError, RevenantError } from "../src/errors.js";
-import { createMockTransport, createValidPdf, FAKE_CMS } from "./conftest.js";
+import { PDFError, RevenantError, SigningResponseError } from "../src/errors.js";
+import { createSigningTransport, signCmsDetached } from "./cms-signer.js";
+import { createMockTransport, createValidPdf } from "./conftest.js";
 
 vi.mock("../src/core/pdf/verify.js", async (importOriginal) => {
   const actual = await importOriginal();
@@ -32,7 +33,7 @@ vi.mock("../src/core/pdf/verify.js", async (importOriginal) => {
 
 describe("signPdfDetachedWithTransport", () => {
   it("rejects non-PDF input", async () => {
-    const transport = createMockTransport();
+    const transport = createSigningTransport();
     const badBytes = new Uint8Array([0x00, 0x01, 0x02]);
     await expect(signPdfDetachedWithTransport(badBytes, transport, "user", "pass")).rejects.toThrow(
       PDFError,
@@ -40,7 +41,7 @@ describe("signPdfDetachedWithTransport", () => {
   });
 
   it("rejects empty input", async () => {
-    const transport = createMockTransport();
+    const transport = createSigningTransport();
     await expect(
       signPdfDetachedWithTransport(new Uint8Array(0), transport, "user", "pass"),
     ).rejects.toThrow(PDFError);
@@ -48,7 +49,7 @@ describe("signPdfDetachedWithTransport", () => {
 
   it("rejects input with correct length but wrong magic bytes", async () => {
     // Exactly 5 bytes (PDF_MAGIC length) but not '%PDF-' -- hits the per-byte check (lines 29-31)
-    const transport = createMockTransport();
+    const transport = createSigningTransport();
     const wrongMagic = new Uint8Array([0x25, 0x50, 0x44, 0x46, 0x00]); // '%PDF\0'
     await expect(
       signPdfDetachedWithTransport(wrongMagic, transport, "user", "pass"),
@@ -56,18 +57,38 @@ describe("signPdfDetachedWithTransport", () => {
   });
 
   it("calls transport.signPdfDetached for valid PDF", async () => {
-    const transport = createMockTransport();
+    const transport = createSigningTransport();
     const pdf = await createValidPdf();
     const result = await signPdfDetachedWithTransport(pdf, transport, "user", "pass", 60);
     expect(transport.signPdfDetached).toHaveBeenCalledWith(pdf, "user", "pass", 60);
-    expect(result).toBe(FAKE_CMS);
+    expect(result).toEqual(await signCmsDetached(pdf));
   });
 
   it("uses default timeout of 120 when not provided", async () => {
-    const transport = createMockTransport();
+    const transport = createSigningTransport();
     const pdf = await createValidPdf();
     await signPdfDetachedWithTransport(pdf, transport, "user", "pass");
     expect(transport.signPdfDetached).toHaveBeenCalledWith(pdf, "user", "pass", 120);
+  });
+
+  it("rejects a response that is not a signature", async () => {
+    const transport = createMockTransport();
+    const pdf = await createValidPdf();
+    await expect(signPdfDetachedWithTransport(pdf, transport, "user", "pass")).rejects.toThrow(
+      SigningResponseError,
+    );
+  });
+
+  it("rejects a genuine signature over a different document", async () => {
+    // Structure and the signer's own key check out, so only binding the
+    // signature to the submitted bytes catches this.
+    const elsewhere = await signCmsDetached(new TextEncoder().encode("another document"));
+    const transport = createMockTransport();
+    transport.signPdfDetached = vi.fn().mockResolvedValue(elsewhere);
+    const pdf = await createValidPdf();
+    await expect(signPdfDetachedWithTransport(pdf, transport, "user", "pass")).rejects.toThrow(
+      /not a valid signature/,
+    );
   });
 });
 
@@ -75,7 +96,7 @@ describe("signPdfDetachedWithTransport", () => {
 
 describe("signHashWithTransport", () => {
   it("rejects wrong-size hash", async () => {
-    const transport = createMockTransport();
+    const transport = createSigningTransport();
     const badHash = new Uint8Array(10);
     await expect(signHashWithTransport(badHash, transport, "user", "pass")).rejects.toThrow(
       RevenantError,
@@ -83,14 +104,14 @@ describe("signHashWithTransport", () => {
   });
 
   it("rejects empty hash", async () => {
-    const transport = createMockTransport();
+    const transport = createSigningTransport();
     await expect(
       signHashWithTransport(new Uint8Array(0), transport, "user", "pass"),
     ).rejects.toThrow(RevenantError);
   });
 
   it("rejects hash that is too long", async () => {
-    const transport = createMockTransport();
+    const transport = createSigningTransport();
     const longHash = new Uint8Array(32);
     await expect(signHashWithTransport(longHash, transport, "user", "pass")).rejects.toThrow(
       RevenantError,
@@ -98,7 +119,7 @@ describe("signHashWithTransport", () => {
   });
 
   it("includes expected and actual sizes in error message", async () => {
-    const transport = createMockTransport();
+    const transport = createSigningTransport();
     const badHash = new Uint8Array(10);
     await expect(signHashWithTransport(badHash, transport, "user", "pass")).rejects.toThrow(
       /Expected 20-byte SHA-1 hash, got 10 bytes/,
@@ -106,18 +127,27 @@ describe("signHashWithTransport", () => {
   });
 
   it("accepts 20-byte SHA-1 hash", async () => {
-    const transport = createMockTransport();
+    const transport = createSigningTransport();
     const hash = new Uint8Array(SHA1_DIGEST_SIZE);
     const result = await signHashWithTransport(hash, transport, "user", "pass");
     expect(transport.signHash).toHaveBeenCalledWith(hash, "user", "pass", 120);
-    expect(result).toBe(FAKE_CMS);
+    expect(result).toEqual(await signCmsDetached(hash));
   });
 
   it("passes explicit timeout to transport", async () => {
-    const transport = createMockTransport();
+    const transport = createSigningTransport();
     const hash = new Uint8Array(SHA1_DIGEST_SIZE);
     await signHashWithTransport(hash, transport, "user", "pass", 45);
     expect(transport.signHash).toHaveBeenCalledWith(hash, "user", "pass", 45);
+  });
+
+  it("rejects a response that is not a signature", async () => {
+    // Submitting a digest still requires a response that is a signature.
+    const transport = createMockTransport();
+    const hash = new Uint8Array(SHA1_DIGEST_SIZE);
+    await expect(signHashWithTransport(hash, transport, "user", "pass")).rejects.toThrow(
+      SigningResponseError,
+    );
   });
 });
 
@@ -125,39 +155,47 @@ describe("signHashWithTransport", () => {
 
 describe("signDataWithTransport", () => {
   it("rejects empty data", async () => {
-    const transport = createMockTransport();
+    const transport = createSigningTransport();
     await expect(
       signDataWithTransport(new Uint8Array(0), transport, "user", "pass"),
     ).rejects.toThrow(RevenantError);
   });
 
   it("includes meaningful error message for empty data", async () => {
-    const transport = createMockTransport();
+    const transport = createSigningTransport();
     await expect(
       signDataWithTransport(new Uint8Array(0), transport, "user", "pass"),
     ).rejects.toThrow(/Cannot sign empty data/);
   });
 
   it("signs non-empty data", async () => {
-    const transport = createMockTransport();
+    const transport = createSigningTransport();
     const data = new TextEncoder().encode("hello world");
     const result = await signDataWithTransport(data, transport, "user", "pass");
     expect(transport.signData).toHaveBeenCalled();
-    expect(result).toBe(FAKE_CMS);
+    expect(result).toEqual(await signCmsDetached(data));
   });
 
   it("passes credentials and timeout to transport", async () => {
-    const transport = createMockTransport();
+    const transport = createSigningTransport();
     const data = new TextEncoder().encode("test");
     await signDataWithTransport(data, transport, "myuser", "mypass", 90);
     expect(transport.signData).toHaveBeenCalledWith(data, "myuser", "mypass", 90);
   });
 
   it("uses default timeout of 120 when not provided", async () => {
-    const transport = createMockTransport();
+    const transport = createSigningTransport();
     const data = new TextEncoder().encode("test");
     await signDataWithTransport(data, transport, "user", "pass");
     expect(transport.signData).toHaveBeenCalledWith(data, "user", "pass", 120);
+  });
+
+  it("rejects filler bytes shaped like DER", async () => {
+    const transport = createMockTransport();
+    const data = new TextEncoder().encode("hello world");
+    await expect(signDataWithTransport(data, transport, "user", "pass")).rejects.toThrow(
+      SigningResponseError,
+    );
   });
 });
 
@@ -165,7 +203,7 @@ describe("signDataWithTransport", () => {
 
 describe("signPdfEmbeddedWithTransport", () => {
   it("rejects non-PDF input", async () => {
-    const transport = createMockTransport();
+    const transport = createSigningTransport();
     const badBytes = new Uint8Array([0x00, 0x01, 0x02]);
     await expect(signPdfEmbeddedWithTransport(badBytes, transport, "user", "pass")).rejects.toThrow(
       PDFError,
@@ -173,7 +211,7 @@ describe("signPdfEmbeddedWithTransport", () => {
   });
 
   it("rejects empty input", async () => {
-    const transport = createMockTransport();
+    const transport = createSigningTransport();
     await expect(
       signPdfEmbeddedWithTransport(new Uint8Array(0), transport, "user", "pass"),
     ).rejects.toThrow(PDFError);
@@ -181,7 +219,7 @@ describe("signPdfEmbeddedWithTransport", () => {
 
   it("rejects input with correct length but wrong magic bytes", async () => {
     // 5 bytes matching PDF_MAGIC length but last byte differs -- hits per-byte check (lines 29-31)
-    const transport = createMockTransport();
+    const transport = createSigningTransport();
     const wrongMagic = new Uint8Array([0x25, 0x50, 0x44, 0x46, 0x00]); // '%PDF\0'
     await expect(
       signPdfEmbeddedWithTransport(wrongMagic, transport, "user", "pass"),
@@ -189,7 +227,7 @@ describe("signPdfEmbeddedWithTransport", () => {
   });
 
   it("rejects negative width", async () => {
-    const transport = createMockTransport();
+    const transport = createSigningTransport();
     const pdf = await createValidPdf();
     await expect(
       signPdfEmbeddedWithTransport(pdf, transport, "user", "pass", 120, { width: -10 }),
@@ -200,7 +238,7 @@ describe("signPdfEmbeddedWithTransport", () => {
   });
 
   it("rejects zero width", async () => {
-    const transport = createMockTransport();
+    const transport = createSigningTransport();
     const pdf = await createValidPdf();
     await expect(
       signPdfEmbeddedWithTransport(pdf, transport, "user", "pass", 120, { width: 0 }),
@@ -208,7 +246,7 @@ describe("signPdfEmbeddedWithTransport", () => {
   });
 
   it("rejects negative height", async () => {
-    const transport = createMockTransport();
+    const transport = createSigningTransport();
     const pdf = await createValidPdf();
     await expect(
       signPdfEmbeddedWithTransport(pdf, transport, "user", "pass", 120, { height: -5 }),
@@ -216,7 +254,7 @@ describe("signPdfEmbeddedWithTransport", () => {
   });
 
   it("rejects zero height", async () => {
-    const transport = createMockTransport();
+    const transport = createSigningTransport();
     const pdf = await createValidPdf();
     await expect(
       signPdfEmbeddedWithTransport(pdf, transport, "user", "pass", 120, { height: 0 }),
@@ -224,7 +262,7 @@ describe("signPdfEmbeddedWithTransport", () => {
   });
 
   it("rejects negative x coordinate", async () => {
-    const transport = createMockTransport();
+    const transport = createSigningTransport();
     const pdf = await createValidPdf();
     await expect(
       signPdfEmbeddedWithTransport(pdf, transport, "user", "pass", 120, { x: -1 }),
@@ -235,7 +273,7 @@ describe("signPdfEmbeddedWithTransport", () => {
   });
 
   it("rejects negative y coordinate", async () => {
-    const transport = createMockTransport();
+    const transport = createSigningTransport();
     const pdf = await createValidPdf();
     await expect(
       signPdfEmbeddedWithTransport(pdf, transport, "user", "pass", 120, { y: -1 }),
@@ -246,14 +284,14 @@ describe("signPdfEmbeddedWithTransport", () => {
   });
 
   it("uses default timeout of 120 when not provided", async () => {
-    const transport = createMockTransport();
+    const transport = createSigningTransport();
     const pdf = await createValidPdf();
     await signPdfEmbeddedWithTransport(pdf, transport, "user", "pass");
     expect(transport.signData).toHaveBeenCalledWith(expect.any(Uint8Array), "user", "pass", 120);
   });
 
   it("calls transport with correct arguments", async () => {
-    const transport = createMockTransport();
+    const transport = createSigningTransport();
     const pdf = await createValidPdf();
     await signPdfEmbeddedWithTransport(pdf, transport, "testuser", "testpass", 60);
     expect(transport.signData).toHaveBeenCalledWith(
@@ -265,7 +303,7 @@ describe("signPdfEmbeddedWithTransport", () => {
   });
 
   it("returns a Uint8Array result", async () => {
-    const transport = createMockTransport();
+    const transport = createSigningTransport();
     const pdf = await createValidPdf();
     const result = await signPdfEmbeddedWithTransport(pdf, transport, "user", "pass");
     expect(result).toBeInstanceOf(Uint8Array);
@@ -273,7 +311,7 @@ describe("signPdfEmbeddedWithTransport", () => {
   });
 
   it("works with invisible signature option", async () => {
-    const transport = createMockTransport();
+    const transport = createSigningTransport();
     const pdf = await createValidPdf();
     const result = await signPdfEmbeddedWithTransport(pdf, transport, "user", "pass", 120, {
       visible: false,
@@ -283,7 +321,7 @@ describe("signPdfEmbeddedWithTransport", () => {
   });
 
   it("works with explicit position", async () => {
-    const transport = createMockTransport();
+    const transport = createSigningTransport();
     const pdf = await createValidPdf();
     const result = await signPdfEmbeddedWithTransport(pdf, transport, "user", "pass", 120, {
       x: 100,
@@ -296,7 +334,7 @@ describe("signPdfEmbeddedWithTransport", () => {
   });
 
   it("accepts zero coordinates", async () => {
-    const transport = createMockTransport();
+    const transport = createSigningTransport();
     const pdf = await createValidPdf();
     const result = await signPdfEmbeddedWithTransport(pdf, transport, "user", "pass", 120, {
       x: 0,
@@ -306,7 +344,7 @@ describe("signPdfEmbeddedWithTransport", () => {
   });
 
   it("does not crash with auto-sizing when fields are provided", async () => {
-    const transport = createMockTransport();
+    const transport = createSigningTransport();
     const pdf = await createValidPdf();
     const result = await signPdfEmbeddedWithTransport(pdf, transport, "user", "pass", 120, {
       fields: ["Signed by: Test User", "Date: 2026-01-01"],
@@ -317,7 +355,7 @@ describe("signPdfEmbeddedWithTransport", () => {
   });
 
   it("works with reason and name options", async () => {
-    const transport = createMockTransport();
+    const transport = createSigningTransport();
     const pdf = await createValidPdf();
     const result = await signPdfEmbeddedWithTransport(pdf, transport, "user", "pass", 120, {
       reason: "Approval",
@@ -327,7 +365,7 @@ describe("signPdfEmbeddedWithTransport", () => {
   });
 
   it("result starts with PDF magic bytes", async () => {
-    const transport = createMockTransport();
+    const transport = createSigningTransport();
     const pdf = await createValidPdf();
     const result = await signPdfEmbeddedWithTransport(pdf, transport, "user", "pass");
     // %PDF-
@@ -350,7 +388,7 @@ describe("signPdfEmbeddedWithTransport", () => {
       signer: null,
     });
 
-    const transport = createMockTransport();
+    const transport = createSigningTransport();
     const pdf = await createValidPdf();
     try {
       await signPdfEmbeddedWithTransport(pdf, transport, "user", "pass");
@@ -375,7 +413,7 @@ describe("signPdfEmbeddedWithTransport", () => {
       signer: null,
     });
 
-    const transport = createMockTransport();
+    const transport = createSigningTransport();
     const pdf = await createValidPdf();
     try {
       await signPdfEmbeddedWithTransport(pdf, transport, "user", "pass");

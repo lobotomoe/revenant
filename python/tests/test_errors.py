@@ -71,3 +71,10 @@ def test_tls_error_setstate_none():
     e.__setstate__(None)
     # retryable should remain unchanged
     assert e.retryable is True
+
+
+def test_signing_response_error_inherits_revenant():
+    from revenant.errors import SigningResponseError
+
+    assert issubclass(SigningResponseError, RevenantError)
+    assert not issubclass(SigningResponseError, ServerError)
