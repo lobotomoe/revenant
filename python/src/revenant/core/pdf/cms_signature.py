@@ -304,7 +304,7 @@ def verify_signer_signature(
         content: The detached content the signature covers. Only consulted when
             the CMS carries no signed attributes and embeds no content of its
             own; RFC 5652 section 5.4 defines the signature input as the content
-            itself in that case. EKENG issues its credential documents this way.
+            itself in that case, and signers do issue documents in that shape.
     """
     try:
         content_info = asn1_cms.ContentInfo.load(cms_der, strict=True)
@@ -354,8 +354,8 @@ def verify_signer_signature(
 
         signer_cert_der = signer_cert.dump()
         # Only the public key is needed, so load the SubjectPublicKeyInfo rather
-        # than the whole certificate. Real signer certificates (EKENG/CoSign among
-        # them) encode DN attributes such as emailAddress as a PrintableString
+        # than the whole certificate. Signer certificates issued in the field
+        # encode DN attributes such as emailAddress as a PrintableString
         # holding '@', which is outside that type's character set; a strict X.509
         # parser rejects the entire certificate over a field this check never
         # reads. Signature verification must not depend on decoding the subject DN.

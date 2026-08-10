@@ -19,12 +19,21 @@ from .. import require_pikepdf as _require_pikepdf
 from .asn1 import ASN1_SEQUENCE_TAG, MIN_CMS_SIZE
 from .cms_extraction import (
     BYTERANGE_PATTERN,
+    byterange_coverage,
     extract_signature_data_from_match,
 )
 from .cms_info import extract_digest_info, extract_signer_info
 from .cms_signature import SignatureVerification, verify_signer_signature
 
 _logger = logging.getLogger(__name__)
+
+
+class SignatureCoverage(TypedDict):
+    """How much of the file one signature covers."""
+
+    covers_whole_file: bool  # ByteRange reaches EOF; False = bytes follow it
+    covered_bytes: int  # Bytes the ByteRange actually covers
+    total_bytes: int  # Size of the whole file
 
 
 class VerificationResult(TypedDict):
@@ -34,6 +43,7 @@ class VerificationResult(TypedDict):
     structure_ok: bool  # ByteRange and CMS structure valid
     hash_ok: bool  # CMS digest matches data (and optional expected hash matches)
     signature_valid: bool | None  # None = cryptographic verification unavailable
+    coverage: SignatureCoverage  # How much of the file this signature covers
     ltv_enabled: bool  # Contains embedded revocation data
     details: list[str]  # Human-readable messages
     signer: dict[str, str | None] | None  # Authenticated certificate info, or None
@@ -150,6 +160,7 @@ def _verify_signature_match(
             "structure_ok": False,
             "hash_ok": False,
             "signature_valid": None,
+            "coverage": {"covers_whole_file": False, "covered_bytes": 0, "total_bytes": 0},
             "ltv_enabled": False,
             "details": [f"Structure error: {e}"],
             "signer": None,
@@ -157,6 +168,21 @@ def _verify_signature_match(
             "trust_anchor": None,
             "trust_status": None,
         }
+
+    # ── 1a. Signature coverage ───────────────────────────────────
+    # Bytes past the ByteRange are not signed by this signature. In an
+    # incrementally updated PDF they are usually a later revision -- possibly
+    # another signature, possibly an unsigned change. Reported, never inferred.
+    coverage = byterange_coverage(pdf_bytes, br_match)
+    if coverage.covers_to_eof:
+        details.append(
+            f"Coverage: whole file ({coverage.covered_bytes} of {coverage.total_bytes} bytes)"
+        )
+    else:
+        details.append(
+            f"Coverage: partial -- {coverage.trailing_bytes} of {coverage.total_bytes} bytes "
+            "follow this signature and are outside it"
+        )
 
     # ── 2. CMS structure check ───────────────────────────────────
     if len(cms_der) < MIN_CMS_SIZE:
@@ -220,6 +246,11 @@ def _verify_signature_match(
         "structure_ok": structure_ok,
         "hash_ok": hash_ok,
         "signature_valid": signature.valid,
+        "coverage": {
+            "covers_whole_file": coverage.covers_to_eof,
+            "covered_bytes": coverage.covered_bytes,
+            "total_bytes": coverage.total_bytes,
+        },
         "ltv_enabled": ltv.ltv_enabled,
         "details": details,
         "signer": signer,
@@ -264,6 +295,7 @@ def verify_embedded_signature(
             "structure_ok": False,
             "hash_ok": False,
             "signature_valid": None,
+            "coverage": {"covers_whole_file": False, "covered_bytes": 0, "total_bytes": 0},
             "ltv_enabled": False,
             "details": ["Structure error: No /ByteRange found in PDF -- not a signed PDF?"],
             "signer": None,
@@ -327,6 +359,16 @@ def verify_all_embedded_signatures(
         result = _verify_signature_match(pdf_bytes, br, tsl_url=tsl_url)
         result["details"].append(pikepdf_detail)
         results.append(result)
+
+    # One signature covering an earlier revision is expected -- a later signature
+    # covers the rest. Bytes past *every* signature are signed by nobody, which
+    # is decided by arithmetic alone, without inspecting what they contain.
+    if results and not any(r["coverage"]["covers_whole_file"] for r in results):
+        furthest = max(byterange_coverage(pdf_bytes, br).coverage_end for br in br_matches)
+        unsigned = len(pdf_bytes) - furthest
+        results[-1]["details"].append(
+            f"WARNING: {unsigned} trailing bytes are covered by no signature in this document"
+        )
 
     return results
 
@@ -409,6 +451,13 @@ def verify_detached_signature(
         "structure_ok": structure_ok,
         "hash_ok": hash_ok,
         "signature_valid": signature.valid,
+        # A detached signature covers exactly the data it was handed; there is
+        # no surrounding file that could carry unsigned bytes.
+        "coverage": {
+            "covers_whole_file": True,
+            "covered_bytes": len(data_bytes),
+            "total_bytes": len(data_bytes),
+        },
         "ltv_enabled": ltv.ltv_enabled,
         "details": details,
         "signer": signer,

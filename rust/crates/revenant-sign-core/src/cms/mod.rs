@@ -26,7 +26,7 @@ pub use asn1::{ASN1_SEQUENCE_TAG, MIN_CMS_SIZE};
 pub use digest::{extract_digest_info, DigestAlgorithm};
 pub use extraction::{
     extract_cms_from_byterange, extract_signature_data, extract_signature_data_for,
-    find_byteranges, ByteRange, BYTERANGE_PATTERN,
+    find_byteranges, ByteRange, ByteRangeCoverage, BYTERANGE_PATTERN,
 };
 pub use inspect::{extract_signer_info, inspect_cms_blob, CmsInspection};
 pub use ltv::{check_ltv_status, LtvStatus};

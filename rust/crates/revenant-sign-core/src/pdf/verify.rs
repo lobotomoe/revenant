@@ -14,8 +14,8 @@
 use super::reader::PdfReader;
 use crate::cms::{
     check_ltv_status, extract_digest_info, extract_signature_data_for, extract_signer_info,
-    find_byteranges, has_signed_attributes, verify_signer_signature, ByteRange, DigestAlgorithm,
-    SignatureStatus, ASN1_SEQUENCE_TAG, MIN_CMS_SIZE,
+    find_byteranges, has_signed_attributes, verify_signer_signature, ByteRange, ByteRangeCoverage,
+    DigestAlgorithm, SignatureStatus, ASN1_SEQUENCE_TAG, MIN_CMS_SIZE,
 };
 use crate::pki::{CertInfo, ChainResult, TrustStatus};
 use crate::{Result, RevenantError};
@@ -34,6 +34,8 @@ pub struct VerificationResult {
     /// Whether the signer's cryptographic signature over the CMS signed
     /// attributes verifies against the signer certificate.
     pub signature: SignatureStatus,
+    /// How much of the file this signature covers.
+    pub coverage: ByteRangeCoverage,
     /// The CMS embeds long-term-validation revocation data.
     pub ltv_enabled: bool,
     /// Human-readable diagnostic lines.
@@ -77,6 +79,7 @@ impl VerificationResult {
             structure_ok: false,
             hash_ok: false,
             signature: SignatureStatus::Unverifiable("structure could not be extracted"),
+            coverage: ByteRangeCoverage::default(),
             ltv_enabled: false,
             details: vec![message],
             signer: None,
@@ -105,6 +108,24 @@ fn verify_signature_match(
         signed_data.len()
     ));
     details.push(format!("CMS blob: {} bytes", cms_der.len()));
+
+    // 1a. Signature coverage. Bytes past the ByteRange are not signed by this
+    //     signature. In an incrementally updated PDF they are usually a later
+    //     revision -- possibly another signature, possibly an unsigned change.
+    //     Reported, never inferred.
+    let coverage = br.coverage(pdf_bytes);
+    if coverage.covers_to_eof() {
+        details.push(format!(
+            "Coverage: whole file ({} of {} bytes)",
+            coverage.covered_bytes, coverage.total_bytes
+        ));
+    } else {
+        details.push(format!(
+            "Coverage: partial -- {} of {} bytes follow this signature and are outside it",
+            coverage.trailing_bytes(),
+            coverage.total_bytes
+        ));
+    }
 
     // 2. CMS structure check.
     let structure_ok = check_cms_structure(&cms_der, &mut details);
@@ -147,6 +168,7 @@ fn verify_signature_match(
         structure_ok,
         hash_ok,
         signature,
+        coverage,
         ltv_enabled,
         details,
         signer,
@@ -316,7 +338,7 @@ pub fn verify_all_embedded_signatures(
     }
 
     let note = parser_note(pdf_bytes);
-    let results = ranges
+    let mut results: Vec<VerificationResult> = ranges
         .iter()
         .map(|br| {
             let mut result = verify_signature_match(pdf_bytes, br, None, validate_chain);
@@ -324,6 +346,24 @@ pub fn verify_all_embedded_signatures(
             result
         })
         .collect();
+
+    // One signature covering an earlier revision is expected -- a later
+    // signature covers the rest. Bytes past *every* signature are signed by
+    // nobody, which is decided by arithmetic alone, without inspecting what
+    // they contain.
+    if !results.iter().any(|r| r.coverage.covers_to_eof()) {
+        let furthest = ranges
+            .iter()
+            .map(|br| br.coverage(pdf_bytes).coverage_end)
+            .max()
+            .unwrap_or(0);
+        let unsigned = pdf_bytes.len().saturating_sub(furthest);
+        if let Some(last) = results.last_mut() {
+            last.details.push(format!(
+                "WARNING: {unsigned} trailing bytes are covered by no signature in this document"
+            ));
+        }
+    }
     Ok(results)
 }
 
@@ -408,6 +448,9 @@ pub fn verify_detached_signature(
         structure_ok,
         hash_ok,
         signature,
+        // A detached signature covers exactly the data it was handed; there is
+        // no surrounding file that could carry unsigned bytes.
+        coverage: ByteRangeCoverage::whole(data_bytes.len()),
         ltv_enabled,
         details,
         signer,
@@ -444,6 +487,35 @@ mod tests {
         cms.extend(std::iter::repeat_n(0xAB, 200));
         let signed = insert_cms(&prepared, hex_start, hex_len, &cms).unwrap();
         (signed, hash)
+    }
+
+    #[test]
+    fn reports_coverage_and_warns_when_nothing_signs_the_trailing_bytes() {
+        let (signed, _) = prepare_and_fake_sign();
+
+        let whole = verify_embedded_signature(&signed, None, None);
+        assert!(whole.coverage.covers_to_eof(), "{:?}", whole.details);
+        // The /Contents slot sits inside the file but outside the ByteRange.
+        assert!(whole.coverage.covered_bytes < whole.coverage.total_bytes);
+        assert!(whole
+            .details
+            .iter()
+            .any(|d| d.starts_with("Coverage: whole file")));
+
+        let appended = b"\n% appended after the signature\n";
+        let mut extended = signed.clone();
+        extended.extend_from_slice(appended);
+
+        let results = verify_all_embedded_signatures(&extended, None).unwrap();
+        let last = results.last().expect("one signature");
+        assert!(!last.coverage.covers_to_eof());
+        assert!(last
+            .details
+            .iter()
+            .any(|d| d.starts_with("Coverage: partial")));
+        assert!(last.details.iter().any(|d| {
+            d.starts_with("WARNING") && d.contains(&format!("{} trailing bytes", appended.len()))
+        }));
     }
 
     #[test]

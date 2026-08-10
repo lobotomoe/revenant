@@ -17,6 +17,7 @@ from revenant.core.pdf import (
     compute_byterange_hash,
     insert_cms,
     prepare_pdf_with_sig_field,
+    verify_all_embedded_signatures,
     verify_detached_signature,
     verify_embedded_signature,
 )
@@ -513,6 +514,50 @@ def test_rejects_tampered_content_without_signed_attributes():
     assert result["signature_valid"] is False
     assert result["hash_ok"] is False
     assert result["valid"] is False
+
+
+def _signed_pdf() -> bytes:
+    pdf = pikepdf.Pdf.new()
+    pdf.add_blank_page()
+    stream = io.BytesIO()
+    pdf.save(stream)
+    prepared, hex_start, hex_len = prepare_pdf_with_sig_field(stream.getvalue(), visible=False)
+    signed_data = prepared[:hex_start] + prepared[hex_start + hex_len + 1 :]
+    return insert_cms(prepared, hex_start, hex_len, _real_cms(signed_data))
+
+
+def test_reports_whole_file_coverage_for_a_single_signature():
+    result = verify_embedded_signature(_signed_pdf())
+
+    assert result["coverage"]["covers_whole_file"] is True
+    assert (
+        result["coverage"]["covered_bytes"] < result["coverage"]["total_bytes"]
+    )  # the /Contents slot is not covered
+    assert any(d.startswith("Coverage: whole file") for d in result["details"])
+
+
+def test_reports_partial_coverage_and_warns_when_nothing_signs_the_tail():
+    appended = b"\n% appended after the signature\n"
+    results = verify_all_embedded_signatures(_signed_pdf() + appended)
+
+    assert len(results) == 1
+    result = results[0]
+    # The signature still covers its own bytes, so it stays valid; the appended
+    # region is simply outside every signature in the document.
+    assert result["valid"] is True
+    assert result["coverage"]["covers_whole_file"] is False
+    assert any(d.startswith("Coverage: partial") for d in result["details"])
+    warning = next(d for d in result["details"] if d.startswith("WARNING"))
+    assert f"{len(appended)} trailing bytes" in warning
+
+
+def test_detached_signature_always_covers_the_data_it_was_given():
+    data = b"detached payload"
+    result = verify_detached_signature(data, _real_cms(data))
+
+    assert result["coverage"]["covers_whole_file"] is True
+    assert result["coverage"]["covered_bytes"] == len(data)
+    assert result["coverage"]["total_bytes"] == len(data)
 
 
 def test_exception_description_is_bounded_and_names_the_type():

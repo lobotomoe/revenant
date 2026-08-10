@@ -852,6 +852,29 @@ describe("verifyDetachedSignature", () => {
     expect(result.valid).toBe(true);
   });
 
+  it("reports coverage and warns when nothing signs the trailing bytes", async () => {
+    const { signedPdf: pdf } = await createSignedPdf();
+
+    const whole = await verifyEmbeddedSignature(pdf);
+    expect(whole.coverage.coversWholeFile).toBe(true);
+    expect(whole.coverage.coveredBytes).toBeLessThan(whole.coverage.totalBytes); // the /Contents slot
+    expect(whole.details.some((d) => d.startsWith("Coverage: whole file"))).toBe(true);
+
+    const appended = new TextEncoder().encode("\n% appended after the signature\n");
+    const extended = new Uint8Array(pdf.length + appended.length);
+    extended.set(pdf);
+    extended.set(appended, pdf.length);
+
+    const results = await verifyAllEmbeddedSignatures(extended);
+    const last = results[results.length - 1];
+    expect(last).toBeDefined();
+    if (last === undefined) return;
+    expect(last.coverage.coversWholeFile).toBe(false);
+    expect(last.details.some((d) => d.startsWith("Coverage: partial"))).toBe(true);
+    const warning = last.details.find((d) => d.startsWith("WARNING"));
+    expect(warning).toContain(`${appended.length} trailing bytes`);
+  });
+
   it("verifies a CMS that carries no signed attributes", async () => {
     // RFC 5652 section 5.4 makes signed attributes optional. EKENG issues its
     // credential documents without them, so the signature covers the content
