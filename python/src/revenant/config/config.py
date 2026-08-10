@@ -113,7 +113,12 @@ def get_active_profile() -> ServerProfile | None:
     timeout = config.get("timeout", DEFAULT_TIMEOUT_SOAP)
 
     if url:
-        return make_custom_profile(url, timeout)
+        return make_custom_profile(
+            url,
+            timeout,
+            legacy_tls=config.get("legacy_tls", False),
+            tls_pins=tuple(config.get("tls_pins", [])),
+        )
 
     return None
 
@@ -129,6 +134,11 @@ def save_server_config(profile: ServerProfile) -> None:
     config["profile"] = profile.name
     config["url"] = profile.url
     config["timeout"] = profile.timeout
+    # Built-in profiles carry their own transport settings; only a custom
+    # server needs its declaration written down to survive a restart.
+    if profile.name not in BUILTIN_PROFILES:
+        config["legacy_tls"] = profile.legacy_tls
+        config["tls_pins"] = list(profile.tls_pins)
     save_config(config)
 
 

@@ -20,6 +20,8 @@ const ConfigSchema = z.object({
   profile: z.string().optional(),
   url: z.string().optional(),
   timeout: z.number().int().min(MIN_TIMEOUT).max(MAX_TIMEOUT).optional(),
+  legacyTls: z.boolean().optional(),
+  tlsPins: z.array(z.string()).optional(),
   username: z.string().optional(),
   password: z.string().optional(),
   name: z.string().optional(),

@@ -49,7 +49,7 @@ if not _profile:
 if _profile:
     _host = urlparse(_profile.url).hostname
     if _host:
-        register_host_tls(_host, _profile.legacy_tls)
+        register_host_tls(_host, _profile.legacy_tls, _profile.tls_pins)
 
 pytestmark = pytest.mark.integration
 

@@ -46,7 +46,7 @@ import type { ServerProfile } from "./profiles.js";
 export async function registerProfileTlsMode(profile: ServerProfile): Promise<void> {
   const { registerHostTls } = await import("../network/transport.js");
   const host = new URL(profile.url).hostname;
-  registerHostTls(host, profile.legacyTls);
+  registerHostTls(host, profile.legacyTls, profile.tlsPins);
 }
 
 /**

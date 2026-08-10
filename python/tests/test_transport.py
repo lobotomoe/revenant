@@ -1,4 +1,4 @@
-"""Tests for revenant.network.transport -- TLS mode cache, http_get, http_post."""
+"""Tests for revenant.network.transport -- declared TLS mode, http_get, http_post."""
 
 from unittest.mock import MagicMock, patch
 
@@ -7,6 +7,9 @@ from tlslite.errors import BaseTLSException
 
 from revenant.errors import RevenantError, TLSError
 from revenant.network import legacy_tls, transport
+from revenant.network.tls_pinning import spki_fingerprint
+
+from ._cert_factory import make_root_ca, to_der
 
 
 def _make_urllib_response(data: bytes) -> MagicMock:
@@ -18,20 +21,36 @@ def _make_urllib_response(data: bytes) -> MagicMock:
     return mock
 
 
+PIN = "ab" * 32
+
+_SERVER_CERT, _ = make_root_ca("Test Appliance")
+SERVER_CERT_DER = to_der(_SERVER_CERT)
+SERVER_PIN = spki_fingerprint(SERVER_CERT_DER)
+
+
+def _mock_tls_connection(cert_der: bytes = SERVER_CERT_DER) -> MagicMock:
+    """A TLSConnection mock that presents a real certificate after handshake."""
+    mock_tls = MagicMock()
+    leaf = MagicMock()
+    leaf.bytes = cert_der
+    mock_tls.session.serverCertChain.x509List = [leaf]
+    return mock_tls
+
+
 @pytest.fixture(autouse=True)
-def _clear_tls_cache():
-    """Ensure clean TLS mode cache for each test."""
-    transport._host_legacy_tls.clear()
+def _clear_tls_registry():
+    """Ensure a clean per-host TLS registry for each test."""
+    transport._host_legacy_pins.clear()
     yield
-    transport._host_legacy_tls.clear()
+    transport._host_legacy_pins.clear()
 
 
 # ── register_host_tls / get_host_tls_info ────────────────────────────
 
 
 def test_register_host_tls_legacy():
-    transport.register_host_tls("ca.gov.am", True)
-    assert transport.get_host_tls_info("ca.gov.am") == "Legacy TLS (RC4)"
+    transport.register_host_tls("ca.gov.am", True, (PIN,))
+    assert transport.get_host_tls_info("ca.gov.am") == "Legacy TLS (RC4, pinned key)"
 
 
 def test_register_host_tls_standard():
@@ -39,22 +58,34 @@ def test_register_host_tls_standard():
     assert transport.get_host_tls_info("example.com") == "Standard HTTPS"
 
 
-def test_get_host_tls_info_unknown():
-    assert transport.get_host_tls_info("unknown.com") is None
+def test_register_host_tls_legacy_without_pin_is_refused():
+    with pytest.raises(TLSError, match="without a pinned server key"):
+        transport.register_host_tls("ca.gov.am", True)
+    assert transport.get_host_tls_info("ca.gov.am") == "Standard HTTPS"
+
+
+def test_registering_standard_clears_a_previous_legacy_declaration():
+    transport.register_host_tls("ca.gov.am", True, (PIN,))
+    transport.register_host_tls("ca.gov.am", False)
+    assert transport.get_host_tls_info("ca.gov.am") == "Standard HTTPS"
+
+
+def test_get_host_tls_info_undeclared_host_is_standard():
+    assert transport.get_host_tls_info("unknown.com") == "Standard HTTPS"
 
 
 # ── http_get (legacy path) ───────────────────────────────────────────
 
 
 def test_http_get_legacy_success():
-    transport.register_host_tls("example.com", True)
+    transport.register_host_tls("example.com", True, (PIN,))
     with patch.object(transport, "legacy_request", return_value=b"response body"):
         result = transport.http_get("https://example.com:8080/path")
         assert result == b"response body"
 
 
 def test_http_get_legacy_timeout():
-    transport.register_host_tls("example.com", True)
+    transport.register_host_tls("example.com", True, (PIN,))
     with (
         patch.object(
             transport,
@@ -67,7 +98,7 @@ def test_http_get_legacy_timeout():
 
 
 def test_http_get_legacy_retries_on_transient_error():
-    transport.register_host_tls("example.com", True)
+    transport.register_host_tls("example.com", True, (PIN,))
     call_count = 0
 
     def _failing_then_ok(*args, **kwargs):
@@ -87,7 +118,7 @@ def test_http_get_legacy_retries_on_transient_error():
 
 
 def test_http_get_legacy_no_retry_on_permanent_error():
-    transport.register_host_tls("example.com", True)
+    transport.register_host_tls("example.com", True, (PIN,))
     with (
         patch.object(
             transport,
@@ -126,38 +157,20 @@ def test_http_get_standard_failure():
         transport.http_get("https://ca.example.com/cert.crl")
 
 
-# ── http_get (auto-detect) ──────────────────────────────────────────
+# ── undeclared hosts never reach the legacy transport ───────────────
 
 
-def test_http_get_auto_detect_standard():
-    """Unknown host: urllib succeeds -> cache as standard."""
-    mock_response = _make_urllib_response(b"auto response")
+def test_undeclared_host_uses_standard_https():
+    mock_response = _make_urllib_response(b"standard response")
 
     with patch.object(transport, "_safe_urlopen", return_value=mock_response):
         result = transport.http_get("https://new-server.com/path")
-        assert result == b"auto response"
-    assert transport._host_legacy_tls["new-server.com"] is False
+        assert result == b"standard response"
+    assert "new-server.com" not in transport._host_legacy_pins
 
 
-def test_http_get_auto_detect_legacy():
-    """Unknown host: urllib fails with SSL error -> fallback to legacy, cache as legacy."""
-    import urllib.error
-
-    with (
-        patch.object(
-            transport,
-            "_safe_urlopen",
-            side_effect=urllib.error.URLError("SSL error"),
-        ),
-        patch.object(transport, "legacy_request", return_value=b"legacy response"),
-    ):
-        result = transport.http_get("https://old-server.com/path")
-        assert result == b"legacy response"
-    assert transport._host_legacy_tls["old-server.com"] is True
-
-
-def test_http_get_auto_detect_falls_back_on_ssl_error():
-    """Unknown host: urllib fails with SSL error -> automatic legacy TLS fallback."""
+def test_a_failed_certificate_check_does_not_downgrade_to_legacy():
+    """The signal that something is wrong must not select an unauthenticated transport."""
     import urllib.error
 
     with (
@@ -166,18 +179,34 @@ def test_http_get_auto_detect_falls_back_on_ssl_error():
             "_safe_urlopen",
             side_effect=urllib.error.URLError("SSL: CERTIFICATE_VERIFY_FAILED"),
         ),
-        patch.object(transport, "legacy_request", return_value=b"fallback response"),
+        patch.object(transport, "legacy_request") as mock_legacy,
+        pytest.raises(TLSError, match="SSL"),
     ):
-        result = transport.http_get("https://unknown-server.com/path")
-        assert result == b"fallback response"
-    assert transport._host_legacy_tls["unknown-server.com"] is True
+        transport.http_get("https://unknown-server.com/path", max_retries=0)
+    mock_legacy.assert_not_called()
+
+
+def test_a_failed_certificate_check_does_not_downgrade_on_post():
+    import urllib.error
+
+    with (
+        patch.object(
+            transport,
+            "_safe_urlopen",
+            side_effect=urllib.error.URLError("SSL: CERTIFICATE_VERIFY_FAILED"),
+        ),
+        patch.object(transport, "legacy_request") as mock_legacy,
+        pytest.raises(TLSError, match="SSL"),
+    ):
+        transport.http_post("https://unknown-server.com/api", b"body", max_retries=0)
+    mock_legacy.assert_not_called()
 
 
 # ── http_post (legacy path) ─────────────────────────────────────────
 
 
 def test_http_post_legacy_success():
-    transport.register_host_tls("example.com", True)
+    transport.register_host_tls("example.com", True, (PIN,))
     with patch.object(transport, "legacy_request", return_value=b"response") as mock_req:
         result = transport.http_post(
             "https://example.com:8080/api",
@@ -191,11 +220,12 @@ def test_http_post_legacy_success():
             body=b"request body",
             headers={"Content-Type": "text/xml"},
             timeout=120,
+            pins=(PIN,),
         )
 
 
 def test_http_post_legacy_timeout():
-    transport.register_host_tls("example.com", True)
+    transport.register_host_tls("example.com", True, (PIN,))
     with (
         patch.object(
             transport,
@@ -223,8 +253,7 @@ def test_http_post_standard_success():
         assert result == b"urllib post response"
 
 
-def test_http_post_unknown_host_auto_detects_standard():
-    """Unknown host: POST auto-detects standard HTTPS."""
+def test_http_post_undeclared_host_uses_standard_https():
     mock_response = _make_urllib_response(b"default response")
 
     with patch.object(transport, "_safe_urlopen", return_value=mock_response):
@@ -233,28 +262,7 @@ def test_http_post_unknown_host_auto_detects_standard():
             b"body",
         )
         assert result == b"default response"
-    assert transport._host_legacy_tls["unknown.example.com"] is False
-
-
-def test_http_post_unknown_host_auto_detects_legacy():
-    """Unknown host: POST auto-detects legacy TLS on SSL error."""
-    import urllib.error
-
-    with (
-        patch.object(
-            transport,
-            "_safe_urlopen",
-            side_effect=urllib.error.URLError("SSL error"),
-        ),
-        patch.object(transport, "legacy_request", return_value=b"legacy post response"),
-    ):
-        result = transport.http_post(
-            "https://legacy-post.example.com/api",
-            b"body",
-            headers={"Content-Type": "text/xml"},
-        )
-        assert result == b"legacy post response"
-    assert transport._host_legacy_tls["legacy-post.example.com"] is True
+    assert "unknown.example.com" not in transport._host_legacy_pins
 
 
 # ── legacy_request internals ─────────────────────────────────────────
@@ -262,7 +270,7 @@ def test_http_post_unknown_host_auto_detects_legacy():
 
 def test_legacy_request_invalid_url():
     with pytest.raises(TLSError, match="Invalid URL"):
-        legacy_tls.legacy_request("GET", "not-a-url")
+        legacy_tls.legacy_request("GET", "not-a-url", pins=(SERVER_PIN,))
 
 
 def test_legacy_request_connection_refused():
@@ -270,7 +278,9 @@ def test_legacy_request_connection_refused():
         patch("socket.create_connection", side_effect=OSError("Connection refused")),
         pytest.raises(TLSError, match="Cannot connect"),
     ):
-        legacy_tls.legacy_request("GET", "https://unreachable.example.com:8080/path")
+        legacy_tls.legacy_request(
+            "GET", "https://unreachable.example.com:8080/path", pins=(SERVER_PIN,)
+        )
 
 
 def test_legacy_request_socket_timeout():
@@ -278,7 +288,7 @@ def test_legacy_request_socket_timeout():
         patch("socket.create_connection", side_effect=TimeoutError("timed out")),
         pytest.raises(TLSError, match="timed out") as exc_info,
     ):
-        legacy_tls.legacy_request("GET", "https://example.com:8080/path")
+        legacy_tls.legacy_request("GET", "https://example.com:8080/path", pins=(SERVER_PIN,))
     assert exc_info.value.retryable is True
 
 
@@ -292,13 +302,13 @@ def test_legacy_request_tls_handshake_failure():
         patch.object(legacy_tls, "TLSConnection", return_value=mock_tls),
         pytest.raises(TLSError, match="TLS error"),
     ):
-        legacy_tls.legacy_request("GET", "https://example.com:8080/path")
+        legacy_tls.legacy_request("GET", "https://example.com:8080/path", pins=(SERVER_PIN,))
     mock_sock.close.assert_called_once()
 
 
 def test_legacy_request_success():
     mock_sock = MagicMock()
-    mock_tls = MagicMock()
+    mock_tls = _mock_tls_connection()
 
     # Simulate HTTP/1.0 response: headers + body
     http_response = b"HTTP/1.0 200 OK\r\nContent-Type: text/xml\r\n\r\nresponse data"
@@ -313,6 +323,7 @@ def test_legacy_request_success():
             "https://example.com:8080/api?WSDL",
             body=b"body",
             headers={"X-Test": "1"},
+            pins=(SERVER_PIN,),
         )
         assert result == b"response data"
         mock_tls.handshakeClientCert.assert_called_once()
@@ -325,6 +336,47 @@ def test_legacy_request_success():
         assert b"Host: example.com:8080\r\n" in sent_data
         assert sent_data.endswith(b"body")
         mock_sock.close.assert_called_once()
+
+
+def test_legacy_request_refuses_a_key_that_is_not_pinned():
+    mock_sock = MagicMock()
+    mock_tls = _mock_tls_connection()
+
+    with (
+        patch("socket.create_connection", return_value=mock_sock),
+        patch.object(legacy_tls, "TLSConnection", return_value=mock_tls),
+        pytest.raises(TLSError, match="not one of its pinned keys"),
+    ):
+        legacy_tls.legacy_request("GET", "https://example.com:8080/path", pins=(PIN,))
+    # The request was never sent.
+    mock_tls.sendall.assert_not_called()
+
+
+def test_legacy_request_refuses_when_no_pin_is_configured():
+    mock_sock = MagicMock()
+    mock_tls = _mock_tls_connection()
+
+    with (
+        patch("socket.create_connection", return_value=mock_sock),
+        patch.object(legacy_tls, "TLSConnection", return_value=mock_tls),
+        pytest.raises(TLSError, match="No pinned key configured"),
+    ):
+        legacy_tls.legacy_request("GET", "https://example.com:8080/path", pins=())
+    mock_tls.sendall.assert_not_called()
+
+
+def test_legacy_request_refuses_a_handshake_without_a_certificate():
+    mock_sock = MagicMock()
+    mock_tls = MagicMock()
+    mock_tls.session.serverCertChain = None
+
+    with (
+        patch("socket.create_connection", return_value=mock_sock),
+        patch.object(legacy_tls, "TLSConnection", return_value=mock_tls),
+        pytest.raises(TLSError, match="without presenting a certificate"),
+    ):
+        legacy_tls.legacy_request("GET", "https://example.com:8080/path", pins=(SERVER_PIN,))
+    mock_tls.sendall.assert_not_called()
 
 
 # ── _with_retry ──────────────────────────────────────────────────────
@@ -498,11 +550,10 @@ def test_http_get_standard_no_retries():
         assert result == b"no retry get"
 
 
-# ── auto-detect non-TLS error propagation ───────────────────────────
+# ── error propagation for undeclared hosts ──────────────────────────
 
 
-def test_auto_detect_propagates_non_tls_error():
-    """Non-TLS RevenantError during auto-detect should propagate, not fall back."""
+def test_non_tls_error_propagates_for_an_undeclared_host():
     with (
         patch.object(
             transport,
@@ -568,7 +619,7 @@ def test_validate_header_accepts_clean_value():
 def test_legacy_request_non_2xx_status():
     """HTTP 500 response should raise RevenantError."""
     mock_sock = MagicMock()
-    mock_tls = MagicMock()
+    mock_tls = _mock_tls_connection()
 
     http_response = b"HTTP/1.0 500 Internal Server Error\r\nContent-Type: text/xml\r\n\r\nerror"
     mock_tls.recv.side_effect = [http_response, b""]
@@ -578,7 +629,7 @@ def test_legacy_request_non_2xx_status():
         patch.object(legacy_tls, "TLSConnection", return_value=mock_tls),
         pytest.raises(RevenantError, match="HTTP 500"),
     ):
-        legacy_tls.legacy_request("GET", "https://example.com/path")
+        legacy_tls.legacy_request("GET", "https://example.com/path", pins=(SERVER_PIN,))
 
 
 # ── _SafeRedirectHandler ────────────────────────────────────────

@@ -165,7 +165,7 @@ pub fn register_profile_tls_mode(transport: &Transport, profile: &ServerProfile)
         return;
     };
     if let Some(host) = parsed.host_str() {
-        transport.register_host_tls(host, profile.tls_mode);
+        transport.register_host_tls(host, profile.tls_mode.clone());
     }
 }
 
@@ -265,7 +265,7 @@ mod tests {
         register_profile_tls_mode(&transport, &ekeng);
         assert_eq!(
             transport.host_tls_info("ca.gov.am"),
-            Some("Legacy TLS (RC4)")
+            "Legacy TLS (RC4, pinned key)"
         );
     }
 
@@ -279,7 +279,7 @@ mod tests {
         register_active_profile_tls(&transport, &store);
         assert_eq!(
             transport.host_tls_info("ca.gov.am"),
-            Some("Legacy TLS (RC4)")
+            "Legacy TLS (RC4, pinned key)"
         );
     }
 
@@ -290,9 +290,6 @@ mod tests {
         store.save_server_config(&custom).unwrap();
         let transport = Transport::new();
         register_active_profile_tls(&transport, &store);
-        assert_eq!(
-            transport.host_tls_info("example.com"),
-            Some("Standard HTTPS")
-        );
+        assert_eq!(transport.host_tls_info("example.com"), "Standard HTTPS");
     }
 }

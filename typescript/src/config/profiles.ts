@@ -27,7 +27,19 @@ export interface ServerProfile {
   readonly url: string;
   readonly timeout: number;
   readonly identityMethods: readonly string[];
+  /**
+   * Whether this deployment needs the TLS 1.0 + RC4 transport. Never inferred
+   * -- a deployment that does not say so is reached over standard HTTPS or
+   * not at all.
+   */
   readonly legacyTls: boolean;
+  /**
+   * Accepted server keys, as lowercase hex SHA-256 of the certificate's
+   * SubjectPublicKeyInfo. Required when legacyTls is set, since that
+   * transport has no other way to tell the server apart from anyone speaking
+   * for it. Several pins may be listed to stage a key rotation.
+   */
+  readonly tlsPins: readonly string[];
   readonly caCertMarkers: readonly string[];
   readonly maxAuthAttempts: number;
   readonly certFields: readonly CertField[];
@@ -52,6 +64,10 @@ export const BUILTIN_PROFILES: ReadonlyMap<string, ServerProfile> = new Map([
       url: "https://ca.gov.am:8080/SAPIWS/DSS.asmx",
       timeout: 120,
       legacyTls: true,
+      // The appliance presents a self-signed factory certificate (CN=CoSign,
+      // issued by AR Ltd., valid 2006-2032) that names neither the host nor
+      // any authority anyone can check. Its key is what identifies it.
+      tlsPins: ["0c00d213f7945bfec24402f8b76ff25f23bc613e58e38aef34e40adcbf9ea6e4"],
       identityMethods: ["server", "manual"],
       caCertMarkers: ["ekeng", "\u0567\u056f\u0565\u0576\u0563"],
       maxAuthAttempts: 5,
@@ -91,7 +107,11 @@ export function getProfile(name: string): ServerProfile {
 export function makeCustomProfile(
   url: string,
   timeout: number = DEFAULT_TIMEOUT_SOAP,
+  options?: { readonly legacyTls?: boolean; readonly tlsPins?: readonly string[] },
 ): ServerProfile {
+  const legacyTls = options?.legacyTls ?? false;
+  const tlsPins = options?.tlsPins ?? [];
+
   let parsed: URL;
   try {
     parsed = new URL(url);
@@ -108,6 +128,14 @@ export function makeCustomProfile(
   if (!parsed.hostname) {
     throw new Error(`Invalid URL: no hostname found in ${JSON.stringify(url)}`);
   }
+  if (legacyTls && tlsPins.length === 0) {
+    throw new Error(
+      "Legacy TLS needs a pinned server key: it negotiates TLS 1.0 with RC4 " +
+        "against appliances whose certificates no authority vouches for, so " +
+        "without a pin there is nothing to tell the server apart from anyone " +
+        "speaking for it.",
+    );
+  }
 
   return {
     name: "custom",
@@ -115,7 +143,8 @@ export function makeCustomProfile(
     url,
     timeout,
     identityMethods: ["server", "manual"],
-    legacyTls: false,
+    legacyTls,
+    tlsPins,
     caCertMarkers: [],
     maxAuthAttempts: 0,
     certFields: [],

@@ -3814,6 +3814,7 @@ dependencies = [
  "rc4",
  "rsa",
  "sha1",
+ "sha2 0.10.9",
  "spki",
  "subtle",
  "thiserror 2.0.19",

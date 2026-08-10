@@ -15,6 +15,8 @@ import { TLSError } from "../src/errors.js";
 import { legacyRequest } from "../src/network/legacy-tls.js";
 import { httpGet, httpPost, registerHostTls } from "../src/network/transport.js";
 
+const PIN = "ab".repeat(32);
+
 const mockFetch = vi.fn();
 vi.stubGlobal("fetch", mockFetch);
 
@@ -29,7 +31,7 @@ describe("httpGet with legacy TLS", () => {
   const TEST_URL = "https://legacy-host.example.com/api";
 
   beforeEach(() => {
-    registerHostTls("legacy-host.example.com", true);
+    registerHostTls("legacy-host.example.com", true, [PIN]);
   });
 
   it("calls legacyRequest for GET when host is registered as legacy", async () => {
@@ -40,6 +42,7 @@ describe("httpGet with legacy TLS", () => {
 
     expect(legacyRequest).toHaveBeenCalledWith("GET", TEST_URL, {
       timeout: expect.any(Number),
+      pins: [PIN],
     });
     expect(result).toEqual(responseBody);
     expect(mockFetch).not.toHaveBeenCalled();
@@ -63,7 +66,7 @@ describe("httpPost with legacy TLS", () => {
   const TEST_URL = "https://legacy-post.example.com/api";
 
   beforeEach(() => {
-    registerHostTls("legacy-post.example.com", true);
+    registerHostTls("legacy-post.example.com", true, [PIN]);
   });
 
   it("calls legacyRequest for POST when host is registered as legacy", async () => {
@@ -81,6 +84,7 @@ describe("httpPost with legacy TLS", () => {
       body: postBody,
       headers,
       timeout: expect.any(Number),
+      pins: [PIN],
     });
     expect(result).toEqual(responseBody);
     expect(mockFetch).not.toHaveBeenCalled();

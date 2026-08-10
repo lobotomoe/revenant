@@ -38,6 +38,8 @@ class ConfigDict(TypedDict, total=False):
     profile: str
     url: str
     timeout: int
+    legacy_tls: bool
+    tls_pins: list[str]
     username: str
     password: str
     name: str
@@ -74,6 +76,16 @@ def _pick_str(data: dict[str, object], key: str) -> str | None:
     return val if isinstance(val, str) else None
 
 
+def _pick_str_list(data: dict[str, object], key: str) -> list[str] | None:
+    """Return data[key] if it's a list of str, else None."""
+    val = data.get(key)
+    if not isinstance(val, list):
+        return None
+    # Every list is a list of objects; the elements are checked below.
+    items = cast("list[object]", val)
+    return [item for item in items if isinstance(item, str)]
+
+
 def _validate_config_dict(data: dict[str, object]) -> ConfigDict:
     """Validate and return config dict, picking only known keys with correct types."""
     result: ConfigDict = {}
@@ -93,6 +105,12 @@ def _validate_config_dict(data: dict[str, object]) -> ConfigDict:
         val = _pick_str(data, key)
         if val is not None:
             result[key] = val  # type: ignore[literal-required]  # dynamic key from known set
+    legacy_val = data.get("legacy_tls")
+    if isinstance(legacy_val, bool):
+        result["legacy_tls"] = legacy_val
+    pins_val = _pick_str_list(data, "tls_pins")
+    if pins_val is not None:
+        result["tls_pins"] = pins_val
     timeout_val = data.get("timeout")
     if isinstance(timeout_val, int):
         if MIN_TIMEOUT <= timeout_val <= MAX_TIMEOUT:

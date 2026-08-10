@@ -2,11 +2,17 @@
 # pyright: reportUnknownMemberType=false, reportUnknownVariableType=false, reportUnknownArgumentType=false
 """Legacy TLS transport using tlslite-ng.
 
-Some CoSign appliances (notably EKENG's ca.gov.am) require TLSv1.0 with
-RC4-MD5 -- a cipher suite removed from OpenSSL 3.x.  This module provides
-a raw HTTP-over-TLS implementation using tlslite-ng's pure-Python TLS stack.
+Some CoSign appliances require TLSv1.0 with RC4-MD5 -- a cipher suite removed
+from OpenSSL 3.x.  This module provides a raw HTTP-over-TLS implementation
+using tlslite-ng's pure-Python TLS stack.
 
-Used internally by ``transport.py`` when a host requires legacy TLS.
+Such appliances present a self-signed factory certificate that names neither
+the host it serves nor an authority anyone can check, so the public PKI has
+nothing to say about them.  The server is instead identified by its key,
+which the caller must pin: the pin is checked as soon as the handshake
+completes and before a single request byte is sent.
+
+Used internally by ``transport.py`` for hosts a profile declared as legacy.
 """
 
 from __future__ import annotations
@@ -14,7 +20,7 @@ from __future__ import annotations
 import logging
 import socket
 import time
-from typing import Literal
+from typing import TYPE_CHECKING, Literal
 from urllib.parse import urlparse
 
 from tlslite import HandshakeSettings, TLSConnection
@@ -27,6 +33,10 @@ from ..constants import (
     RECV_BUFFER_SIZE,
 )
 from ..errors import RevenantError, TLSError
+from .tls_pinning import check_server_pin
+
+if TYPE_CHECKING:
+    from collections.abc import Sequence
 
 _logger = logging.getLogger(__name__)
 
@@ -65,6 +75,8 @@ def legacy_request(
     body: bytes | None = None,
     headers: dict[str, str] | None = None,
     timeout: int = DEFAULT_TIMEOUT_LEGACY_TLS,
+    *,
+    pins: Sequence[str],
 ) -> bytes:
     """
     Send an HTTP request over legacy TLS (TLS 1.0 + RC4) using tlslite-ng.
@@ -78,12 +90,15 @@ def legacy_request(
         body: Request body (for POST).
         headers: Additional HTTP headers.
         timeout: Socket timeout in seconds.
+        pins: Accepted server keys. Checked before anything is sent; an
+            empty sequence is refused rather than treated as "any key".
 
     Returns:
         Response body as bytes.
 
     Raises:
-        TLSError: On connection or TLS handshake failures.
+        TLSError: On connection or TLS handshake failures, or if the server's
+            key is not one of the pinned keys.
     """
     parsed = urlparse(url)
     host = parsed.hostname
@@ -115,14 +130,13 @@ def legacy_request(
         # IIS 5.1 closes TCP without sending TLS close_notify alert.
         # Without this flag, recv() raises TLSAbruptCloseError on last read.
         tls.ignoreAbruptClose = True
-        # NOTE: tlslite-ng does NOT verify the server certificate by default.
-        # This is a known limitation for legacy TLS connections.  The target
-        # servers (EKENG ca.gov.am) are accessed over a government intranet
-        # and require RC4-MD5 which precludes modern certificate validation.
+        # tlslite-ng does not validate the server certificate, and for these
+        # appliances no validation could succeed anyway -- the pinned key
+        # below is what authenticates the peer.
         tls.handshakeClientCert(settings=make_legacy_settings())
-        _logger.warning(
-            "Using legacy TLS (TLS 1.0 + RC4) for %s:%d. "
-            "This cipher suite is deprecated and only used for backward compatibility.",
+        _check_pinned_key(tls, host, port, pins)
+        _logger.debug(
+            "Legacy TLS (TLS 1.0 + RC4) established with %s:%d against a pinned key",
             host,
             port,
         )
@@ -146,6 +160,23 @@ def legacy_request(
         return response_body
     finally:
         sock.close()
+
+
+def _check_pinned_key(
+    tls: TLSConnection,
+    host: str,
+    port: int,
+    pins: Sequence[str],
+) -> None:
+    """Verify the peer's key against the pins, before any request is sent.
+
+    Raises:
+        TLSError: If the server sent no certificate, or its key is not pinned.
+    """
+    chain = tls.session.serverCertChain
+    if chain is None or not chain.x509List:
+        raise TLSError(f"{host}:{port} completed a handshake without presenting a certificate")
+    check_server_pin(bytes(chain.x509List[0].bytes), pins, host, port)
 
 
 def _validate_header_value(name: str, value: str) -> str:

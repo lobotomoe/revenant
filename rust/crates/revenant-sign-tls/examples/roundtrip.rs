@@ -24,12 +24,16 @@ fn main() {
         None => b"revenant-sign-tls interop probe".to_vec(),
     };
 
+    // The probe is told which key to expect; pass the fingerprint as argv[3].
+    let pins: Vec<String> = std::env::args().nth(3).into_iter().collect();
+
     match request(
         Method::Post,
         &url,
         Some(&body),
         &[("Content-Type", "text/plain")],
         Duration::from_secs(10),
+        &pins,
     ) {
         Ok(resp) => {
             println!("STATUS {} {}", resp.status, resp.reason);

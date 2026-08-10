@@ -206,7 +206,14 @@ fn ekeng_profile() -> ServerProfile {
         url: "https://ca.gov.am:8080/SAPIWS/DSS.asmx".to_owned(),
         timeout: 120,
         identity_methods: default_identity_methods(),
-        tls_mode: TlsMode::Legacy,
+        // The appliance presents a self-signed factory certificate
+        // (CN=CoSign, issued by AR Ltd., valid 2006-2032) that names neither
+        // the host nor any authority anyone can check. Its key identifies it.
+        tls_mode: TlsMode::Legacy {
+            pins: vec![
+                "0c00d213f7945bfec24402f8b76ff25f23bc613e58e38aef34e40adcbf9ea6e4".to_owned(),
+            ],
+        },
         // Second marker is "ԵԿԵՆԳ" (EKENG in Armenian).
         ca_cert_markers: vec![
             "ekeng".to_owned(),
@@ -336,6 +343,24 @@ impl ServerProfile {
     pub fn custom_default(url: &str) -> Result<Self, RevenantError> {
         Self::custom(url, DEFAULT_TIMEOUT_SOAP_SECS)
     }
+
+    /// An ad-hoc profile for a custom server reached over a declared TLS mode.
+    ///
+    /// Use this for an appliance that needs the legacy transport: build the
+    /// mode with [`TlsMode::legacy`], which refuses an empty pin list.
+    ///
+    /// # Errors
+    ///
+    /// [`RevenantError::Config`] if the URL is not a valid `https://` URL.
+    pub fn custom_with_tls(
+        url: &str,
+        timeout: u32,
+        tls_mode: TlsMode,
+    ) -> Result<Self, RevenantError> {
+        let mut profile = Self::custom(url, timeout)?;
+        profile.tls_mode = tls_mode;
+        Ok(profile)
+    }
 }
 
 #[cfg(test)]
@@ -348,7 +373,11 @@ mod tests {
         assert_eq!(ekeng.name, "ekeng");
         assert_eq!(ekeng.url, "https://ca.gov.am:8080/SAPIWS/DSS.asmx");
         assert_eq!(ekeng.timeout, 120);
-        assert_eq!(ekeng.tls_mode, TlsMode::Legacy);
+        let TlsMode::Legacy { pins } = &ekeng.tls_mode else {
+            panic!("ekeng must declare legacy TLS");
+        };
+        assert_eq!(pins.len(), 1);
+        assert_eq!(pins[0].len(), 64);
         assert_eq!(ekeng.max_auth_attempts, 5);
         assert_eq!(ekeng.font, "ghea-grapalat");
         // EKENG uses pinned trust anchors (the dead TSL is not a usable source).

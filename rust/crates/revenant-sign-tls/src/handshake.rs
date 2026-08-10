@@ -89,7 +89,11 @@ const ENC_KEY_LEN: usize = 16;
 
 /// Run the handshake to completion, leaving `conn` with both cipher directions
 /// active and ready for application data.
-pub(crate) fn perform(conn: &mut Connection, timeout: Duration) -> Result<(), TlsError> {
+pub(crate) fn perform<P: AsRef<str>>(
+    conn: &mut Connection,
+    timeout: Duration,
+    pins: &[P],
+) -> Result<(), TlsError> {
     let deadline = Deadline::new(timeout);
     let mut transcript: Vec<u8> = Vec::new();
 
@@ -102,7 +106,7 @@ pub(crate) fn perform(conn: &mut Connection, timeout: Duration) -> Result<(), Tl
 
     // -- Server flight: ServerHello .. ServerHelloDone -----------------------
     let mut reader = HandshakeReader::default();
-    let server = read_server_flight(conn, &mut reader, &mut transcript, deadline)?;
+    let server = read_server_flight(conn, &mut reader, &mut transcript, deadline, pins)?;
     let ServerParams {
         server_random,
         mac_alg,
@@ -210,11 +214,12 @@ struct ServerParams {
 
 /// Read ServerHello through ServerHelloDone, collecting the parameters needed to
 /// derive keys and encrypt the premaster secret.
-fn read_server_flight(
+fn read_server_flight<P: AsRef<str>>(
     conn: &mut Connection,
     reader: &mut HandshakeReader,
     transcript: &mut Vec<u8>,
     deadline: Deadline,
+    pins: &[P],
 ) -> Result<ServerParams, TlsError> {
     let mut server_random: Option<[u8; 32]> = None;
     let mut mac_alg: Option<MacAlg> = None;
@@ -230,7 +235,8 @@ fn read_server_flight(
                 mac_alg = Some(hello.mac_alg);
             }
             HT_CERTIFICATE => {
-                server_pubkey = Some(parse_leaf_public_key(&body)?);
+                let (host, port) = conn.peer();
+                server_pubkey = Some(parse_leaf_public_key(&body, pins, &host, port)?);
             }
             HT_CERTIFICATE_REQUEST => client_cert_requested = true,
             HT_SERVER_KEY_EXCHANGE => {
@@ -313,8 +319,18 @@ fn parse_server_hello(body: &[u8]) -> Result<ServerHello, String> {
     Ok(ServerHello { random, mac_alg })
 }
 
-/// Parse the Certificate message and extract the leaf certificate's RSA public key.
-fn parse_leaf_public_key(body: &[u8]) -> Result<RsaPublicKey, TlsError> {
+/// Parse the Certificate message, check the leaf's key against the pins, and
+/// extract its RSA public key.
+///
+/// The pin check happens here, the moment the certificate is readable and
+/// before the premaster secret is encrypted to it -- so a server that fails it
+/// never receives anything.
+fn parse_leaf_public_key<P: AsRef<str>>(
+    body: &[u8],
+    pins: &[P],
+    host: &str,
+    port: u16,
+) -> Result<RsaPublicKey, TlsError> {
     let mut r = ByteReader::new(body);
     r.take_u24().map_err(TlsError::Certificate)?; // certificate_list length
     let cert_len = r.take_u24().map_err(TlsError::Certificate)?; // leaf certificate length
@@ -329,6 +345,7 @@ fn parse_leaf_public_key(body: &[u8]) -> Result<RsaPublicKey, TlsError> {
             spki.algorithm.oid
         )));
     }
+    crate::pin::check(&spki, pins, host, port)?;
     let key_der = spki.subject_public_key.as_bytes().ok_or_else(|| {
         TlsError::Certificate("RSA public key bit string is not byte-aligned".into())
     })?;

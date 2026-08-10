@@ -157,9 +157,7 @@ fn ping(app: &App, profile: &ServerProfile) -> Result<(), CliError> {
         .ok()
         .and_then(|u| u.host_str().map(str::to_owned))
     {
-        if let Some(tls_info) = app.transport.host_tls_info(&host) {
-            println!("  TLS: {tls_info}");
-        }
+        println!("  TLS: {}", app.transport.host_tls_info(&host));
     }
     Ok(())
 }

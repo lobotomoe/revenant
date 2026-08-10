@@ -12,12 +12,15 @@
 //! # Scope and non-goals
 //!
 //! This is **not** a general-purpose TLS library and must never be used as one.
-//! It implements only the RC4 cipher suites, does not verify the server
-//! certificate (the target appliances present certs no modern chain would
-//! accept, and are reached over a government intranet), and supports only the
-//! RSA key-exchange path. RC4 is cryptographically broken (RFC 7465); this code
-//! exists solely for backward compatibility with legacy appliances that offer
-//! nothing else.
+//! It implements only the RC4 cipher suites and only the RSA key-exchange
+//! path. It performs no chain validation: the target appliances present a
+//! self-signed factory certificate that names neither the host it serves nor
+//! an authority anyone can check, so there is nothing for the public PKI to
+//! validate. The server is instead identified by its key, which the caller
+//! must pin -- the pin is checked as soon as the certificate arrives and
+//! before the premaster secret is sent. RC4 is cryptographically broken
+//! (RFC 7465); this code exists solely for backward compatibility with legacy
+//! appliances that offer nothing else.
 //!
 //! # Usage
 //!
@@ -31,6 +34,7 @@
 //!     Some(b"<soap:Envelope>...</soap:Envelope>"),
 //!     &[("Content-Type", "text/xml; charset=utf-8")],
 //!     Duration::from_secs(120),
+//!     &["0c00d213f7945bfec24402f8b76ff25f23bc613e58e38aef34e40adcbf9ea6e4"],
 //! )?;
 //! assert_eq!(resp.status, 200);
 //! # Ok::<(), revenant_sign_tls::TlsError>(())
@@ -42,6 +46,7 @@
 
 mod handshake;
 mod http;
+mod pin;
 mod prf;
 mod record;
 
@@ -104,16 +109,25 @@ impl HttpResponse {
 /// headers. The whole exchange -- connect, handshake, and response read -- is
 /// bounded by `timeout`.
 ///
+/// `pins` are the accepted server keys, as lowercase hex SHA-256 of the
+/// certificate's `SubjectPublicKeyInfo`. They are checked as soon as the
+/// server's certificate arrives, before the premaster secret or any request
+/// byte is sent. An empty slice is refused rather than treated as "any key":
+/// this transport has no other way to tell the server apart from anyone
+/// speaking for it.
+///
 /// # Errors
 ///
 /// Returns [`TlsError`] on connection failure, handshake failure, protocol
-/// violation, or when the response exceeds the size or time limit.
-pub fn request(
+/// violation, a key that is not pinned, or when the response exceeds the size
+/// or time limit.
+pub fn request<P: AsRef<str>>(
     method: Method,
     url: &str,
     body: Option<&[u8]>,
     extra_headers: &[(&str, &str)],
     timeout: Duration,
+    pins: &[P],
 ) -> Result<HttpResponse, TlsError> {
-    http::request(method, url, body, extra_headers, timeout)
+    http::request(method, url, body, extra_headers, timeout, pins)
 }

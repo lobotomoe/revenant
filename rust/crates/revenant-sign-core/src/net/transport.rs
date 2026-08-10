@@ -1,10 +1,16 @@
-//! HTTP transport with per-host TLS-mode auto-detection.
+//! HTTP transport over a per-host TLS mode.
 //!
 //! Standard hosts are reached with `ureq` (rustls); appliances that only speak
-//! TLS 1.0 + RC4 -- notably EKENG's `ca.gov.am` -- fall back to the from-scratch
-//! [`revenant_sign_tls`] client. The mode is resolved per host: pre-registered
-//! via [`Transport::register_host_tls`], or probed on first contact (standard
-//! first, then legacy) and cached.
+//! TLS 1.0 + RC4 go through the from-scratch [`revenant_sign_tls`] client
+//! against a pinned key.
+//!
+//! Which of the two a host gets is declared, never inferred: a profile that
+//! needs the legacy transport says so via [`Transport::register_host_tls`], and
+//! a host nobody declared is reached over standard HTTPS or not at all.
+//! Falling back to the legacy transport when standard HTTPS fails would mean
+//! answering a failed certificate check -- the one signal that something is
+//! wrong -- by switching to a transport that performs no certificate check,
+//! which is why no such fallback exists.
 //!
 //! Non-2xx HTTP responses are surfaced as errors with the status discarded. The
 //! appliance returns HTTP 200 with a SOAP `ResultMajor` for application-level
@@ -28,21 +34,48 @@ use crate::{Result, RevenantError};
 const MAX_REDIRECTS: u32 = 5;
 
 /// Which TLS stack reaches a given host.
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+///
+/// The legacy variant carries the keys it will accept, so a legacy host
+/// without a pinned key cannot be expressed: that transport validates no
+/// certificate chain, and a pin is the only thing that tells the real
+/// appliance apart from anyone speaking for it.
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub enum TlsMode {
     /// Modern HTTPS via `ureq` (rustls) with the bundled Mozilla roots.
     Standard,
     /// The from-scratch TLS 1.0 + RC4 client for legacy CoSign appliances.
-    Legacy,
+    Legacy {
+        /// Accepted server keys, as lowercase hex SHA-256 of the certificate's
+        /// `SubjectPublicKeyInfo`. Several may be listed to stage a rotation.
+        pins: Vec<String>,
+    },
 }
 
 impl TlsMode {
+    /// Build the legacy mode, refusing an empty pin list.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`RevenantError::Config`] if `pins` is empty.
+    pub fn legacy(pins: Vec<String>) -> Result<Self> {
+        if pins.is_empty() {
+            return Err(RevenantError::Config(
+                "Legacy TLS needs a pinned server key: it negotiates TLS 1.0 with RC4 \
+                 against appliances whose certificates no authority vouches for, so \
+                 without a pin there is nothing to tell the server apart from anyone \
+                 speaking for it."
+                    .to_owned(),
+            ));
+        }
+        Ok(TlsMode::Legacy { pins })
+    }
+
     /// A human-readable label for diagnostics and setup output.
     #[must_use]
-    pub fn label(self) -> &'static str {
+    pub fn label(&self) -> &'static str {
         match self {
             TlsMode::Standard => "Standard HTTPS",
-            TlsMode::Legacy => "Legacy TLS (RC4)",
+            TlsMode::Legacy { .. } => "Legacy TLS (RC4, pinned key)",
         }
     }
 }
@@ -76,44 +109,54 @@ impl Transport {
         }
     }
 
-    /// Pre-register a host's TLS mode, skipping auto-detection.
+    /// Register a host's declared TLS mode.
     ///
-    /// Used by the config layer to apply a saved profile's TLS setting.
+    /// Used by the config layer to apply a profile's TLS setting. A host that
+    /// is never registered is reached over standard HTTPS.
     pub fn register_host_tls(&self, host: &str, mode: TlsMode) {
-        self.lock_cache().insert(host.to_owned(), mode);
         log::debug!("Registered TLS mode for {host}: {}", mode.label());
+        self.lock_cache().insert(host.to_owned(), mode);
     }
 
-    /// A human-readable TLS mode for `host`, or `None` if not yet detected.
+    /// A human-readable TLS mode for `host`.
     #[must_use]
-    pub fn host_tls_info(&self, host: &str) -> Option<&'static str> {
-        self.lookup_host(host).map(TlsMode::label)
+    pub fn host_tls_info(&self, host: &str) -> &'static str {
+        match self.lookup_host(host) {
+            Some(mode) => mode.label(),
+            None => TlsMode::Standard.label(),
+        }
     }
 
-    /// Fetch `url` with auto-detected TLS mode and retry on transient failures.
+    /// Fetch `url` over the transport its host was registered with, retrying
+    /// transient failures.
     ///
     /// # Errors
     ///
-    /// Returns a [`RevenantError`] on connection, TLS, or HTTP failure.
+    /// Returns a [`RevenantError`] on connection, TLS, or HTTP failure, or if
+    /// the server's key is not one of the pinned keys.
     pub fn get(&self, url: &str, timeout: Duration, max_retries: u32) -> Result<Vec<u8>> {
         let parsed = parse_https(url)?;
         let host = host_of(&parsed)?;
         match self.lookup_host(&host) {
-            None => self.auto_detect(Method::Get, url, &host, None, &[], timeout),
-            Some(TlsMode::Standard) => with_retry(max_retries, &format!("GET {url}"), || {
-                self.std_get(url, timeout)
-            }),
-            Some(TlsMode::Legacy) => with_retry(max_retries, &format!("GET {url}"), || {
-                legacy_request(Method::Get, url, None, &[], timeout)
-            }),
+            None | Some(TlsMode::Standard) => {
+                with_retry(max_retries, &format!("GET {url}"), || {
+                    self.std_get(url, timeout)
+                })
+            }
+            Some(TlsMode::Legacy { pins }) => {
+                with_retry(max_retries, &format!("GET {url}"), || {
+                    legacy_request(Method::Get, url, None, &[], timeout, &pins)
+                })
+            }
         }
     }
 
-    /// POST `body` to `url` with auto-detected TLS mode and retry.
+    /// POST `body` to `url` over the transport its host was registered with.
     ///
     /// # Errors
     ///
-    /// Returns a [`RevenantError`] on connection, TLS, or HTTP failure.
+    /// Returns a [`RevenantError`] on connection, TLS, or HTTP failure, or if
+    /// the server's key is not one of the pinned keys.
     pub fn post(
         &self,
         url: &str,
@@ -125,13 +168,16 @@ impl Transport {
         let parsed = parse_https(url)?;
         let host = host_of(&parsed)?;
         match self.lookup_host(&host) {
-            None => self.auto_detect(Method::Post, url, &host, Some(body), headers, timeout),
-            Some(TlsMode::Standard) => with_retry(max_retries, &format!("POST {url}"), || {
-                self.std_post(url, body, headers, timeout)
-            }),
-            Some(TlsMode::Legacy) => with_retry(max_retries, &format!("POST {url}"), || {
-                legacy_request(Method::Post, url, Some(body), headers, timeout)
-            }),
+            None | Some(TlsMode::Standard) => {
+                with_retry(max_retries, &format!("POST {url}"), || {
+                    self.std_post(url, body, headers, timeout)
+                })
+            }
+            Some(TlsMode::Legacy { pins }) => {
+                with_retry(max_retries, &format!("POST {url}"), || {
+                    legacy_request(Method::Post, url, Some(body), headers, timeout, &pins)
+                })
+            }
         }
     }
 
@@ -142,41 +188,7 @@ impl Transport {
     }
 
     fn lookup_host(&self, host: &str) -> Option<TlsMode> {
-        self.lock_cache().get(host).copied()
-    }
-
-    /// Try standard HTTPS first; fall back to legacy TLS only on a TLS/connection
-    /// error. HTTP status and config errors propagate -- a reachable server that
-    /// rejected the request will not accept it over a different cipher either.
-    fn auto_detect(
-        &self,
-        method: Method,
-        url: &str,
-        host: &str,
-        body: Option<&[u8]>,
-        headers: &[(&str, &str)],
-        timeout: Duration,
-    ) -> Result<Vec<u8>> {
-        let std_result = match method {
-            Method::Get => self.std_get(url, timeout),
-            Method::Post => self.std_post(url, body.unwrap_or_default(), headers, timeout),
-        };
-        match std_result {
-            Ok(bytes) => {
-                self.lock_cache().insert(host.to_owned(), TlsMode::Standard);
-                log::info!("Auto-detected TLS for {host}: standard HTTPS");
-                return Ok(bytes);
-            }
-            Err(err) if err.is_tls() => {
-                log::warn!("Standard HTTPS failed for {host}, trying legacy TLS...");
-            }
-            Err(err) => return Err(err),
-        }
-
-        let bytes = legacy_request(method, url, body, headers, timeout)?;
-        self.lock_cache().insert(host.to_owned(), TlsMode::Legacy);
-        log::warn!("Auto-detected legacy TLS (RC4) for {host}");
-        Ok(bytes)
+        self.lock_cache().get(host).cloned()
     }
 
     fn std_get(&self, url: &str, timeout: Duration) -> Result<Vec<u8>> {
@@ -235,8 +247,9 @@ fn legacy_request(
     body: Option<&[u8]>,
     headers: &[(&str, &str)],
     timeout: Duration,
+    pins: &[String],
 ) -> Result<Vec<u8>> {
-    let response = revenant_sign_tls::request(method, url, body, headers, timeout)?;
+    let response = revenant_sign_tls::request(method, url, body, headers, timeout, pins)?;
     if !response.is_success() {
         return Err(RevenantError::Other(format!(
             "HTTP {} from {url}: {}",
@@ -400,11 +413,12 @@ mod tests {
     #[test]
     fn host_cache_register_and_report() {
         let t = Transport::new();
-        assert_eq!(t.host_tls_info("ca.gov.am"), None);
-        t.register_host_tls("ca.gov.am", TlsMode::Legacy);
-        assert_eq!(t.host_tls_info("ca.gov.am"), Some("Legacy TLS (RC4)"));
+        // An undeclared host is standard HTTPS, not "unknown".
+        assert_eq!(t.host_tls_info("ca.gov.am"), "Standard HTTPS");
+        t.register_host_tls("ca.gov.am", TlsMode::legacy(vec!["ab".repeat(32)]).unwrap());
+        assert_eq!(t.host_tls_info("ca.gov.am"), "Legacy TLS (RC4, pinned key)");
         t.register_host_tls("example.com", TlsMode::Standard);
-        assert_eq!(t.host_tls_info("example.com"), Some("Standard HTTPS"));
+        assert_eq!(t.host_tls_info("example.com"), "Standard HTTPS");
     }
 
     #[test]

@@ -57,7 +57,18 @@ class SigField:
 
 @dataclass(frozen=True)
 class ServerProfile:
-    """Describes a CoSign server deployment."""
+    """Describes a CoSign server deployment.
+
+    Attributes:
+        legacy_tls: Whether this deployment needs the TLS 1.0 + RC4 transport.
+            Never inferred -- a deployment that does not say so is reached over
+            standard HTTPS or not at all.
+        tls_pins: Accepted server keys, as lowercase hex SHA-256 of the
+            certificate's SubjectPublicKeyInfo. Required when legacy_tls is
+            set, since that transport has no other way to tell the server
+            apart from anyone speaking for it. Several pins may be listed to
+            stage a key rotation.
+    """
 
     name: str
     display_name: str
@@ -65,6 +76,7 @@ class ServerProfile:
     timeout: int = DEFAULT_TIMEOUT_SOAP
     identity_methods: tuple[str, ...] = ("server", "manual")
     legacy_tls: bool = False
+    tls_pins: tuple[str, ...] = ()
     ca_cert_markers: tuple[str, ...] = ()
     max_auth_attempts: int = 0
     cert_fields: tuple[CertField, ...] = ()
@@ -86,6 +98,10 @@ BUILTIN_PROFILES: dict[str, ServerProfile] = {
         url="https://ca.gov.am:8080/SAPIWS/DSS.asmx",
         timeout=120,
         legacy_tls=True,
+        # The appliance presents a self-signed factory certificate (CN=CoSign,
+        # issued by AR Ltd., valid 2006-2032) that names neither the host nor
+        # any authority anyone can check. Its key is what identifies it.
+        tls_pins=("0c00d213f7945bfec24402f8b76ff25f23bc613e58e38aef34e40adcbf9ea6e4",),
         identity_methods=("server", "manual"),
         ca_cert_markers=("ekeng", "\u0567\u056f\u0565\u0576\u0563"),
         max_auth_attempts=5,
@@ -128,14 +144,27 @@ def get_profile(name: str) -> ServerProfile:
     return BUILTIN_PROFILES[key]
 
 
-def make_custom_profile(url: str, timeout: int = DEFAULT_TIMEOUT_SOAP) -> ServerProfile:
+def make_custom_profile(
+    url: str,
+    timeout: int = DEFAULT_TIMEOUT_SOAP,
+    *,
+    legacy_tls: bool = False,
+    tls_pins: tuple[str, ...] = (),
+) -> ServerProfile:
     """
     Create an ad-hoc profile for a custom server.
 
     Identity methods default to server + manual.
 
+    Args:
+        url: Server endpoint. Must be https://.
+        timeout: SOAP timeout in seconds.
+        legacy_tls: Set only for an appliance known to require TLS 1.0 + RC4.
+        tls_pins: Accepted server keys; required when legacy_tls is set.
+
     Raises:
-        ValueError: If the URL scheme or hostname is invalid.
+        ValueError: If the URL scheme or hostname is invalid, or legacy TLS
+            was asked for without a pinned key.
     """
     from urllib.parse import urlparse
 
@@ -148,11 +177,20 @@ def make_custom_profile(url: str, timeout: int = DEFAULT_TIMEOUT_SOAP) -> Server
         raise ValueError(f"Invalid URL scheme {parsed.scheme!r}. Use https://.")
     if not parsed.hostname:
         raise ValueError(f"Invalid URL: no hostname found in {url!r}")
+    if legacy_tls and not tls_pins:
+        raise ValueError(
+            "Legacy TLS needs a pinned server key: it negotiates TLS 1.0 with "
+            "RC4 against appliances whose certificates no authority vouches "
+            "for, so without a pin there is nothing to tell the server apart "
+            "from anyone speaking for it."
+        )
 
     return ServerProfile(
         name="custom",
         display_name=f"Custom ({url})",
         url=url,
         timeout=timeout,
+        legacy_tls=legacy_tls,
+        tls_pins=tls_pins,
         identity_methods=("server", "manual"),
     )

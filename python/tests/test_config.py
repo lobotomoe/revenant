@@ -26,6 +26,7 @@ from revenant.config.credentials import (
     save_credentials,
 )
 from revenant.config.profiles import (
+    BUILTIN_PROFILES,
     ServerProfile,
     get_profile,
     make_custom_profile,
@@ -917,6 +918,53 @@ def test_make_custom_profile_https():
     assert profile.legacy_tls is False
 
 
+def test_make_custom_profile_legacy_tls_requires_a_pin():
+    """Legacy TLS cannot authenticate a server, so it may not be declared blind."""
+    with pytest.raises(ValueError, match="needs a pinned server key"):
+        make_custom_profile("https://appliance.example/DSS.asmx", legacy_tls=True)
+
+
+def test_make_custom_profile_legacy_tls_with_a_pin():
+    profile = make_custom_profile(
+        "https://appliance.example/DSS.asmx",
+        legacy_tls=True,
+        tls_pins=("ab" * 32,),
+    )
+    assert profile.legacy_tls is True
+    assert profile.tls_pins == ("ab" * 32,)
+
+
+def test_the_ekeng_profile_pins_its_appliance_key():
+    """The declared legacy profile must name the key it expects to see."""
+    profile = BUILTIN_PROFILES["ekeng"]
+    assert profile.legacy_tls is True
+    assert len(profile.tls_pins) == 1
+    assert all(len(pin) == 64 for pin in profile.tls_pins)
+
+
+def test_custom_legacy_declaration_survives_a_save_and_load(config_dir):
+    """A declaration that is not persisted would silently become standard HTTPS."""
+    pin = "cd" * 32
+    profile = make_custom_profile(
+        "https://appliance.example/DSS.asmx",
+        legacy_tls=True,
+        tls_pins=(pin,),
+    )
+    save_server_config(profile)
+
+    restored = get_active_profile()
+    assert restored is not None
+    assert restored.legacy_tls is True
+    assert restored.tls_pins == (pin,)
+
+
+def test_a_saved_builtin_profile_keeps_its_own_transport_settings(config_dir):
+    save_server_config(BUILTIN_PROFILES["ekeng"])
+    restored = get_active_profile()
+    assert restored is not None
+    assert restored.tls_pins == BUILTIN_PROFILES["ekeng"].tls_pins
+
+
 def test_make_custom_profile_http_rejected():
     """make_custom_profile rejects HTTP URLs to prevent plaintext credentials."""
     with pytest.raises(ValueError, match="HTTP URLs are not supported"):
@@ -963,10 +1011,11 @@ def test_register_profile_tls_mode(config_dir):
         display_name="Test",
         url="https://test.example.com:8080/DSS.asmx",
         legacy_tls=True,
+        tls_pins=("ab" * 32,),
     )
     with patch("revenant.network.transport.register_host_tls") as mock_reg:
         register_profile_tls_mode(profile)
-    mock_reg.assert_called_once_with("test.example.com", True)
+    mock_reg.assert_called_once_with("test.example.com", True, ("ab" * 32,))
 
 
 def test_register_profile_tls_mode_standard(config_dir):
@@ -976,7 +1025,7 @@ def test_register_profile_tls_mode_standard(config_dir):
     profile = ServerProfile(name="test", display_name="Test", url="https://standard.com/api")
     with patch("revenant.network.transport.register_host_tls") as mock_reg:
         register_profile_tls_mode(profile)
-    mock_reg.assert_called_once_with("standard.com", False)
+    mock_reg.assert_called_once_with("standard.com", False, ())
 
 
 def test_register_active_profile_tls(config_dir):
@@ -986,7 +1035,7 @@ def test_register_active_profile_tls(config_dir):
     save_config({"profile": "ekeng"})
     with patch("revenant.network.transport.register_host_tls") as mock_reg:
         register_active_profile_tls()
-    mock_reg.assert_called_once_with("ca.gov.am", True)
+    mock_reg.assert_called_once_with("ca.gov.am", True, BUILTIN_PROFILES["ekeng"].tls_pins)
 
 
 def test_register_active_profile_tls_no_profile(config_dir):
