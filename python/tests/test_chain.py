@@ -403,23 +403,6 @@ def test_is_self_signed(root_ca, chain_3):
     assert _is_self_signed(_load_asn1(leaf_cert)) is False
 
 
-def test_get_aia_urls():
-    from revenant.core.chain import _get_aia_ca_issuer_urls
-
-    root_cert, root_key = make_root_ca()
-    leaf_cert, _ = make_leaf(root_cert, root_key, aia_url="http://example.com/ca.crt")
-    urls = _get_aia_ca_issuer_urls(_load_asn1(leaf_cert))
-    assert urls == ["http://example.com/ca.crt"]
-
-
-def test_get_aia_urls_no_aia():
-    from revenant.core.chain import _get_aia_ca_issuer_urls
-
-    root_cert, _ = make_root_ca()
-    urls = _get_aia_ca_issuer_urls(_load_asn1(root_cert))
-    assert urls == []
-
-
 # ── Chain: CMS extraction ────────────────────────────────────────────
 
 
@@ -442,30 +425,6 @@ def test_extract_certs_from_empty_cms():
     except Exception:
         result = []
     assert result == []
-
-
-# ── Chain: fetch intermediate ─────────────────────────────────────────
-
-
-def test_fetch_intermediate_success(root_ca):
-    from revenant.core.chain import _fetch_intermediate_cert
-
-    root_cert, _ = root_ca
-    root_der = to_der(root_cert)
-
-    with patch("revenant.network.transport.http_get", return_value=root_der):
-        result = _fetch_intermediate_cert("http://example.com/ca.crt")
-
-    assert result is not None
-
-
-def test_fetch_intermediate_failure():
-    from revenant.core.chain import _fetch_intermediate_cert
-
-    with patch("revenant.network.transport.http_get", side_effect=RuntimeError("network")):
-        result = _fetch_intermediate_cert("http://example.com/ca.crt")
-
-    assert result is None
 
 
 # ── Chain: chain building ─────────────────────────────────────────────
@@ -491,24 +450,31 @@ def test_build_chain_self_signed_only(root_ca):
     assert len(chain) == 1
 
 
-def test_build_chain_with_aia_fetch(root_ca):
-    """Chain building fetches missing intermediate via AIA."""
+def test_build_chain_never_follows_aia_urls(root_ca):
+    """A certificate's AIA URLs must not turn verification into a network call.
+
+    The URLs live in the document being verified, so following them would let
+    whoever wrote it pick hosts for this machine to contact. Building stops at
+    the missing issuer instead.
+    """
     from revenant.core.chain import _build_chain
 
     root_cert, root_key = root_ca
     inter_cert, inter_key = make_intermediate(root_cert, root_key)
     leaf_cert, _ = make_leaf(inter_cert, inter_key, aia_url="http://example.com/inter.crt")
 
-    # Pool has leaf only -- intermediate must be fetched via AIA
+    # The intermediate is deliberately absent from the pool: the only way to
+    # reach it is the AIA URL.
     leaf_asn1 = _load_asn1(leaf_cert)
-    root_asn1 = _load_asn1(root_cert)
-    pool = [leaf_asn1, root_asn1]
+    pool = [leaf_asn1, _load_asn1(root_cert)]
 
-    inter_der = to_der(inter_cert)
-    with patch("revenant.network.transport.http_get", return_value=inter_der):
+    def _forbidden(*args: object, **kwargs: object) -> bytes:
+        pytest.fail(f"chain building made a network request: {args} {kwargs}")
+
+    with patch("revenant.network.transport.http_get", _forbidden):
         chain = _build_chain(leaf_asn1, pool)
 
-    assert len(chain) >= 2  # at least leaf + intermediate
+    assert len(chain) == 1
 
 
 def test_build_chain_no_aki():

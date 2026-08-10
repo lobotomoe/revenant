@@ -7,6 +7,28 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Removed
+
+- **Certificate chains are no longer completed by fetching the Authority
+  Information Access URLs printed inside a certificate.** Those URLs travel
+  inside the document being verified, so following them let whoever produced a
+  file choose hosts for the verifying machine to contact -- opening a document
+  became a network callback that reports the reader's address and the moment
+  they opened it, and a certificate may carry any number of them. The per-chain
+  limit did not restrain this: it counted only fetches that *succeeded*, so
+  unreachable URLs were retried without bound, each costing a connection
+  attempt with retries. Issuers now come from the CMS blob, which is where
+  RFC 5652 has a signer put them, and from the configured trust store. A
+  signature whose CMS omits its own intermediates stops short of a trusted
+  anchor and reads as `untrusted` -- or `indeterminate`, if an anchor still
+  matched by name but the chain could not be verified -- instead of silently
+  reaching out for them. No built-in
+  profile is affected: EKENG's chain has no intermediates, and its certificates'
+  AIA URLs are plain HTTP, which the transport has always refused.
+  `MAX_AIA_FETCHES` is gone from all three implementations, and Rust's
+  `validate_chain` no longer takes a `Transport` -- chain validation now has no
+  way to reach the network at all.
+
 ### Fixed
 
 - **Python/TypeScript: CMS verification now checks the cryptographic signer

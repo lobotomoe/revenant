@@ -5,6 +5,13 @@ PKI certificate chain validation against a Trust Service List.
 
 Extracts all certificates from a CMS SignedData blob, builds the
 certificate chain, and validates it against trust anchors from a TSL.
+
+Chain building is offline. Issuers come from the CMS blob, which is where
+RFC 5652 says a signer puts them, and from the trust store. Following the
+Authority Information Access URLs printed inside a certificate would let any
+document being verified choose hosts for this machine to contact, which turns
+opening a file into a network callback -- and it never bought anything here,
+since a CMS that omits its own issuers is malformed rather than merely terse.
 """
 
 from __future__ import annotations
@@ -16,7 +23,6 @@ from typing import TYPE_CHECKING
 if TYPE_CHECKING:
     import datetime
 
-from ..constants import MAX_AIA_FETCHES
 from .cms_certificates import find_signer_certificate, x509_certificates
 from .tsl import TrustStore, get_trust_store
 
@@ -89,44 +95,10 @@ def _is_self_signed(cert: object) -> bool:
     return cert.self_signed in ("maybe", True)  # pyright: ignore[reportAttributeAccessIssue]
 
 
-# ── AIA fetching ─────────────────────────────────────────────────────
-
-
-def _get_aia_ca_issuer_urls(cert: object) -> list[str]:
-    """Extract CA issuer URLs from the Authority Information Access extension."""
-    aia = cert.authority_information_access_value  # pyright: ignore[reportAttributeAccessIssue]
-    if aia is None:
-        return []
-
-    urls: list[str] = []
-    for desc in aia:
-        method = desc["access_method"].native
-        if method == "ca_issuers":
-            loc = desc["access_location"]
-            if loc.name == "uniform_resource_identifier":
-                urls.append(loc.chosen.native)
-    return urls
-
-
-def _fetch_intermediate_cert(url: str) -> object | None:
-    """Fetch a single intermediate CA certificate via AIA URL.
-
-    Returns an asn1crypto.x509.Certificate or None on failure.
-    """
-    from asn1crypto import x509 as asn1_x509
-
-    from ..network.transport import http_get
-
-    try:
-        _logger.debug("Fetching intermediate cert from %s", url)
-        cert_der = http_get(url, timeout=15)
-        return asn1_x509.Certificate.load(cert_der)
-    except Exception:
-        _logger.debug("Failed to fetch intermediate from %s", url, exc_info=True)
-        return None
-
-
 # ── Chain building ───────────────────────────────────────────────────
+
+# Guards against a cycle in issuer references.
+MAX_CHAIN_DEPTH = 20
 
 
 def _build_chain(
@@ -134,8 +106,6 @@ def _build_chain(
     pool: list[object],
 ) -> list[object]:
     """Build a certificate chain from leaf to root using SKI/AKI matching.
-
-    Fetches missing intermediates via AIA if needed.
 
     Args:
         leaf: The end-entity (signer) certificate.
@@ -146,9 +116,8 @@ def _build_chain(
     """
     chain = [leaf]
     current = leaf
-    fetched = 0
 
-    for _ in range(20):  # safety limit
+    for _ in range(MAX_CHAIN_DEPTH):
         if _is_self_signed(current):
             break
 
@@ -163,18 +132,6 @@ def _build_chain(
             if candidate_ski == aki and candidate is not current:
                 issuer = candidate
                 break
-
-        # If not found in pool, try AIA
-        if issuer is None and fetched < MAX_AIA_FETCHES:
-            for url in _get_aia_ca_issuer_urls(current):
-                fetched_cert = _fetch_intermediate_cert(url)
-                if fetched_cert is not None:
-                    fetched += 1
-                    pool.append(fetched_cert)
-                    fetched_ski = _get_ski(fetched_cert)
-                    if fetched_ski == aki:
-                        issuer = fetched_cert
-                        break
 
         if issuer is None:
             break

@@ -5,11 +5,27 @@ import { readFileSync } from "node:fs";
 
 import * as asn1js from "asn1js";
 import * as pkijs from "pkijs";
-import { describe, expect, it } from "vitest";
+import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import { validateChain } from "../src/core/chain.js";
 import { findSignerCertificate } from "../src/core/cms-certificates.js";
 import type { TrustStore } from "../src/core/tsl.js";
+
+/** Every URL chain validation tried to open, in order. */
+const { attemptedUrls } = vi.hoisted(() => ({ attemptedUrls: [] as string[] }));
+
+vi.mock("../src/network/transport.js", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("../src/network/transport.js")>();
+  return {
+    ...actual,
+    httpGet: (url: string): never => {
+      attemptedUrls.push(url);
+      // Refusing the way an unreachable host would: a caller that swallows the
+      // failure still leaves the attempt recorded above.
+      throw new Error(`network access is not allowed in this test: ${url}`);
+    },
+  };
+});
 
 function fixture(name: string): Uint8Array {
   return new Uint8Array(
@@ -34,6 +50,10 @@ function certificateSki(cert: pkijs.Certificate): Uint8Array {
   }
   return new Uint8Array(parsed.result.valueBlock.valueHexView);
 }
+
+beforeEach(() => {
+  attemptedUrls.length = 0;
+});
 
 describe("validateChain", () => {
   it("selects the leaf by SignerInfo instead of certificate SET order", async () => {
@@ -62,6 +82,32 @@ describe("validateChain", () => {
     expect(result.details.some((detail) => detail.includes("signer cert: CN=Test Root CA"))).toBe(
       false,
     );
+  });
+
+  it("never follows the AIA URLs printed in a certificate", async () => {
+    // The URLs live in the document being verified, so following them would let
+    // whoever wrote it pick hosts for this machine to contact. This fixture's
+    // issuer is reachable only through its AIA URL, and the anchor below is
+    // unrelated to it, so the issuer cannot come from the pool either.
+    const anchor = {
+      subjectName: "CN=Test Root CA",
+      serviceName: "TestRootCA",
+      serviceType: "CA/QC",
+      status: "granted",
+      certDer: fixture("root.der"),
+    };
+    const store: TrustStore = {
+      anchors: [anchor],
+      caAnchors: [anchor],
+      schemeOperator: "Test",
+      tslUrl: "https://example.com",
+      fetchedAt: Date.now(),
+    };
+
+    const result = await validateChain(fixture("cms_leaf_aia.der"), store);
+
+    expect(attemptedUrls).toEqual([]);
+    expect(result.chainDepth).toBe(1);
   });
 });
 

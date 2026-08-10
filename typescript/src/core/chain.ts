@@ -4,13 +4,18 @@
  *
  * Extracts all certificates from a CMS SignedData blob, builds the
  * certificate chain, and validates it against trust anchors from a TSL.
+ *
+ * Chain building is offline. Issuers come from the CMS blob, which is where
+ * RFC 5652 says a signer puts them, and from the trust store. Following the
+ * Authority Information Access URLs printed inside a certificate would let any
+ * document being verified choose hosts for this machine to contact, which turns
+ * opening a file into a network callback -- and it never bought anything here,
+ * since a CMS that omits its own issuers is malformed rather than merely terse.
  */
 
 import * as asn1js from "asn1js";
 import * as pkijs from "pkijs";
 
-import { MAX_AIA_FETCHES } from "../constants.js";
-import { httpGet } from "../network/transport.js";
 import { toArrayBuffer } from "../utils.js";
 import { getOidName } from "./cert-info.js";
 import { findSignerCertificate, x509Certificates } from "./cms-certificates.js";
@@ -112,54 +117,16 @@ function bytesEqual(a: Uint8Array | null, b: Uint8Array | null): boolean {
   return true;
 }
 
-// -- AIA fetching -------------------------------------------------------------
-
-function getAiaCaIssuerUrls(cert: pkijs.Certificate): string[] {
-  if (!cert.extensions) return [];
-  const urls: string[] = [];
-  for (const ext of cert.extensions) {
-    if (ext.extnID === "1.3.6.1.5.5.7.1.1") {
-      // Authority Information Access
-      try {
-        const parsedValue = ext.parsedValue as pkijs.InfoAccess | undefined;
-        if (parsedValue?.accessDescriptions) {
-          for (const desc of parsedValue.accessDescriptions) {
-            // caIssuers OID: 1.3.6.1.5.5.7.48.2
-            if (desc.accessMethod === "1.3.6.1.5.5.7.48.2" && desc.accessLocation.type === 6) {
-              urls.push(desc.accessLocation.value as string);
-            }
-          }
-        }
-      } catch {
-        // ignore parse errors
-      }
-    }
-  }
-  return urls;
-}
-
-async function fetchIntermediateCert(url: string): Promise<pkijs.Certificate | null> {
-  try {
-    const certDer = await httpGet(url, { timeout: 15 });
-    const asn1 = asn1js.fromBER(toArrayBuffer(certDer));
-    if (asn1.offset === -1) return null;
-    return new pkijs.Certificate({ schema: asn1.result });
-  } catch {
-    return null;
-  }
-}
-
 // -- Chain building -----------------------------------------------------------
 
-async function buildChain(
-  leaf: pkijs.Certificate,
-  pool: pkijs.Certificate[],
-): Promise<pkijs.Certificate[]> {
+/** Guards against a cycle in issuer references. */
+const MAX_CHAIN_DEPTH = 20;
+
+function buildChain(leaf: pkijs.Certificate, pool: pkijs.Certificate[]): pkijs.Certificate[] {
   const chain = [leaf];
   let current = leaf;
-  let fetched = 0;
 
-  for (let i = 0; i < 20; i++) {
+  for (let i = 0; i < MAX_CHAIN_DEPTH; i++) {
     if (isSelfSigned(current)) break;
 
     const aki = getAkiKeyId(current);
@@ -172,22 +139,6 @@ async function buildChain(
       if (bytesEqual(candidateSki, aki) && candidate !== current) {
         issuer = candidate;
         break;
-      }
-    }
-
-    // AIA fetch if not found
-    if (issuer === null && fetched < MAX_AIA_FETCHES) {
-      for (const url of getAiaCaIssuerUrls(current)) {
-        const fetchedCert = await fetchIntermediateCert(url);
-        if (fetchedCert !== null) {
-          fetched++;
-          pool.push(fetchedCert);
-          const fetchedSki = getSki(fetchedCert);
-          if (bytesEqual(fetchedSki, aki)) {
-            issuer = fetchedCert;
-            break;
-          }
-        }
       }
     }
 
@@ -273,7 +224,7 @@ export async function validateChain(
     }
   }
 
-  const chain = await buildChain(leaf, pool);
+  const chain = buildChain(leaf, pool);
   const chainDepth = chain.length;
 
   if (chainDepth > 1) {

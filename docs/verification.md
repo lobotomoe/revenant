@@ -79,7 +79,7 @@ Since v1.1, revenant can validate the signer's certificate chain against a Trust
 ### How it works
 
 1. **TSL fetch** -- downloads and caches the country's Trust Service List XML (ETSI TS 119 612). The TSL lists all trusted CA certificates.
-2. **Chain building** -- selects the leaf named by `SignerInfo.sid`, then builds a chain using SKI/AKI matching. Missing intermediates are fetched via AIA URLs.
+2. **Chain building** -- selects the leaf named by `SignerInfo.sid`, then builds a chain using SKI/AKI matching. Issuers come from the CMS blob and the trust store only; the Authority Information Access URLs printed inside a certificate are never fetched, since they let the document being verified choose hosts for your machine to contact. A signature whose CMS omits its own intermediates stops short of a trusted anchor and reads as `untrusted` -- or `indeterminate`, if an anchor still matched by name but the chain could not be verified cryptographically.
 3. **Anchor matching** -- checks if the chain terminates at a CA listed in the TSL.
 4. **Cryptographic verification** -- validates the chain using `cryptography.x509.verification` (Python) or `pkijs.CertificateChainValidationEngine` (TypeScript).
 

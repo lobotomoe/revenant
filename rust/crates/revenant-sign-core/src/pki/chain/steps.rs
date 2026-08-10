@@ -1,30 +1,28 @@
 //! Chain-construction and verification steps.
 //!
 //! The mechanics behind the [`super`] validation pipeline: building the chain
-//! by SKI/AKI matching (fetching missing intermediates via AIA), matching a
-//! trust anchor, and verifying each link cryptographically with `x509-verify`.
+//! by SKI/AKI matching, matching a trust anchor, and verifying each link
+//! cryptographically with `x509-verify`.
+//!
+//! Nothing here touches the network. Issuers come from the pool the caller
+//! assembled -- the CMS blob and the trust store -- never from the Authority
+//! Information Access URLs printed inside a certificate, which the document
+//! being verified would otherwise get to choose.
 
 use x509_cert::Certificate;
 use x509_verify::VerifyingKey;
 
 use super::super::cert;
 use super::super::tsl::TrustStore;
-use crate::constants::{DEFAULT_MAX_RETRIES, DEFAULT_TIMEOUT_HTTP_GET, MAX_AIA_FETCHES};
-use crate::net::Transport;
 
 /// Hard cap on chain length, guarding against a cycle in issuer references.
 const MAX_CHAIN_DEPTH: usize = 20;
 
-/// Build a chain from the signer (pool index 0) upward via SKI/AKI matching,
-/// fetching missing intermediates through AIA. Returns the ordered chain from
-/// leaf to the highest issuer reachable.
-pub(super) fn build_chain(
-    mut pool: Vec<Certificate>,
-    fetch: impl Fn(&str) -> Option<Certificate>,
-) -> Vec<Certificate> {
+/// Build a chain from the signer (pool index 0) upward via SKI/AKI matching.
+/// Returns the ordered chain from leaf to the highest issuer present in `pool`.
+pub(super) fn build_chain(pool: &[Certificate]) -> Vec<Certificate> {
     let mut chain_idx = vec![0usize];
     let mut current = 0usize;
-    let mut fetched = 0u32;
 
     for _ in 0..MAX_CHAIN_DEPTH {
         if cert::is_self_signed(&pool[current]) {
@@ -33,26 +31,7 @@ pub(super) fn build_chain(
         let Some(aki) = cert::authority_key_id(&pool[current]) else {
             break;
         };
-
-        let mut issuer = pool_index_by_ski(&pool, &aki, current);
-
-        if issuer.is_none() && fetched < MAX_AIA_FETCHES {
-            for url in cert::aia_ca_issuer_urls(&pool[current]) {
-                let Some(fetched_cert) = fetch(&url) else {
-                    continue;
-                };
-                fetched += 1;
-                let matches = cert::subject_key_identifier(&fetched_cert).as_deref() == Some(&aki);
-                let idx = pool.len();
-                pool.push(fetched_cert);
-                if matches {
-                    issuer = Some(idx);
-                    break;
-                }
-            }
-        }
-
-        let Some(issuer) = issuer else {
+        let Some(issuer) = pool_index_by_ski(pool, &aki, current) else {
             break;
         };
         chain_idx.push(issuer);
@@ -103,20 +82,6 @@ pub(super) fn find_matching_anchor(
     }
 
     None
-}
-
-/// Fetch a single intermediate certificate via an AIA URL, or `None` on any
-/// failure (best-effort). AIA URLs are frequently plain HTTP, which the
-/// HTTPS-only transport refuses -- such fetches simply fail.
-pub(super) fn fetch_intermediate(transport: &Transport, url: &str) -> Option<Certificate> {
-    log::debug!("Fetching intermediate cert from {url}");
-    match transport.get(url, DEFAULT_TIMEOUT_HTTP_GET, DEFAULT_MAX_RETRIES) {
-        Ok(der) => cert::parse_der(&der).ok(),
-        Err(err) => {
-            log::debug!("Failed to fetch intermediate from {url}: {err}");
-            None
-        }
-    }
 }
 
 /// Cryptographically verify a built chain: every adjacent link's signature, the
@@ -205,10 +170,6 @@ mod tests {
         cert::parse_der(der).unwrap()
     }
 
-    fn no_fetch(_url: &str) -> Option<Certificate> {
-        None
-    }
-
     fn trust_store_with(anchor_der: &[u8], subject_name: &str, service_name: &str) -> TrustStore {
         let anchor = TrustAnchor {
             subject_name: subject_name.to_owned(),
@@ -228,30 +189,27 @@ mod tests {
 
     #[test]
     fn builds_full_chain_from_pool() {
-        let pool = vec![cert(LEAF_DER), cert(INTER_DER), cert(ROOT_DER)];
-        assert_eq!(build_chain(pool, no_fetch).len(), 3);
+        let pool = [cert(LEAF_DER), cert(INTER_DER), cert(ROOT_DER)];
+        assert_eq!(build_chain(&pool).len(), 3);
     }
 
     #[test]
     fn self_signed_only_is_depth_one() {
-        assert_eq!(build_chain(vec![cert(ROOT_DER)], no_fetch).len(), 1);
+        assert_eq!(build_chain(&[cert(ROOT_DER)]).len(), 1);
     }
 
     #[test]
     fn no_aki_stops_at_depth_one() {
-        assert_eq!(build_chain(vec![cert(NO_AKI_DER)], no_fetch).len(), 1);
+        assert_eq!(build_chain(&[cert(NO_AKI_DER)]).len(), 1);
     }
 
     #[test]
-    fn builds_chain_via_aia_fetch() {
-        // Pool has only the AIA leaf and the root; the intermediate must be
-        // fetched via AIA.
-        let pool = vec![cert(LEAF_AIA_DER), cert(ROOT_DER)];
-        let chain = build_chain(pool, |url| {
-            assert_eq!(url, "http://example.com/inter.crt");
-            Some(cert(INTER_DER))
-        });
-        assert!(chain.len() >= 2, "got {}", chain.len());
+    fn a_missing_issuer_stops_the_chain_rather_than_being_fetched() {
+        // This leaf names its issuer only through an AIA URL, and the
+        // intermediate is absent from the pool. `build_chain` takes no fetcher,
+        // so the URL cannot be dialed: the chain stops at the leaf.
+        let pool = [cert(LEAF_AIA_DER), cert(ROOT_DER)];
+        assert_eq!(build_chain(&pool).len(), 1);
     }
 
     #[test]

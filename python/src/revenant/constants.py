@@ -30,7 +30,6 @@ __all__ = [
     "ENV_TIMEOUT",
     "ENV_URL",
     "ENV_USER",
-    "MAX_AIA_FETCHES",
     "MAX_RESPONSE_SIZE",
     "MAX_TIMEOUT",
     "MIN_SIGNATURE_B64_LEN",
@@ -132,9 +131,6 @@ TSL_CACHE_TTL = 86400
 
 # TSL fetch timeout (seconds)
 TSL_FETCH_TIMEOUT = 30
-
-# Maximum AIA intermediate cert fetches per chain
-MAX_AIA_FETCHES = 5
 
 # PDF file magic bytes
 PDF_MAGIC = b"%PDF-"
