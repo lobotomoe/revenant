@@ -26,7 +26,7 @@ import {
   SIG_WIDTH,
   verifyEmbeddedSignature,
 } from "./pdf/index.js";
-import { checkSigningResponse } from "./signing-response.js";
+import { checkResponseOverContent, checkResponseOverDigest } from "./signing-response.js";
 
 // -- Helpers ------------------------------------------------------------------
 
@@ -62,7 +62,7 @@ export async function signPdfDetachedWithTransport(
 ): Promise<Uint8Array> {
   validatePdf(pdfBytes);
   const cmsDer = await transport.signPdfDetached(pdfBytes, username, password, timeout);
-  await checkSigningResponse(cmsDer, pdfBytes, "signPdfDetached");
+  await checkResponseOverContent(cmsDer, pdfBytes, "signPdfDetached");
   return cmsDer;
 }
 
@@ -73,10 +73,13 @@ export async function signPdfDetachedWithTransport(
  * Low-level; production callers should prefer the `signHash` export
  * from `revenant-sign` top-level.
  *
- * The returned signature is checked to be a genuine signature, but — unlike the
- * operations that submit content — nothing here can tie it to the document the
- * hash was taken from: what a service binds in response to a pre-computed
- * digest is service-defined, and observed to vary.
+ * Signs the hash bytes themselves. What a service does with a submitted digest
+ * is service-defined and observed to vary: some sign it as a pre-computed
+ * digest, others hash it again and sign it as ordinary content. Only the first
+ * kind yields a signature that can be attached to the document the hash came
+ * from, so the response is checked to be a genuine signature and a warning is
+ * logged when it does not bind the submitted digest. To sign a document, pass
+ * the document to `signData`.
  *
  * @throws SigningResponseError if the response is not a verifiable signature.
  */
@@ -93,7 +96,7 @@ export async function signHashWithTransport(
     );
   }
   const cmsDer = await transport.signHash(hashBytes, username, password, timeout);
-  await checkSigningResponse(cmsDer, null, "signHash");
+  await checkResponseOverDigest(cmsDer, hashBytes, "signHash");
   return cmsDer;
 }
 
@@ -119,7 +122,7 @@ export async function signDataWithTransport(
     throw new RevenantError("Cannot sign empty data.");
   }
   const cmsDer = await transport.signData(dataBytes, username, password, timeout);
-  await checkSigningResponse(cmsDer, dataBytes, "signData");
+  await checkResponseOverContent(cmsDer, dataBytes, "signData");
   return cmsDer;
 }
 
