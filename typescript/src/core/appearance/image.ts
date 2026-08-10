@@ -10,6 +10,8 @@ import { readFileSync, statSync } from "node:fs";
 import { resolve } from "node:path";
 import { deflateSync } from "node:zlib";
 
+import { readJpegDimensions, readPngDimensions } from "./image-header.js";
+
 export interface SignatureImageData {
   samples: Uint8Array; // Deflate-compressed RGB pixel data
   smask: Uint8Array | null; // Deflate-compressed alpha channel
@@ -26,6 +28,21 @@ const MAX_FILE_SIZE = 5 * 1024 * 1024;
 
 /** Maximum pixel count to prevent decompression bombs. */
 const MAX_IMAGE_PIXELS = 2000 * 2000;
+
+/** Divisor for expressing the pixel budget in the units jpeg-js takes. */
+const PIXELS_PER_MEGAPIXEL = 1_000_000;
+
+/**
+ * Reject an image whose declared dimensions exceed the pixel budget.
+ *
+ * Must run before the pixel data is decoded: decoders allocate the full
+ * output up front, so checking afterwards is checking too late.
+ */
+function assertWithinPixelBudget(width: number, height: number): void {
+  if (width * height > MAX_IMAGE_PIXELS) {
+    throw new Error(`Image too large: ${width}x${height}. Maximum: ${MAX_IMAGE_PIXELS} pixels.`);
+  }
+}
 
 /**
  * Load an image file and prepare it for embedding in a PDF signature.
@@ -76,15 +93,13 @@ function isJpeg(data: Buffer): boolean {
 }
 
 async function loadPng(data: Buffer): Promise<SignatureImageData> {
+  const declared = readPngDimensions(data);
+  assertWithinPixelBudget(declared.width, declared.height);
+
+  // pngjs sizes its output buffer from the same IHDR chunk, so the budget
+  // is settled before the decoder allocates anything.
   const { PNG } = await import("pngjs");
-
   const png = PNG.sync.read(data);
-
-  if (png.width * png.height > MAX_IMAGE_PIXELS) {
-    throw new Error(
-      `Image too large: ${png.width}x${png.height}. Maximum: ${MAX_IMAGE_PIXELS} pixels.`,
-    );
-  }
 
   // Downscale if needed
   let pixels: Uint8Array | Buffer = png.data;
@@ -142,14 +157,17 @@ async function loadPng(data: Buffer): Promise<SignatureImageData> {
 }
 
 async function loadJpeg(data: Buffer): Promise<SignatureImageData> {
-  const jpeg = await import("jpeg-js");
-  const decoded = jpeg.decode(data, { useTArray: true });
+  const declared = readJpegDimensions(data);
+  assertWithinPixelBudget(declared.width, declared.height);
 
-  if (decoded.width * decoded.height > MAX_IMAGE_PIXELS) {
-    throw new Error(
-      `Image too large: ${decoded.width}x${decoded.height}. Maximum: ${MAX_IMAGE_PIXELS} pixels.`,
-    );
-  }
+  const jpeg = await import("jpeg-js");
+  const decoded = jpeg.decode(data, {
+    useTArray: true,
+    // Backstop on the same threshold: the frame header was already checked,
+    // but a JPEG may carry several frames, and only the decoder sees the
+    // ones that were not read here.
+    maxResolutionInMP: MAX_IMAGE_PIXELS / PIXELS_PER_MEGAPIXEL,
+  });
 
   let pixels: Uint8Array | Buffer = decoded.data;
   let w = decoded.width;
