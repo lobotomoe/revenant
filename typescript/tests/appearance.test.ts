@@ -683,6 +683,23 @@ describe("loadSignatureImage", () => {
     await expect(loadSignatureImage(jpgPath)).rejects.toThrow(/Image too large/);
   });
 
+  it("loads a JPEG sized just under the pixel budget", async () => {
+    // 1999x1999 is 3,996,001 pixels -- inside the budget by a hair. Guards
+    // against a decoder limit set tight enough to reject legitimate input.
+    const jpeg = await import("jpeg-js");
+    const width = 1999;
+    const height = 1999;
+    const rawData = Buffer.alloc(width * height * 4);
+    rawData.fill(128);
+    const encoded = jpeg.encode({ data: rawData, width, height }, 80);
+    const jpgPath = join(tmpDir, "near-budget.jpg");
+    writeFileSync(jpgPath, encoded.data);
+
+    const result = await loadSignatureImage(jpgPath);
+    expect(result.width).toBe(200);
+    expect(result.height).toBe(200);
+  });
+
   it("downscales large PNG images to max 200px", async () => {
     const { PNG } = await import("pngjs");
     // Create a 400x300 PNG (will be downscaled)

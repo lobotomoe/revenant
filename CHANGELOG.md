@@ -65,6 +65,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   when it does not bind the one submitted. The operation is not failed over
   this: the caller asked for those bytes to be signed, and they were. To sign a
   document, pass the document to `sign_data`.
+- **TypeScript: the signature image pixel budget is enforced before decoding,
+  not after.** `loadSignatureImage` decoded the whole file and only then
+  compared the pixel count against its limit, by which point the decoder had
+  already allocated the full output: a 547 KB PNG declaring 12000x12000 drove
+  resident memory to 1.7 GB before the check ran, and the 5 MB file cap allows
+  an order of magnitude more. Dimensions are now read from the PNG `IHDR` chunk
+  and the JPEG frame header, and refused there; `jpeg-js` is additionally given
+  the same limit so that a frame the header scan did not reach cannot exceed it
+  either. Python and Rust already checked dimensions before decoding.
 
 ### Changed
 
