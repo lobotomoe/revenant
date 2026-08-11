@@ -33,7 +33,7 @@ def test_two_certificates_have_different_fingerprints():
     assert spki_fingerprint(OTHER_CERT_DER) != CERT_PIN
 
 
-def test_unparseable_certificate_is_rejected():
+def test_unparsable_certificate_is_rejected():
     with pytest.raises(TLSError, match="Cannot read the server's public key"):
         spki_fingerprint(b"not a certificate")
 
