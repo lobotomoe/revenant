@@ -70,6 +70,38 @@
   </branding>
 
   <releases>
+    <release version="3.0.0" date="2026-08-11">
+      <description>
+        <p>
+          Security release. Signature verification is hardened throughout and
+          upgrading is recommended for all users.
+        </p>
+        <ul>
+          <li>
+            Signatures are now checked cryptographically, not only for
+            structure, and the signer identity is bound to the certificate the
+            signature was actually made with.
+          </li>
+          <li>
+            A signing service's response is verified before any workflow
+            reports success.
+          </li>
+          <li>
+            Unsigned incremental revisions appended to a signed document are
+            detected and reported.
+          </li>
+          <li>
+            Verification no longer contacts hosts named inside the document
+            being verified.
+          </li>
+          <li>
+            The legacy TLS transport authenticates the appliance against a
+            pinned key, and is never selected as a fallback after a standard
+            HTTPS failure.
+          </li>
+        </ul>
+      </description>
+    </release>
     <release version="2.1.2" date="2026-08-03">
       <description>
         <p>
