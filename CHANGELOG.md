@@ -7,6 +7,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [3.0.0] - 2026-08-11
+
+Security release. Every change below is a fix for a reported vulnerability;
+upgrading is recommended for all users.
+
+The major bump is required by one breaking API change in the Rust crates:
+`pki::validate_chain` no longer takes a `Transport`, and
+`constants::MAX_AIA_FETCHES` is gone. The Python and TypeScript packages keep
+their public surface -- `MAX_AIA_FETCHES` was never exported from either
+entry point -- but their verification behaviour changes, as described below.
+
 ### Removed
 
 - **Certificate chains are no longer completed by fetching the Authority
@@ -473,7 +484,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Pyright strict mode type checking with 0 errors
 - 96%+ test coverage (600+ tests)
 
-[Unreleased]: https://github.com/lobotomoe/revenant/compare/v2.1.1...HEAD
+[Unreleased]: https://github.com/lobotomoe/revenant/compare/v3.0.0...HEAD
+[3.0.0]: https://github.com/lobotomoe/revenant/compare/v2.1.2...v3.0.0
+[2.1.2]: https://github.com/lobotomoe/revenant/compare/v2.1.1...v2.1.2
 [2.1.1]: https://github.com/lobotomoe/revenant/compare/v2.1.0...v2.1.1
 [2.1.0]: https://github.com/lobotomoe/revenant/compare/v2.0.0...v2.1.0
 [2.0.0]: https://github.com/lobotomoe/revenant/compare/v1.2.1...v2.0.0
