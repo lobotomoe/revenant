@@ -4,7 +4,7 @@
 
 import * as asn1js from "asn1js";
 import * as pkijs from "pkijs";
-import { describe, expect, it, vi } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 import {
   discoverIdentityFromServer,
   extractAllCertInfoFromPdf,
@@ -547,8 +547,29 @@ describe("extractAllCertInfoFromPdf", () => {
 
 // -- discoverIdentityFromServer -----------------------------------------------
 
+/**
+ * Make the enum-certificates step fail without touching the network.
+ *
+ * `discoverIdentityFromServer` calls `enumCertificates(transport.url, ...)`
+ * before falling back to dummy-hash signing, and the mock transport's url is a
+ * real host. Left unmocked these tests POST to it for real, which is both a
+ * stray outbound request and a timeout waiting to happen on a slow link.
+ */
+function mockEnumCertificatesUnavailable(): void {
+  vi.doMock("../src/network/soap-transport.js", () => ({
+    enumCertificates: vi.fn().mockRejectedValue(new Error("enum-certificates unavailable")),
+  }));
+}
+
+afterEach(() => {
+  // Module mocks here are per-test; leaving one in place would silently change
+  // what the next test exercises.
+  vi.doUnmock("../src/network/soap-transport.js");
+});
+
 describe("discoverIdentityFromServer", () => {
   it("falls back to dummy-hash signing when enum-certificates fails", async () => {
+    mockEnumCertificatesUnavailable();
     const transport = createMockTransport();
     // FAKE_CMS is not a valid CMS blob, so extractCertInfoFromCms will throw.
     // The dummy-hash fallback calls transport.signHash which returns FAKE_CMS,
@@ -559,6 +580,7 @@ describe("discoverIdentityFromServer", () => {
   });
 
   it("calls transport.signHash with a 20-byte dummy hash as fallback", async () => {
+    mockEnumCertificatesUnavailable();
     const transport = createMockTransport();
     try {
       await discoverIdentityFromServer(transport, "user", "pass", 120);
@@ -584,6 +606,7 @@ describe("discoverIdentityFromServer", () => {
   });
 
   it("passes credentials and timeout through to transport", async () => {
+    mockEnumCertificatesUnavailable();
     const transport = createMockTransport();
     try {
       await discoverIdentityFromServer(transport, "myuser", "mypass", 45);
@@ -656,11 +679,11 @@ describe("discoverIdentityFromServer", () => {
   });
 
   it("falls back to dummy-hash when transport has url but enum-certificates import fails", async () => {
-    // The enum-certificates dynamic import may fail (module not found, etc.)
-    // In that case it falls back to dummy-hash signing.
-    // The createMockTransport has a url, so it tries enum-certificates first.
-    // Since the real soap-transport module may or may not export enumCertificates,
-    // we verify that signHash is called as fallback.
+    // When the enum-certificates step fails, discovery falls back to
+    // dummy-hash signing. The mock transport has a url, so that step is
+    // reached first.
+    mockEnumCertificatesUnavailable();
+    // enum-certificates is mocked as unavailable, so signHash is the fallback.
     const transport = createMockTransport();
 
     // The FAKE_CMS can't be parsed as real CMS, so this throws CertificateError
