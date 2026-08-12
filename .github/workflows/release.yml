@@ -27,10 +27,65 @@ jobs:
     with:
       skip-build-test: true
 
+  # The Python and npm versions are rewritten from the tag further down, but the
+  # Rust tree is never touched: whatever Cargo.toml says is what reaches
+  # crates.io, and whatever the metainfo says is what the Snap calls itself.
+  # Both are hand-maintained, so both can silently disagree with the tag -- a
+  # stale metainfo has already shipped a mis-versioned Snap once. Fail here,
+  # before anything is built or published.
+  version-guard:
+    name: Version Guard
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    permissions:
+      contents: read
+
+    steps:
+      - uses: step-security/harden-runner@bf7454d06d71f1098171f2acdf0cd4708d7b5920 # v2.20.0
+        with:
+          egress-policy: audit
+
+      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v6
+        with:
+          persist-credentials: false
+
+      - name: Tag must match the versions the tree ships
+        run: |
+          set -euo pipefail
+          tag="${GITHUB_REF_NAME#v}"
+          # A prerelease tag (3.0.0-rc.1) releases the 3.0.0 tree.
+          base="${tag%%-*}"
+
+          workspace=$(awk '
+            /^\[workspace\.package\]/ { in_pkg = 1; next }
+            /^\[/                     { in_pkg = 0 }
+            in_pkg && $1 == "version" { gsub(/"/, "", $3); print $3; exit }
+          ' rust/Cargo.toml)
+          if [ -z "$workspace" ]; then
+            echo "::error::no [workspace.package] version in rust/Cargo.toml"
+            exit 1
+          fi
+          if [ "$workspace" != "$tag" ] && [ "$workspace" != "$base" ]; then
+            echo "::error::tag ${GITHUB_REF_NAME} would publish Rust crates versioned ${workspace}."
+            echo "crates.io would receive ${workspace} while the GitHub Release, PyPI and npm say ${tag}."
+            echo "Fix rust/Cargo.toml (and the three internal path-dep requirements) before tagging."
+            exit 1
+          fi
+
+          metainfo=rust/packaging/linux/io.github.lobotomoe.revenant.metainfo.xml
+          newest=$(grep -m1 -o '<release version="[^"]*"' "$metainfo" | cut -d'"' -f2)
+          if [ "$newest" != "$base" ]; then
+            echo "::error::${metainfo} lists ${newest} as its newest release, expected ${base}."
+            echo "The Snap adopts its version from this file, so it would ship as ${newest}."
+            exit 1
+          fi
+
+          echo "tag ${GITHUB_REF_NAME}: crates ${workspace}, metainfo ${newest} -- consistent"
+
   # -- Linux: build + AppImage per arch --------------------------------------
   build-linux:
     name: Build Linux (${{ matrix.arch }})
-    needs: ci
+    needs: [ci, version-guard]
     runs-on: ${{ matrix.runner }}
     timeout-minutes: 30
     permissions:
@@ -106,7 +161,7 @@ jobs:
   # -- Windows: build + Authenticode sign + MSIX -----------------------------
   build-windows:
     name: Build Windows (x64)
-    needs: ci
+    needs: [ci, version-guard]
     runs-on: windows-latest
     timeout-minutes: 30
     permissions:
@@ -209,7 +264,7 @@ jobs:
   # -- macOS: build universal binaries (one runner, both arches + lipo) -------
   build-macos:
     name: Build macOS (universal)
-    needs: ci
+    needs: [ci, version-guard]
     runs-on: macos-latest
     timeout-minutes: 30
     permissions:
