@@ -243,8 +243,15 @@ def _single_signing_certificate_binding(
             if not parsed["certs"]:
                 return "unparsable"
             cert_id = parsed["certs"][0]
-            # RFC 2634 fixes ESSCertID v1 to SHA-1; this is an identifier hash,
-            # not a signature or collision-resistance security decision.
+            # RFC 2634 fixes ESSCertID v1 to SHA-1, so there is no stronger
+            # option inside this attribute, and refusing v1 outright is not open
+            # to us either: real signers still emit it alone. It is checked
+            # because checking beats ignoring, not because SHA-1 is sound -- a
+            # certificate-hash binding does rest on collision resistance, so it
+            # counts as defence in depth over chain validation rather than proof
+            # by itself. Every binding present must match (see
+            # _signing_certificate_binding), so a signer that also emits v2
+            # cannot be satisfied by a v1 collision alone.
             hash_algorithm = hashes.SHA1()  # noqa: S303
 
         expected_hash = cert_id["cert_hash"].native
