@@ -553,7 +553,11 @@ jobs:
     name: Build Test
     if: ${{ !inputs.skip-build-test }}
     runs-on: ${{ matrix.os }}
-    timeout-minutes: 20
+    # The Windows leg compiles with nuitka and had been finishing at 19m against
+    # this cap -- one minute of headroom, which adding a dependency spent. The
+    # other two legs finish in a fraction of it and are unaffected by a larger
+    # ceiling; this bounds a hung build rather than budgeting a healthy one.
+    timeout-minutes: 40
     defaults:
       run:
         working-directory: python
