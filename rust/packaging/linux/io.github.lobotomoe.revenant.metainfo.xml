@@ -70,7 +70,7 @@
   </branding>
 
   <releases>
-    <release version="3.0.0" date="2026-08-11">
+    <release version="3.0.0" date="2026-08-12">
       <description>
         <p>
           Security release. Signature verification is hardened throughout and
