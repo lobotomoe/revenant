@@ -164,7 +164,7 @@ pub(crate) fn batch_sign(
                 });
                 return;
             }
-            Ok(bytes) if write_new_file(&output, &bytes).is_ok() => succeeded += 1,
+            Ok(bytes) if write_unique_file(&output, &bytes).is_ok() => succeeded += 1,
             // A non-fatal signing error or a failed write: count it and continue.
             _ => failed += 1,
         }
@@ -227,11 +227,29 @@ fn numbered_output_path(path: &Path, index: u64) -> PathBuf {
     path.with_file_name(name)
 }
 
-/// Persist a batch output without replacing a file that appeared after the
-/// destinations were planned.
-fn write_new_file(path: &Path, data: &[u8]) -> io::Result<()> {
-    let mut file = OpenOptions::new().write(true).create_new(true).open(path)?;
-    file.write_all(data)
+/// Persist a batch output without replacing an existing filesystem entry.
+///
+/// The filesystem is the final authority on whether two names collide: this
+/// also covers case-insensitive aliases and files created after planning.
+fn write_unique_file(path: &Path, data: &[u8]) -> io::Result<PathBuf> {
+    let mut candidate = path.to_path_buf();
+    for index in 2_u64.. {
+        match OpenOptions::new()
+            .write(true)
+            .create_new(true)
+            .open(&candidate)
+        {
+            Ok(mut file) => {
+                file.write_all(data)?;
+                return Ok(candidate);
+            }
+            Err(err) if err.kind() == io::ErrorKind::AlreadyExists => {
+                candidate = numbered_output_path(path, index);
+            }
+            Err(err) => return Err(err),
+        }
+    }
+    unreachable!("an unused numeric output suffix must exist")
 }
 
 /// Whether an error should abort the whole batch rather than just fail one file.
@@ -311,10 +329,9 @@ pub(crate) fn format_bytes(bytes: u64) -> String {
 
 #[cfg(test)]
 mod tests {
-    use std::io::ErrorKind;
     use std::path::PathBuf;
 
-    use super::{batch_output_paths, format_bytes, write_new_file};
+    use super::{batch_output_paths, format_bytes, write_unique_file};
 
     #[test]
     fn format_bytes_scales_units() {
@@ -360,14 +377,16 @@ mod tests {
     }
 
     #[test]
-    fn batch_write_never_replaces_an_existing_file() {
+    fn batch_write_uses_a_suffix_instead_of_replacing_an_existing_file() {
         let dir = tempfile::tempdir().unwrap();
         let output = dir.path().join("contract_signed.pdf");
-        write_new_file(&output, b"first signature").unwrap();
+        let first = write_unique_file(&output, b"first signature").unwrap();
 
-        let err = write_new_file(&output, b"second signature").unwrap_err();
+        let second = write_unique_file(&output, b"second signature").unwrap();
 
-        assert_eq!(err.kind(), ErrorKind::AlreadyExists);
-        assert_eq!(std::fs::read(output).unwrap(), b"first signature");
+        assert_eq!(first, output);
+        assert_eq!(second, dir.path().join("contract_signed_2.pdf"));
+        assert_eq!(std::fs::read(first).unwrap(), b"first signature");
+        assert_eq!(std::fs::read(second).unwrap(), b"second signature");
     }
 }
