@@ -6,7 +6,7 @@
 //! collects their results as [`crate::worker::WorkerMsg`]s and folds them back
 //! into the UI state on the main thread.
 
-use std::collections::HashSet;
+use std::collections::{HashMap, HashSet};
 use std::fs::OpenOptions;
 use std::io::{self, Write};
 use std::path::{Path, PathBuf};
@@ -187,13 +187,14 @@ fn batch_output_paths(
     detached: bool,
 ) -> Vec<Option<PathBuf>> {
     let mut reserved = HashSet::with_capacity(files.len());
+    let mut next_suffixes = HashMap::new();
     files
         .iter()
         .map(|path| {
             let output = views::sign::default_output(path, detached)
                 .file_name()
                 .map(|name| output_dir.join(name))?;
-            let output = unique_output_path(&output, &reserved);
+            let output = unique_output_path(&output, &reserved, &mut next_suffixes);
             reserved.insert(output.clone());
             Some(output)
         })
@@ -203,18 +204,24 @@ fn batch_output_paths(
 /// Pick the requested path when available, otherwise add `_2`, `_3`, ...
 /// before its final extension until both the filesystem and this batch agree
 /// that the name is unused.
-fn unique_output_path(output: &Path, reserved: &HashSet<PathBuf>) -> PathBuf {
-    if !output.exists() && !reserved.contains(output) {
+fn unique_output_path(
+    output: &Path,
+    reserved: &HashSet<PathBuf>,
+    next_suffixes: &mut HashMap<PathBuf, u64>,
+) -> PathBuf {
+    if !reserved.contains(output) && !output.exists() {
         return output.to_path_buf();
     }
 
-    for index in 2_u64.. {
+    let next_suffix = next_suffixes.entry(output.to_path_buf()).or_insert(2);
+    loop {
+        let index = *next_suffix;
+        *next_suffix += 1;
         let candidate = numbered_output_path(output, index);
-        if !candidate.exists() && !reserved.contains(&candidate) {
+        if !reserved.contains(&candidate) && !candidate.exists() {
             return candidate;
         }
     }
-    unreachable!("an unused numeric output suffix must exist")
 }
 
 fn numbered_output_path(path: &Path, index: u64) -> PathBuf {
@@ -347,6 +354,7 @@ mod tests {
         let files = vec![
             PathBuf::from("first").join("contract.pdf"),
             PathBuf::from("second").join("contract.pdf"),
+            PathBuf::from("third").join("contract.pdf"),
         ];
 
         assert_eq!(
@@ -354,6 +362,7 @@ mod tests {
             vec![
                 Some(dir.path().join("contract_signed.pdf")),
                 Some(dir.path().join("contract_signed_2.pdf")),
+                Some(dir.path().join("contract_signed_3.pdf")),
             ]
         );
     }
