@@ -37,3 +37,4 @@ workspace = true
 
 [dev-dependencies]
 ab_glyph = "0.2.32"
+tempfile.workspace = true

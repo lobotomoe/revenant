@@ -6,6 +6,9 @@
 //! collects their results as [`crate::worker::WorkerMsg`]s and folds them back
 //! into the UI state on the main thread.
 
+use std::collections::HashSet;
+use std::fs::OpenOptions;
+use std::io::{self, Write};
 use std::path::{Path, PathBuf};
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::Arc;
@@ -109,9 +112,10 @@ pub(crate) fn batch_sign(
     };
     let total = files.len();
     let server = ServerChoice::default();
+    let outputs = batch_output_paths(files, ctx.output_dir, ctx.detached);
     let mut succeeded = 0;
     let mut failed = 0;
-    for (index, path) in files.iter().enumerate() {
+    for (index, (path, output)) in files.iter().zip(outputs).enumerate() {
         if cancel.load(Ordering::Relaxed) {
             break;
         }
@@ -127,16 +131,10 @@ pub(crate) fn batch_sign(
             failed += 1;
             continue;
         };
-        // Write the signed file into the chosen folder, keeping the derived
-        // name (`foo_signed.pdf`). A path with no file name can't be signed.
-        let Some(output_name) = views::sign::default_output(path, ctx.detached)
-            .file_name()
-            .map(|name| ctx.output_dir.join(name))
-        else {
+        let Some(output) = output else {
             failed += 1;
             continue;
         };
-        let output = output_name;
         let result = if ctx.detached {
             api::sign_detached(
                 ctx.store,
@@ -166,7 +164,7 @@ pub(crate) fn batch_sign(
                 });
                 return;
             }
-            Ok(bytes) if std::fs::write(&output, &bytes).is_ok() => succeeded += 1,
+            Ok(bytes) if write_new_file(&output, &bytes).is_ok() => succeeded += 1,
             // A non-fatal signing error or a failed write: count it and continue.
             _ => failed += 1,
         }
@@ -176,6 +174,64 @@ pub(crate) fn batch_sign(
         failed,
         aborted: None,
     });
+}
+
+/// Reserve a distinct, currently-unused destination for every batch input.
+///
+/// File names are derived before any signing request is made. Collisions within
+/// the batch, and files already present in the selected directory, receive a
+/// numeric suffix rather than being overwritten.
+fn batch_output_paths(
+    files: &[PathBuf],
+    output_dir: &Path,
+    detached: bool,
+) -> Vec<Option<PathBuf>> {
+    let mut reserved = HashSet::with_capacity(files.len());
+    files
+        .iter()
+        .map(|path| {
+            let output = views::sign::default_output(path, detached)
+                .file_name()
+                .map(|name| output_dir.join(name))?;
+            let output = unique_output_path(&output, &reserved);
+            reserved.insert(output.clone());
+            Some(output)
+        })
+        .collect()
+}
+
+/// Pick the requested path when available, otherwise add `_2`, `_3`, ...
+/// before its final extension until both the filesystem and this batch agree
+/// that the name is unused.
+fn unique_output_path(output: &Path, reserved: &HashSet<PathBuf>) -> PathBuf {
+    if !output.exists() && !reserved.contains(output) {
+        return output.to_path_buf();
+    }
+
+    for index in 2_u64.. {
+        let candidate = numbered_output_path(output, index);
+        if !candidate.exists() && !reserved.contains(&candidate) {
+            return candidate;
+        }
+    }
+    unreachable!("an unused numeric output suffix must exist")
+}
+
+fn numbered_output_path(path: &Path, index: u64) -> PathBuf {
+    let mut name = path.file_stem().unwrap_or_default().to_os_string();
+    name.push(format!("_{index}"));
+    if let Some(extension) = path.extension() {
+        name.push(".");
+        name.push(extension);
+    }
+    path.with_file_name(name)
+}
+
+/// Persist a batch output without replacing a file that appeared after the
+/// destinations were planned.
+fn write_new_file(path: &Path, data: &[u8]) -> io::Result<()> {
+    let mut file = OpenOptions::new().write(true).create_new(true).open(path)?;
+    file.write_all(data)
 }
 
 /// Whether an error should abort the whole batch rather than just fail one file.
@@ -255,7 +311,10 @@ pub(crate) fn format_bytes(bytes: u64) -> String {
 
 #[cfg(test)]
 mod tests {
-    use super::format_bytes;
+    use std::io::ErrorKind;
+    use std::path::PathBuf;
+
+    use super::{batch_output_paths, format_bytes, write_new_file};
 
     #[test]
     fn format_bytes_scales_units() {
@@ -263,5 +322,52 @@ mod tests {
         assert_eq!(format_bytes(1024), "1.0 KB");
         assert_eq!(format_bytes(1536), "1.5 KB");
         assert_eq!(format_bytes(1024 * 1024), "1.0 MB");
+    }
+
+    #[test]
+    fn batch_outputs_disambiguate_same_named_inputs() {
+        let dir = tempfile::tempdir().unwrap();
+        let files = vec![
+            PathBuf::from("first").join("contract.pdf"),
+            PathBuf::from("second").join("contract.pdf"),
+        ];
+
+        assert_eq!(
+            batch_output_paths(&files, dir.path(), false),
+            vec![
+                Some(dir.path().join("contract_signed.pdf")),
+                Some(dir.path().join("contract_signed_2.pdf")),
+            ]
+        );
+    }
+
+    #[test]
+    fn batch_outputs_skip_existing_and_reserved_detached_names() {
+        let dir = tempfile::tempdir().unwrap();
+        std::fs::write(dir.path().join("contract.pdf.p7s"), b"existing").unwrap();
+        let files = vec![
+            PathBuf::from("first").join("contract.pdf"),
+            PathBuf::from("second").join("contract.pdf"),
+        ];
+
+        assert_eq!(
+            batch_output_paths(&files, dir.path(), true),
+            vec![
+                Some(dir.path().join("contract.pdf_2.p7s")),
+                Some(dir.path().join("contract.pdf_3.p7s")),
+            ]
+        );
+    }
+
+    #[test]
+    fn batch_write_never_replaces_an_existing_file() {
+        let dir = tempfile::tempdir().unwrap();
+        let output = dir.path().join("contract_signed.pdf");
+        write_new_file(&output, b"first signature").unwrap();
+
+        let err = write_new_file(&output, b"second signature").unwrap_err();
+
+        assert_eq!(err.kind(), ErrorKind::AlreadyExists);
+        assert_eq!(std::fs::read(output).unwrap(), b"first signature");
     }
 }
