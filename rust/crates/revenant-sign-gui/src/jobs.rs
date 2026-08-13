@@ -176,6 +176,12 @@ pub(crate) fn batch_sign(
     });
 }
 
+struct BatchOutputPath {
+    base: PathBuf,
+    planned: PathBuf,
+    next_suffix: u64,
+}
+
 /// Reserve a distinct, currently-unused destination for every batch input.
 ///
 /// File names are derived before any signing request is made. Collisions within
@@ -185,18 +191,22 @@ fn batch_output_paths(
     files: &[PathBuf],
     output_dir: &Path,
     detached: bool,
-) -> Vec<Option<PathBuf>> {
+) -> Vec<Option<BatchOutputPath>> {
     let mut reserved = HashSet::with_capacity(files.len());
     let mut next_suffixes = HashMap::new();
     files
         .iter()
         .map(|path| {
-            let output = views::sign::default_output(path, detached)
+            let base = views::sign::default_output(path, detached)
                 .file_name()
                 .map(|name| output_dir.join(name))?;
-            let output = unique_output_path(&output, &reserved, &mut next_suffixes);
-            reserved.insert(output.clone());
-            Some(output)
+            let (planned, next_suffix) = unique_output_path(&base, &reserved, &mut next_suffixes);
+            reserved.insert(planned.clone());
+            Some(BatchOutputPath {
+                base,
+                planned,
+                next_suffix,
+            })
         })
         .collect()
 }
@@ -208,9 +218,9 @@ fn unique_output_path(
     output: &Path,
     reserved: &HashSet<PathBuf>,
     next_suffixes: &mut HashMap<PathBuf, u64>,
-) -> PathBuf {
+) -> (PathBuf, u64) {
     if !reserved.contains(output) && !output.exists() {
-        return output.to_path_buf();
+        return (output.to_path_buf(), 2);
     }
 
     let next_suffix = next_suffixes.entry(output.to_path_buf()).or_insert(2);
@@ -219,7 +229,7 @@ fn unique_output_path(
         *next_suffix += 1;
         let candidate = numbered_output_path(output, index);
         if !reserved.contains(&candidate) && !candidate.exists() {
-            return candidate;
+            return (candidate, *next_suffix);
         }
     }
 }
@@ -237,10 +247,12 @@ fn numbered_output_path(path: &Path, index: u64) -> PathBuf {
 /// Persist a batch output without replacing an existing filesystem entry.
 ///
 /// The filesystem is the final authority on whether two names collide: this
-/// also covers case-insensitive aliases and files created after planning.
-fn write_unique_file(path: &Path, data: &[u8]) -> io::Result<PathBuf> {
-    let mut candidate = path.to_path_buf();
-    for index in 2_u64.. {
+/// also covers case-insensitive aliases and files created after planning. A
+/// retry continues the original base name's numeric suffix sequence.
+fn write_unique_file(output: &BatchOutputPath, data: &[u8]) -> io::Result<PathBuf> {
+    let mut candidate = output.planned.clone();
+    let mut next_suffix = output.next_suffix;
+    loop {
         match OpenOptions::new()
             .write(true)
             .create_new(true)
@@ -251,12 +263,12 @@ fn write_unique_file(path: &Path, data: &[u8]) -> io::Result<PathBuf> {
                 return Ok(candidate);
             }
             Err(err) if err.kind() == io::ErrorKind::AlreadyExists => {
-                candidate = numbered_output_path(path, index);
+                candidate = numbered_output_path(&output.base, next_suffix);
+                next_suffix += 1;
             }
             Err(err) => return Err(err),
         }
     }
-    unreachable!("an unused numeric output suffix must exist")
 }
 
 /// Whether an error should abort the whole batch rather than just fail one file.
@@ -338,7 +350,14 @@ pub(crate) fn format_bytes(bytes: u64) -> String {
 mod tests {
     use std::path::PathBuf;
 
-    use super::{batch_output_paths, format_bytes, write_unique_file};
+    use super::{batch_output_paths, format_bytes, write_unique_file, BatchOutputPath};
+
+    fn planned_paths(outputs: Vec<Option<BatchOutputPath>>) -> Vec<Option<PathBuf>> {
+        outputs
+            .into_iter()
+            .map(|output| output.map(|output| output.planned))
+            .collect()
+    }
 
     #[test]
     fn format_bytes_scales_units() {
@@ -358,7 +377,7 @@ mod tests {
         ];
 
         assert_eq!(
-            batch_output_paths(&files, dir.path(), false),
+            planned_paths(batch_output_paths(&files, dir.path(), false)),
             vec![
                 Some(dir.path().join("contract_signed.pdf")),
                 Some(dir.path().join("contract_signed_2.pdf")),
@@ -377,7 +396,7 @@ mod tests {
         ];
 
         assert_eq!(
-            batch_output_paths(&files, dir.path(), true),
+            planned_paths(batch_output_paths(&files, dir.path(), true)),
             vec![
                 Some(dir.path().join("contract.pdf_2.p7s")),
                 Some(dir.path().join("contract.pdf_3.p7s")),
@@ -389,13 +408,42 @@ mod tests {
     fn batch_write_uses_a_suffix_instead_of_replacing_an_existing_file() {
         let dir = tempfile::tempdir().unwrap();
         let output = dir.path().join("contract_signed.pdf");
-        let first = write_unique_file(&output, b"first signature").unwrap();
+        let planned = BatchOutputPath {
+            base: output.clone(),
+            planned: output.clone(),
+            next_suffix: 2,
+        };
+        let first = write_unique_file(&planned, b"first signature").unwrap();
 
-        let second = write_unique_file(&output, b"second signature").unwrap();
+        let second = write_unique_file(&planned, b"second signature").unwrap();
 
         assert_eq!(first, output);
         assert_eq!(second, dir.path().join("contract_signed_2.pdf"));
         assert_eq!(std::fs::read(first).unwrap(), b"first signature");
         assert_eq!(std::fs::read(second).unwrap(), b"second signature");
+    }
+
+    #[test]
+    fn batch_write_continues_the_planned_suffix_series_after_a_race() {
+        let dir = tempfile::tempdir().unwrap();
+        let base = dir.path().join("contract_signed.pdf");
+        std::fs::write(&base, b"existing signature").unwrap();
+        let files = vec![PathBuf::from("contract.pdf")];
+        let planned = batch_output_paths(&files, dir.path(), false)
+            .pop()
+            .flatten()
+            .unwrap();
+        assert_eq!(planned.planned, dir.path().join("contract_signed_2.pdf"));
+
+        std::fs::write(&planned.planned, b"racing signature").unwrap();
+        let written = write_unique_file(&planned, b"new signature").unwrap();
+
+        assert_eq!(written, dir.path().join("contract_signed_3.pdf"));
+        assert_eq!(std::fs::read(&base).unwrap(), b"existing signature");
+        assert_eq!(
+            std::fs::read(&planned.planned).unwrap(),
+            b"racing signature"
+        );
+        assert_eq!(std::fs::read(written).unwrap(), b"new signature");
     }
 }
