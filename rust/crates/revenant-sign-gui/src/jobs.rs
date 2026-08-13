@@ -78,6 +78,9 @@ pub(crate) fn sign(
     }
 }
 
+#[cfg(test)]
+pub(crate) type BatchSignOverride<'a> = dyn Fn(&[u8]) -> revenant_sign_core::Result<Vec<u8>> + 'a;
+
 /// The signing configuration shared across a batch's files.
 pub(crate) struct BatchContext<'a> {
     pub(crate) store: &'a ConfigStore,
@@ -89,6 +92,37 @@ pub(crate) struct BatchContext<'a> {
     pub(crate) output_dir: &'a Path,
     /// Localized message for the "no saved credentials" case.
     pub(crate) no_credentials_message: &'a str,
+    #[cfg(test)]
+    pub(crate) sign_override: Option<&'a BatchSignOverride<'a>>,
+}
+
+impl BatchContext<'_> {
+    fn sign_pdf(
+        &self,
+        pdf: &[u8],
+        username: &str,
+        password: &str,
+        server: &ServerChoice<'_>,
+    ) -> revenant_sign_core::Result<Vec<u8>> {
+        #[cfg(test)]
+        if let Some(sign) = self.sign_override {
+            return sign(pdf);
+        }
+
+        if self.detached {
+            api::sign_detached(self.store, self.transport, pdf, username, password, server)
+        } else {
+            api::sign(
+                self.store,
+                self.transport,
+                pdf,
+                username,
+                password,
+                server,
+                self.options.clone(),
+            )
+        }
+    }
 }
 
 /// Sign every file in `files` sequentially, emitting progress before each and a
@@ -135,26 +169,7 @@ pub(crate) fn batch_sign(
             failed += 1;
             continue;
         };
-        let result = if ctx.detached {
-            api::sign_detached(
-                ctx.store,
-                ctx.transport,
-                &pdf,
-                &username,
-                password.expose(),
-                &server,
-            )
-        } else {
-            api::sign(
-                ctx.store,
-                ctx.transport,
-                &pdf,
-                &username,
-                password.expose(),
-                &server,
-                ctx.options.clone(),
-            )
-        };
+        let result = ctx.sign_pdf(&pdf, &username, password.expose(), &server);
         match result {
             Err(err) if is_fatal_batch_error(&err) => {
                 emit(WorkerMsg::BatchDone {
@@ -348,9 +363,20 @@ pub(crate) fn format_bytes(bytes: u64) -> String {
 
 #[cfg(test)]
 mod tests {
+    use std::cell::RefCell;
     use std::path::PathBuf;
+    use std::sync::atomic::AtomicBool;
+    use std::sync::Arc;
 
-    use super::{batch_output_paths, format_bytes, write_unique_file, BatchOutputPath};
+    use revenant_sign_core::config::ConfigStore;
+    use revenant_sign_core::net::Transport;
+    use revenant_sign_core::signing::EmbeddedSignatureOptions;
+
+    use super::{
+        batch_output_paths, batch_sign, format_bytes, write_unique_file, BatchContext,
+        BatchOutputPath,
+    };
+    use crate::worker::WorkerMsg;
 
     fn planned_paths(outputs: Vec<Option<BatchOutputPath>>) -> Vec<Option<PathBuf>> {
         outputs
@@ -445,5 +471,67 @@ mod tests {
             b"racing signature"
         );
         assert_eq!(std::fs::read(written).unwrap(), b"new signature");
+    }
+
+    #[test]
+    fn batch_sign_counts_each_distinct_output_as_successful() {
+        let inputs = tempfile::tempdir().unwrap();
+        let output = tempfile::tempdir().unwrap();
+        let first_dir = inputs.path().join("first");
+        let second_dir = inputs.path().join("second");
+        std::fs::create_dir_all(&first_dir).unwrap();
+        std::fs::create_dir_all(&second_dir).unwrap();
+        let first = first_dir.join("contract.pdf");
+        let second = second_dir.join("contract.pdf");
+        std::fs::write(&first, b"first pdf").unwrap();
+        std::fs::write(&second, b"second pdf").unwrap();
+
+        let store = ConfigStore::new();
+        store.set_session_credentials("test-user", "test-password");
+        let transport = Arc::new(Transport::new());
+        let options = EmbeddedSignatureOptions::default();
+        let sign = |pdf: &[u8]| {
+            let mut signed = b"signed:".to_vec();
+            signed.extend_from_slice(pdf);
+            Ok(signed)
+        };
+        let ctx = BatchContext {
+            store: &store,
+            transport: &transport,
+            detached: false,
+            options: &options,
+            output_dir: output.path(),
+            no_credentials_message: "missing credentials",
+            sign_override: Some(&sign),
+        };
+        let messages = RefCell::new(Vec::new());
+
+        batch_sign(
+            &|message| messages.borrow_mut().push(message),
+            &ctx,
+            &[first, second],
+            &AtomicBool::new(false),
+        );
+
+        let messages = messages.into_inner();
+        let Some(WorkerMsg::BatchDone {
+            succeeded,
+            failed,
+            aborted,
+        }) = messages.last()
+        else {
+            panic!("batch must emit a final tally");
+        };
+        assert_eq!((*succeeded, *failed), (2, 0));
+        assert!(aborted.is_none());
+        assert_eq!(
+            std::fs::read(output.path().join("contract_signed.pdf")).unwrap(),
+            b"signed:first pdf"
+        );
+        assert_eq!(
+            std::fs::read(output.path().join("contract_signed_2.pdf")).unwrap(),
+            b"signed:second pdf"
+        );
+        assert_eq!(std::fs::read_dir(output.path()).unwrap().count(), 2);
     }
 }
