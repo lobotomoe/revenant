@@ -443,6 +443,8 @@ impl RevenantApp {
                 options: &options,
                 output_dir: &output_dir,
                 no_credentials_message: &no_creds,
+                #[cfg(test)]
+                sign_override: None,
             };
             jobs::batch_sign(emit, &ctx, &files, &cancel);
         });
