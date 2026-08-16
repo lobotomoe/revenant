@@ -40,6 +40,7 @@ import {
   getPageDimensions,
   insertCms,
   inspectCmsBlob,
+  MAX_CMS_HEX_CHARS,
   MIN_CMS_SIZE,
   parsePageSpec,
   patchByterange,
@@ -585,6 +586,16 @@ describe("ASN1 constants", () => {
 });
 
 describe("extractDerFromPaddedHex", () => {
+  it("refuses an oversized indefinite-length blob", () => {
+    // A definite length is checked against what it claims, but an indefinite one
+    // claims nothing: its extent is only known after walking to the end marker,
+    // by which point the bytes are decoded. So the input itself must be bounded.
+    // "30 80" opens the BER indefinite form; the padding never reaches an EOC.
+    const oversized = `3080${"AB".repeat(MAX_CMS_HEX_CHARS)}`;
+
+    expect(() => extractDerFromPaddedHex(oversized)).toThrow(/exceeds maximum/);
+  });
+
   it("extracts short-form length DER", () => {
     // Tag=30, Len=02, Data=00AB -> total 4 bytes
     const hex = `300200AB${"00".repeat(50)}`;

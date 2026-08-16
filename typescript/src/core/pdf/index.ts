@@ -4,6 +4,7 @@
 export {
   ASN1_SEQUENCE_TAG,
   extractDerFromPaddedHex,
+  MAX_CMS_HEX_CHARS,
   MIN_CMS_SIZE,
 } from "./asn1.js";
 export {

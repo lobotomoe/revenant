@@ -4,7 +4,7 @@
  */
 
 import { PDFError } from "../../errors.js";
-import { extractDerFromPaddedHex } from "./asn1.js";
+import { extractDerFromPaddedHex, MAX_CMS_HEX_CHARS } from "./asn1.js";
 
 /** Regex pattern to find ByteRange arrays in PDF. */
 export const BYTERANGE_PATTERN = /\/ByteRange\s*\[\s*(\d+)\s+(\d+)\s+(\d+)\s+(\d+)\s*\]/g;
@@ -119,6 +119,17 @@ export function extractCmsFromByterange(
   if (pdfBytes[hexEnd] !== 0x3e) {
     throw new PDFError(
       `Expected '>' at offset ${hexEnd}, got 0x${(pdfBytes[hexEnd] ?? 0).toString(16)}`,
+    );
+  }
+
+  // Bound the gap before decoding it, not after: the /Contents span is whatever
+  // the document says it is, and turning it into a string is itself the
+  // allocation worth refusing.
+  const gapLength = hexEnd - hexStart;
+  if (gapLength > MAX_CMS_HEX_CHARS) {
+    throw new PDFError(
+      `Signature /Contents is ${gapLength / 2} bytes, exceeds maximum ` +
+        `(${MAX_CMS_HEX_CHARS / 2} bytes)`,
     );
   }
 

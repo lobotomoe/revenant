@@ -8,9 +8,12 @@ export const ASN1_SEQUENCE_TAG = 0x30;
 
 /**
  * Maximum hex chars for a single CMS blob (16 MB DER = 32M hex chars).
- * Protects against malformed length fields claiming absurd sizes.
+ *
+ * Bounds both a length field claiming an absurd size and an encoding that
+ * declares no size at all. Exported so the PDF extractor refuses an oversized
+ * `/Contents` gap against the same ceiling, before it decodes one.
  */
-const MAX_CMS_HEX_CHARS = 32 * 1024 * 1024;
+export const MAX_CMS_HEX_CHARS = 32 * 1024 * 1024;
 
 /** Minimum plausible CMS blob size in bytes (header + basic content). */
 export const MIN_CMS_SIZE = 100;
@@ -31,6 +34,17 @@ const EOC_BYTE_0 = 0x00;
 export function extractDerFromPaddedHex(hexStr: string): Uint8Array {
   if (hexStr.length < 4) {
     throw new Error("Hex string too short for ASN.1 TLV header");
+  }
+
+  // The cap has to bite before the encoding is examined. A definite length is
+  // checked against what it claims further down, but an indefinite one claims
+  // nothing: its size is discovered by walking to the end marker, and by then
+  // the bytes are already decoded. The input this is given comes straight out of
+  // a document, so its length is the only bound available in advance.
+  if (hexStr.length > MAX_CMS_HEX_CHARS) {
+    throw new Error(
+      `ASN.1 input is ${hexStr.length / 2} bytes, exceeds maximum (${MAX_CMS_HEX_CHARS / 2} bytes)`,
+    );
   }
 
   const tag = parseInt(hexStr.slice(0, 2), 16);
