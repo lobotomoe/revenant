@@ -70,6 +70,35 @@
   </branding>
 
   <releases>
+    <release version="3.0.2" date="2026-08-16">
+      <description>
+        <p>
+          Security release. Three fixes in signature verification plus a
+          batch-signing fix; upgrading is recommended.
+        </p>
+        <ul>
+          <li>
+            The order certificates appear in a signature no longer decides which
+            one is trusted or shown as the signer. A signature made by an
+            untrusted certificate could be reported as valid and trusted by
+            listing a trusted one ahead of it.
+          </li>
+          <li>
+            Long-term validation status is no longer claimed on the strength of
+            data that sits outside the signature, where anyone can add it.
+          </li>
+          <li>
+            An oversized signature is refused before it is decoded, so a crafted
+            document can no longer exhaust memory during verification.
+          </li>
+          <li>
+            Batch signing reserves every output name before signing and never
+            replaces an existing file, so a queued document can no longer be
+            overwritten by an earlier one's result.
+          </li>
+        </ul>
+      </description>
+    </release>
     <release version="3.0.1" date="2026-08-16">
       <description>
         <p>

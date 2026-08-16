@@ -7,6 +7,52 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [3.0.2] - 2026-08-16
+
+Security release. Three reported vulnerabilities in signature verification,
+plus a batch-signing fix in the desktop app. Upgrading is recommended.
+
+### Fixed
+
+- **Certificate order in a CMS no longer confers trust.** Chain validation began
+  from the first embedded certificate and signer identity was read from the same
+  one, while the signature itself was verified against the certificate named by
+  `SignerInfo.sid`. A CMS certificate set is a `SET OF`, so those need not be the
+  same certificate: signing detached content with an untrusted self-signed
+  certificate and listing a trusted root ahead of it made Revenant verify the
+  attacker's signature, walk the chain from the root, report `VALID and trusted`,
+  and display the root as the signer. All three now resolve the signer through
+  the `SignerInfo`, and only when exactly one embedded certificate matches --
+  an ambiguous set has not named a signer. Rust's `build_chain` takes the leaf as
+  a parameter instead of reading pool index 0. Reported by peyuaa.
+- **LTV status is no longer raised by data anyone can append.** The status came
+  from the presence of a revocation-related OID and counted the signer's
+  *unsigned* attributes alongside the signed ones. Unsigned attributes are not
+  covered by the signature, so an Adobe `RevocationInfoArchival` attribute
+  holding the string `bogus-not-ocsp-or-crl` could be stapled onto a finished
+  document and reported as LTV enabled with `has_ocsp` set. The `SignedData.crls`
+  field is outside the signature for the same reason. Both are still reported,
+  now marked as present and not counted, and attribute values are decoded rather
+  than taken on the OID's word. This reports what a signature carries, not that
+  the revocation data was validated -- that check does not exist yet, and the
+  documentation says so. Python and TypeScript gain
+  `has_unauthenticated_material`; Rust reports the same distinction as a
+  `RevocationMaterial` enum. Rust was affected too, though the report named only
+  the Python and npm packages. Reported by peyuaa.
+- **A BER indefinite-length CMS is bounded before it is decoded.** The 16 MiB
+  ceiling was checked against the length a definite-length header claims. An
+  indefinite-length blob claims nothing, so it was decoded whole and its extent
+  discovered only on reaching the end marker -- a crafted PDF allocated its
+  entire `/Contents` gap regardless of the limit. Both the extractor and the PDF
+  path now refuse an oversized gap up front, against the same exported ceiling.
+  Reported by peyuaa.
+- **Batch signing no longer overwrites files it did not create.** Every
+  destination is reserved before the first signing request and written with
+  exclusive creation, so a queued input can no longer be replaced by an earlier
+  file's output, and same-named inputs from different folders no longer collide.
+  Outputs that could not take their derived name are now reported, labelled by
+  full input path. Contributed by peyuaa.
+
 ## [3.0.1] - 2026-08-16
 
 Security release. Fixes one vulnerability introduced in 3.0.0; upgrading is
@@ -508,7 +554,8 @@ entry point -- but their verification behaviour changes, as described below.
 - Pyright strict mode type checking with 0 errors
 - 96%+ test coverage (600+ tests)
 
-[Unreleased]: https://github.com/lobotomoe/revenant/compare/v3.0.1...HEAD
+[Unreleased]: https://github.com/lobotomoe/revenant/compare/v3.0.2...HEAD
+[3.0.2]: https://github.com/lobotomoe/revenant/compare/v3.0.1...v3.0.2
 [3.0.1]: https://github.com/lobotomoe/revenant/compare/v3.0.0...v3.0.1
 [3.0.0]: https://github.com/lobotomoe/revenant/compare/v2.1.2...v3.0.0
 [2.1.2]: https://github.com/lobotomoe/revenant/compare/v2.1.1...v2.1.2
