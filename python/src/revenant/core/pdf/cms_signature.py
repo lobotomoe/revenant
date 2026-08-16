@@ -110,8 +110,10 @@ class SignatureVerification:
     valid: bool | None
     reason: str | None = None
     signer_certificate_bound: bool = False
-    #: True when the CMS carries no signed attributes, so the signature was
-    #: verified over the content itself and no separate digest exists to compare.
+    #: True when the CMS carries no signed attributes and the signature was
+    #: verified over the caller-supplied content itself, so no separate digest
+    #: exists to compare and the signature verdict is the integrity check.
+    #: Never true for content the caller did not supply.
     covers_content: bool = False
 
     def describe(self) -> str:
@@ -308,10 +310,11 @@ def verify_signer_signature(
 
     Args:
         cms_der: DER-encoded CMS/PKCS#7 ``SignedData``.
-        content: The detached content the signature covers. Only consulted when
-            the CMS carries no signed attributes and embeds no content of its
-            own; RFC 5652 section 5.4 defines the signature input as the content
-            itself in that case, and signers do issue documents in that shape.
+        content: The detached content the signature covers. Consulted when the
+            CMS carries no signed attributes -- RFC 5652 section 5.4 defines the
+            signature input as the content itself in that case, and signers do
+            issue documents in that shape. A CMS that also embeds its own content
+            is rejected unless the two are byte-identical.
     """
     try:
         content_info = asn1_cms.ContentInfo.load(cms_der, strict=True)
@@ -349,11 +352,25 @@ def verify_signer_signature(
             if not signature_inputs:
                 return _unverifiable("cannot encode signed attributes")
         else:
-            encapsulated = signed_data["encap_content_info"]["content"].native
-            body = encapsulated if encapsulated is not None else content
+            # RFC 5652 section 5.4 makes the content itself the signature input,
+            # which leaves the question of whose content. A CMS may carry its own
+            # eContent, and a signature over those bytes says nothing about the
+            # caller's. Preferring the embedded copy silently re-attributes the
+            # verdict to data the signer never saw, so the caller's bytes win and
+            # an embedded copy is only ever a duplicate of them.
+            embedded = signed_data["encap_content_info"]["content"].native
+            if content is not None and embedded is not None and embedded != content:
+                return _unverifiable("embedded CMS content differs from the data being verified")
+            body = content if content is not None else embedded
             if body is None:
                 return _unverifiable("no signed attributes and no content to verify")
             signature_inputs = [body]
+
+        # Without signed attributes there is no messageDigest for the caller to
+        # re-check, so this flag is the whole integrity argument downstream. It
+        # may only be raised when the bytes fed to the signature were the ones
+        # the caller asked about.
+        covers_caller_content = not signed_attrs_present and content is not None
 
         signer_cert = find_signer_certificate(signed_data, signer_info)
         if signer_cert is None:
@@ -388,7 +405,7 @@ def verify_signer_signature(
             except InvalidSignature:
                 continue
         else:
-            return SignatureVerification(valid=False, covers_content=not signed_attrs_present)
+            return SignatureVerification(valid=False, covers_content=covers_caller_content)
 
         # An ESS binding lives in the signed attributes, so without them there is
         # nothing to bind the certificate beyond the signature itself.
@@ -411,5 +428,5 @@ def verify_signer_signature(
     return SignatureVerification(
         valid=True,
         signer_certificate_bound=binding == "match",
-        covers_content=not signed_attrs_present,
+        covers_content=covers_caller_content,
     )

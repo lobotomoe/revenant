@@ -891,6 +891,30 @@ describe("verifyDetachedSignature", () => {
     expect(tampered.valid).toBe(false);
   });
 
+  it("does not let attached content vouch for unrelated data", async () => {
+    // The fixture is a genuine signature over its own embedded eContent. Offered
+    // alongside a different document it must not lend that verdict: with no
+    // signed attributes there is no messageDigest to re-check, so the signature
+    // result is the entire integrity argument the caller receives.
+    const cms = pkiFixture("cms_no_attrs_attached.der");
+    const payload = new TextEncoder().encode("payload the signer actually signed");
+
+    const unrelated = await verifyDetachedSignature(
+      new TextEncoder().encode("an unrelated document"),
+      cms,
+    );
+    expect(unrelated.signatureValid).not.toBe(true);
+    expect(unrelated.hashOk).not.toBe(true);
+    expect(unrelated.valid).not.toBe(true);
+
+    // Pins the rejection to the mismatch rather than a fixture that could never
+    // verify at all.
+    const own = await verifyDetachedSignature(payload, cms);
+    expect(own.signatureValid).toBe(true);
+    expect(own.hashOk).toBe(true);
+    expect(own.valid).toBe(true);
+  });
+
   it("verifies a signer whose subject DN is nonconforming", async () => {
     // Real EKENG/CoSign certificates encode emailAddress as a PrintableString
     // holding '@', which strict X.509 parsers reject outright. Deriving the

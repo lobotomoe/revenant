@@ -7,6 +7,30 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [3.0.1] - 2026-08-16
+
+Security release. Fixes one vulnerability introduced in 3.0.0; upgrading is
+recommended for everyone running that version.
+
+### Fixed
+
+- **A CMS signature without signed attributes no longer vouches for content it
+  never covered.** RFC 5652 section 5.4 puts the signature over the content
+  itself when `signedAttrs` is absent, and 3.0.0 added support for that shape.
+  It resolved the content in the wrong order: an `encapContentInfo.eContent`
+  embedded in the blob was preferred over the bytes the caller asked about, so a
+  genuine attached signature over attacker-chosen bytes verified successfully
+  and the result was then reported as covering an unrelated PDF `ByteRange` or
+  detached payload. Because no signed attributes means no `messageDigest` to
+  re-check, that signature verdict was the entire integrity argument:
+  verification returned `valid`, `hash_ok` and `signature_valid` all true for a
+  document the signer never saw. The caller's bytes are now authoritative, and a
+  CMS that also embeds its own content is rejected as unverifiable unless the
+  two are byte-identical. Verifying an attached CMS on its own terms, by passing
+  no detached content, still works. Signatures that carry signed attributes were
+  never affected -- their `messageDigest` was always compared against the
+  caller's bytes.
+
 ## [3.0.0] - 2026-08-12
 
 Security release. Every change below is a fix for a reported vulnerability;
@@ -484,7 +508,8 @@ entry point -- but their verification behaviour changes, as described below.
 - Pyright strict mode type checking with 0 errors
 - 96%+ test coverage (600+ tests)
 
-[Unreleased]: https://github.com/lobotomoe/revenant/compare/v3.0.0...HEAD
+[Unreleased]: https://github.com/lobotomoe/revenant/compare/v3.0.1...HEAD
+[3.0.1]: https://github.com/lobotomoe/revenant/compare/v3.0.0...v3.0.1
 [3.0.0]: https://github.com/lobotomoe/revenant/compare/v2.1.2...v3.0.0
 [2.1.2]: https://github.com/lobotomoe/revenant/compare/v2.1.1...v2.1.2
 [2.1.1]: https://github.com/lobotomoe/revenant/compare/v2.1.0...v2.1.1

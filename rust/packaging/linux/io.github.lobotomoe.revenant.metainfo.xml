@@ -70,6 +70,23 @@
   </branding>
 
   <releases>
+    <release version="3.0.1" date="2026-08-16">
+      <description>
+        <p>
+          Security release. Fixes one signature-verification flaw introduced in
+          3.0.0; upgrading is recommended for everyone running that version.
+        </p>
+        <ul>
+          <li>
+            A CMS signature that carries no signed attributes no longer vouches
+            for a document it never covered. Content embedded in the signature
+            blob was preferred over the file being checked, so a genuine
+            signature over other bytes could be reported as valid for an
+            unrelated document.
+          </li>
+        </ul>
+      </description>
+    </release>
     <release version="3.0.0" date="2026-08-12">
       <description>
         <p>
