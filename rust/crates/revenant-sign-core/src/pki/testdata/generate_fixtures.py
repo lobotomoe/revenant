@@ -390,6 +390,31 @@ def build_ski_selector_confusion_cms() -> bytes:
     return content_info.dump(force=True)
 
 
+def build_trusted_cert_listed_first_cms() -> bytes:
+    """Build a CMS signed by an untrusted key that lists a trusted root first.
+
+    The signature is made by a self-signed certificate no trust store knows, but
+    the committed ``root.der`` anchor is placed ahead of it in ``certificates``.
+    A verifier that reads the set positionally builds its chain from the anchor,
+    reports the signature as trusted, and shows the anchor's identity as the
+    signer. ``certificates`` is a SET OF, so position carries no such meaning.
+    """
+    attacker, attacker_key = make_root_ca("Untrusted Attacker Signer")
+    trusted_root = ax509.Certificate.load((OUT_DIR / "root.der").read_bytes())
+
+    content_info = acms.ContentInfo.load(build_cms(attacker, attacker_key))
+    content_info["content"]["certificates"] = acms.CertificateSet(
+        [
+            acms.CertificateChoices(name="certificate", value=trusted_root),
+            acms.CertificateChoices(
+                name="certificate",
+                value=ax509.Certificate.load(to_der(attacker)),
+            ),
+        ]
+    )
+    return content_info.dump(force=True)
+
+
 def build_nonconforming_dn_cms() -> bytes:
     """Build a valid CMS whose signer certificate has a nonconforming subject DN.
 
@@ -688,6 +713,7 @@ def write_identity_hardening_fixtures() -> None:
         build_attached_no_signed_attrs_cms(signer, signer_key),
     )
     write("cms_ski_selector_confusion.der", build_ski_selector_confusion_cms())
+    write("cms_trusted_cert_listed_first.der", build_trusted_cert_listed_first_cms())
     write(
         "cms_unbound_identity_substituted.der",
         substitute_embedded_certificate(unbound_cms, forged_identity),

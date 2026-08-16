@@ -18,35 +18,46 @@ use super::super::tsl::TrustStore;
 /// Hard cap on chain length, guarding against a cycle in issuer references.
 const MAX_CHAIN_DEPTH: usize = 20;
 
-/// Build a chain from the signer (pool index 0) upward via SKI/AKI matching.
-/// Returns the ordered chain from leaf to the highest issuer present in `pool`.
-pub(super) fn build_chain(pool: &[Certificate]) -> Vec<Certificate> {
-    let mut chain_idx = vec![0usize];
-    let mut current = 0usize;
+/// Build a chain from `leaf` upward via SKI/AKI matching. Returns the ordered
+/// chain from leaf to the highest issuer present in `pool`.
+///
+/// The leaf is a parameter rather than a position in `pool` on purpose: a CMS
+/// certificate set is unordered, so any rule of the form "the signer is the
+/// first one" is a bug waiting for a blob that lists them the other way round.
+pub(super) fn build_chain(leaf: &Certificate, pool: &[Certificate]) -> Vec<Certificate> {
+    let mut chain = vec![leaf.clone()];
+    let mut current = leaf.clone();
 
     for _ in 0..MAX_CHAIN_DEPTH {
-        if cert::is_self_signed(&pool[current]) {
+        if cert::is_self_signed(&current) {
             break;
         }
-        let Some(aki) = cert::authority_key_id(&pool[current]) else {
+        let Some(aki) = cert::authority_key_id(&current) else {
             break;
         };
-        let Some(issuer) = pool_index_by_ski(pool, &aki, current) else {
+        let Some(issuer) = issuer_by_ski(pool, &aki, &current) else {
             break;
         };
-        chain_idx.push(issuer);
+        chain.push(issuer.clone());
         current = issuer;
     }
 
-    chain_idx.into_iter().map(|i| pool[i].clone()).collect()
+    chain
 }
 
-/// Index of a certificate in the pool whose SKI equals `key_id`, other than
-/// `exclude`.
-fn pool_index_by_ski(pool: &[Certificate], key_id: &[u8], exclude: usize) -> Option<usize> {
-    pool.iter().enumerate().position(|(i, candidate)| {
-        i != exclude && cert::subject_key_identifier(candidate).as_deref() == Some(key_id)
-    })
+/// A certificate in the pool whose SKI equals `key_id` and which is not `current`
+/// itself, so a certificate cannot be presented as its own issuer.
+fn issuer_by_ski(
+    pool: &[Certificate],
+    key_id: &[u8],
+    current: &Certificate,
+) -> Option<Certificate> {
+    pool.iter()
+        .find(|candidate| {
+            cert::subject_key_identifier(candidate).as_deref() == Some(key_id)
+                && *candidate != current
+        })
+        .cloned()
 }
 
 /// Find which trust anchor the chain terminates at: first by SKI equality with
@@ -190,17 +201,17 @@ mod tests {
     #[test]
     fn builds_full_chain_from_pool() {
         let pool = [cert(LEAF_DER), cert(INTER_DER), cert(ROOT_DER)];
-        assert_eq!(build_chain(&pool).len(), 3);
+        assert_eq!(build_chain(&cert(LEAF_DER), &pool).len(), 3);
     }
 
     #[test]
     fn self_signed_only_is_depth_one() {
-        assert_eq!(build_chain(&[cert(ROOT_DER)]).len(), 1);
+        assert_eq!(build_chain(&cert(ROOT_DER), &[cert(ROOT_DER)]).len(), 1);
     }
 
     #[test]
     fn no_aki_stops_at_depth_one() {
-        assert_eq!(build_chain(&[cert(NO_AKI_DER)]).len(), 1);
+        assert_eq!(build_chain(&cert(NO_AKI_DER), &[cert(NO_AKI_DER)]).len(), 1);
     }
 
     #[test]
@@ -209,7 +220,7 @@ mod tests {
         // intermediate is absent from the pool. `build_chain` takes no fetcher,
         // so the URL cannot be dialed: the chain stops at the leaf.
         let pool = [cert(LEAF_AIA_DER), cert(ROOT_DER)];
-        assert_eq!(build_chain(&pool).len(), 1);
+        assert_eq!(build_chain(&cert(LEAF_AIA_DER), &pool).len(), 1);
     }
 
     #[test]

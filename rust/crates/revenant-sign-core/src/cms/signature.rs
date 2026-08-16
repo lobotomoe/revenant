@@ -370,22 +370,46 @@ fn embedded_certificates(signed_data: &SignedData) -> Vec<Certificate> {
 }
 
 /// Locate the signer's certificate among the embedded certs by its identifier.
+///
+/// Exactly one match, or nothing. `certificates` is a SET OF, so a blob naming
+/// its signer ambiguously has not named it at all, and picking either match
+/// would be a guess about whose signature this is.
 fn find_signer_cert<'a>(
     certs: &'a [Certificate],
     signer_id: &SignerIdentifier,
 ) -> Option<&'a Certificate> {
+    let mut matches = certs
+        .iter()
+        .filter(|cert| matches_signer_id(cert, signer_id));
+    let only = matches.next()?;
+    matches.next().is_none().then_some(only)
+}
+
+fn matches_signer_id(cert: &Certificate, signer_id: &SignerIdentifier) -> bool {
     match signer_id {
-        SignerIdentifier::IssuerAndSerialNumber(ias) => certs.iter().find(|cert| {
+        SignerIdentifier::IssuerAndSerialNumber(ias) => {
             cert.tbs_certificate.issuer == ias.issuer
                 && cert.tbs_certificate.serial_number == ias.serial_number
-        }),
+        }
         SignerIdentifier::SubjectKeyIdentifier(skid) => {
-            let want = skid.0.as_bytes();
-            certs
-                .iter()
-                .find(|cert| cert_ski(cert).as_deref() == Some(want))
+            cert_ski(cert).as_deref() == Some(skid.0.as_bytes())
         }
     }
+}
+
+/// The certificate the first `SignerInfo` names, if the blob names exactly one.
+///
+/// Certificate order in a CMS carries no meaning, so everything that speaks
+/// about *the signer* -- chain trust and the identity shown to the user, not
+/// just the signature check -- has to resolve it through the `SignerInfo`.
+/// Reading the set positionally lets a blob be signed by one certificate and
+/// vouched for by another.
+#[must_use]
+pub fn signer_certificate(cms_der: &[u8]) -> Option<Certificate> {
+    let signed_data = signed_data_from_der(cms_der).ok()?;
+    let signer_info = signed_data.signer_infos.0.iter().next()?;
+    let certs = embedded_certificates(&signed_data);
+    find_signer_cert(&certs, &signer_info.sid).cloned()
 }
 
 /// The Subject Key Identifier extension value of a certificate, if present.

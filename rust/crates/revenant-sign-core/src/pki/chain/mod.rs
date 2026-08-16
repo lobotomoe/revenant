@@ -99,13 +99,18 @@ fn validate_chain_inner(
     let Ok(cms_certs) = cert::all_certs_from_cms(cms_der) else {
         return ChainResult::indeterminate("Chain: failed to parse CMS certificates");
     };
-    let Some(leaf) = cms_certs.first() else {
-        return ChainResult::indeterminate("Chain: no certificates in CMS");
+    // The signer comes from the SignerInfo, never from certificate order: trust
+    // has to be decided about the certificate that actually made the signature,
+    // or a blob can be signed by one certificate and vouched for by another.
+    let Some(leaf) = crate::cms::signer_certificate(cms_der) else {
+        return ChainResult::indeterminate(
+            "Chain: CMS does not name exactly one signer certificate",
+        );
     };
 
-    let mut details = vec![format!("Chain: signer cert: {}", cert::subject_dn(leaf))];
+    let mut details = vec![format!("Chain: signer cert: {}", cert::subject_dn(&leaf))];
 
-    // Pool = CMS certs + trust-anchor certs; the leaf stays at index 0.
+    // Pool = CMS certs + trust-anchor certs. Order carries no meaning here.
     let mut pool = cms_certs;
     pool.extend(
         trust_store
@@ -114,7 +119,7 @@ fn validate_chain_inner(
             .filter_map(|anchor| cert::parse_der(&anchor.cert_der).ok()),
     );
 
-    let chain = build_chain(&pool);
+    let chain = build_chain(&leaf, &pool);
     let chain_depth = chain.len();
     if chain_depth > 1 {
         let subjects: Vec<String> = chain.iter().map(cert::subject_dn).collect();
@@ -181,6 +186,8 @@ mod tests {
     const CMS_LEAF_ROOT2: &[u8] = include_bytes!("../testdata/cms_leaf_root2.der");
     const CMS_CHAIN3: &[u8] = include_bytes!("../testdata/cms_chain3.der");
     const CMS_LEAF_AIA: &[u8] = include_bytes!("../testdata/cms_leaf_aia.der");
+    const CMS_TRUSTED_FIRST: &[u8] =
+        include_bytes!("../testdata/cms_trusted_cert_listed_first.der");
     const ROOT_DER: &[u8] = include_bytes!("../testdata/root.der");
 
     fn trust_store_with(anchor_der: &[u8], subject_name: &str, service_name: &str) -> TrustStore {
@@ -213,6 +220,32 @@ mod tests {
         assert_eq!(result.trust, TrustStatus::Trusted);
         assert_eq!(result.trust_anchor.as_deref(), Some("TestRootCA"));
         assert!(result.chain_depth >= 2);
+    }
+
+    #[test]
+    fn a_trusted_certificate_listed_first_does_not_lend_its_trust() {
+        // The blob is signed by a self-signed certificate the store has never
+        // heard of, and simply lists the trusted anchor ahead of it. Deciding
+        // trust by position would verify the attacker's signature and then vouch
+        // for it with a certificate that had nothing to do with it.
+        let store = trust_store_with(ROOT_DER, "CN=Test Root CA", "TestRootCA");
+
+        let result = validate_chain(CMS_TRUSTED_FIRST, &store);
+
+        assert_ne!(
+            result.trust,
+            TrustStatus::Trusted,
+            "certificate order must not confer trust"
+        );
+        assert_eq!(result.trust_anchor, None);
+        assert!(
+            result
+                .details
+                .iter()
+                .any(|detail| detail.contains("Untrusted Attacker Signer")),
+            "the signer named by the SignerInfo is the one to report, got {:?}",
+            result.details
+        );
     }
 
     #[test]

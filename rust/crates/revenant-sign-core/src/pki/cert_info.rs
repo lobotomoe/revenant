@@ -1,8 +1,8 @@
 //! Signer-identity extraction from certificates and CMS/PKCS#7 signatures.
 //!
 //! Recovers signer identity -- name (CN), email, organization, full subject DN,
-//! and validity dates -- from a raw X.509 certificate, the first certificate in
-//! a CMS signature, or every signature embedded in a signed PDF. It also drives
+//! and validity dates -- from a raw X.509 certificate, the certificate a CMS
+//! names as its signer, or every signature embedded in a signed PDF. It also drives
 //! a live signing transport to discover identity from the server, and summarizes
 //! the full certificate set of a CMS blob for the `info` command.
 
@@ -42,21 +42,26 @@ impl CertInfo {
         Ok(cert_info_of(&cert))
     }
 
-    /// Build signer info from the first certificate in a CMS/PKCS#7 blob.
+    /// Build signer info from the certificate a CMS/PKCS#7 blob names as signer.
+    ///
+    /// The certificate is resolved through `SignerInfo.sid`, not by position:
+    /// `certificates` is a SET OF, so reading it positionally would let a blob
+    /// display an identity that did not make the signature.
     ///
     /// Uses lenient ASN.1 parsing, so it handles certificates whose DN fields are
     /// BMPString-encoded (as EKENG's CA emits).
     ///
     /// # Errors
     ///
-    /// Returns [`RevenantError::Certificate`] if the CMS cannot be parsed or
-    /// carries no certificate.
+    /// Returns [`RevenantError::Certificate`] if the CMS cannot be parsed or does
+    /// not name exactly one embedded signer certificate.
     pub fn from_cms(cms_der: &[u8]) -> Result<Self> {
-        let certs = cert::all_certs_from_cms(cms_der)?;
-        let first = certs.first().ok_or_else(|| {
-            RevenantError::Certificate("No certificate subject found in CMS blob.".to_owned())
+        let signer = crate::cms::signer_certificate(cms_der).ok_or_else(|| {
+            RevenantError::Certificate(
+                "CMS blob does not name exactly one signer certificate.".to_owned(),
+            )
         })?;
-        Ok(cert_info_of(first))
+        Ok(cert_info_of(&signer))
     }
 
     /// Extract signer identity from every distinct signature in a signed PDF.
@@ -245,6 +250,19 @@ mod tests {
     fn from_cms_reads_signer() {
         let info = CertInfo::from_cms(CMS_LEAF_DIRECT).unwrap();
         assert_eq!(info.name.as_deref(), Some("Test Signer Direct"));
+    }
+
+    #[test]
+    fn from_cms_reports_the_signer_not_whoever_is_listed_first() {
+        // The blob lists a trusted root ahead of the certificate that actually
+        // signed it. Displaying the first one would put a reputable name on an
+        // untrusted signature.
+        const CMS_TRUSTED_FIRST: &[u8] =
+            include_bytes!("testdata/cms_trusted_cert_listed_first.der");
+
+        let info = CertInfo::from_cms(CMS_TRUSTED_FIRST).unwrap();
+
+        assert_eq!(info.name.as_deref(), Some("Untrusted Attacker Signer"));
     }
 
     #[test]
