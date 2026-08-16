@@ -589,6 +589,59 @@ def build_no_signed_attrs_cms(
     ).dump()
 
 
+ATTACHED_PAYLOAD = b"payload the signer actually signed"
+
+
+def build_attached_no_signed_attrs_cms(
+    signer: x509.Certificate,
+    signer_key: rsa.RSAPrivateKey,
+) -> bytes:
+    """Build an attached CMS with no signed attributes, carrying its own content.
+
+    The signature covers ``ATTACHED_PAYLOAD``, which travels inside the blob as
+    ``encapContentInfo.eContent``. Nothing here is malformed -- this is the shape
+    RFC 5652 section 5.4 describes for an attached signature. It is a fixture
+    because a verifier that prefers the embedded copy over the caller's own bytes
+    will report this signature as proof of a document it never covered.
+    """
+    signer_info = acms.SignerInfo(
+        {
+            "version": "v1",
+            "sid": acms.SignerIdentifier(
+                name="issuer_and_serial_number",
+                value=acms.IssuerAndSerialNumber(
+                    {
+                        "issuer": ax509.Certificate.load(to_der(signer))["tbs_certificate"][
+                            "issuer"
+                        ],
+                        "serial_number": signer.serial_number,
+                    }
+                ),
+            ),
+            "digest_algorithm": aalgos.DigestAlgorithm({"algorithm": "sha256"}),
+            "signature_algorithm": aalgos.SignedDigestAlgorithm({"algorithm": "rsassa_pkcs1v15"}),
+            "signature": signer_key.sign(ATTACHED_PAYLOAD, padding.PKCS1v15(), hashes.SHA256()),
+        }
+    )
+    return acms.ContentInfo(
+        {
+            "content_type": "signed_data",
+            "content": acms.SignedData(
+                {
+                    "version": "v1",
+                    "digest_algorithms": [aalgos.DigestAlgorithm({"algorithm": "sha256"})],
+                    "encap_content_info": {
+                        "content_type": "data",
+                        "content": ATTACHED_PAYLOAD,
+                    },
+                    "certificates": [ax509.Certificate.load(to_der(signer))],
+                    "signer_infos": [signer_info],
+                }
+            ),
+        }
+    ).dump()
+
+
 def write_test_signer_material() -> None:
     """Write a signer certificate together with its private key.
 
@@ -630,6 +683,10 @@ def write_identity_hardening_fixtures() -> None:
         build_der_signed_unsorted_transmitted_cms(signer, signer_key),
     )
     write("cms_no_signed_attrs.der", build_no_signed_attrs_cms(signer, signer_key))
+    write(
+        "cms_no_attrs_attached.der",
+        build_attached_no_signed_attrs_cms(signer, signer_key),
+    )
     write("cms_ski_selector_confusion.der", build_ski_selector_confusion_cms())
     write(
         "cms_unbound_identity_substituted.der",

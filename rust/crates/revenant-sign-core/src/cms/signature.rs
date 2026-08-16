@@ -101,9 +101,10 @@ pub fn has_signed_attributes(cms_der: &[u8]) -> Option<bool> {
 
 /// Verify the first `SignerInfo`'s signature in a CMS/PKCS#7 blob.
 ///
-/// `content` is the detached content the signature covers. It is consulted only
-/// when the CMS carries no signed attributes and embeds no content of its own;
-/// signers do issue documents in exactly that shape.
+/// `content` is the detached content the signature covers. It is consulted when
+/// the CMS carries no signed attributes; signers do issue documents in exactly
+/// that shape. A CMS that also embeds its own content is rejected unless the two
+/// are byte-identical, so a `Valid` verdict always speaks about `content`.
 #[must_use]
 pub fn verify_signer_signature(cms_der: &[u8], content: Option<&[u8]>) -> SignatureStatus {
     match signed_data_from_der(cms_der) {
@@ -140,12 +141,24 @@ fn verify_from_signed_data(signed_data: &SignedData, content: Option<&[u8]>) -> 
         };
         encoded
     } else {
+        // Which content, though. A CMS may carry its own `eContent`, and a
+        // signature over those bytes says nothing about the caller's. Preferring
+        // the embedded copy silently re-attributes the verdict to data the signer
+        // never saw, so the caller's bytes win and an embedded copy is only ever
+        // allowed to be a duplicate of them.
         let embedded = signed_data
             .encap_content_info
             .econtent
             .as_ref()
             .map(der::asn1::Any::value);
-        let Some(body) = embedded.or(content) else {
+        let contradicts_caller =
+            matches!((content, embedded), (Some(caller), Some(own)) if caller != own);
+        if contradicts_caller {
+            return SignatureStatus::Unverifiable(
+                "embedded CMS content differs from the data being verified",
+            );
+        }
+        let Some(body) = content.or(embedded) else {
             return SignatureStatus::Unverifiable("no signed attributes and no content to verify");
         };
         body.to_vec()
@@ -464,6 +477,36 @@ mod tests {
         // A blob that does not parse must not be reported as "no attributes":
         // that wording belongs to a CMS that actually said so.
         assert_eq!(has_signed_attributes(&[0x30, 0x03, 0xAB, 0xAB, 0xAB]), None);
+    }
+
+    #[test]
+    fn attached_content_never_stands_in_for_the_callers_bytes() {
+        // The blob is a perfectly good attached signature over its own eContent.
+        // The attack is to present it as proof of something else: verifying it
+        // against unrelated bytes must not inherit the embedded content's verdict,
+        // because the caller reads Valid as a statement about what it passed in.
+        const CMS_ATTACHED: &[u8] = include_bytes!("../pki/testdata/cms_no_attrs_attached.der");
+        const PAYLOAD: &[u8] = b"payload the signer actually signed";
+
+        assert!(
+            matches!(
+                verify_signer_signature(CMS_ATTACHED, Some(b"an unrelated document")),
+                SignatureStatus::Unverifiable(_)
+            ),
+            "embedded content must not vouch for bytes the caller supplied"
+        );
+        // The fixture is genuinely signed, so the rejection above is about the
+        // mismatch rather than a blob that could never verify in the first place.
+        assert_eq!(
+            verify_signer_signature(CMS_ATTACHED, Some(PAYLOAD)),
+            SignatureStatus::Valid
+        );
+        assert_eq!(
+            verify_signer_signature(CMS_ATTACHED, None),
+            SignatureStatus::Valid,
+            "verifying the attached CMS on its own terms still works"
+        );
+        assert_eq!(has_signed_attributes(CMS_ATTACHED), Some(false));
     }
 
     #[test]

@@ -38,8 +38,10 @@ export interface SignatureVerification {
   /** Whether a matching signed ESS attribute binds the exact signer certificate. */
   signerCertificateBound: boolean;
   /**
-   * True when the CMS carries no signed attributes, so the signature was
-   * verified over the content itself and no separate digest exists to compare.
+   * True when the CMS carries no signed attributes and the signature was
+   * verified over the caller-supplied content itself, so no separate digest
+   * exists to compare and the signature verdict is the integrity check. Never
+   * true for content the caller did not supply.
    */
   coversContent: boolean;
   /** Stable diagnostic line for VerificationResult.details. */
@@ -317,11 +319,27 @@ export async function verifySignerSignature(
         ? [signedAttrs.encodedValue]
         : [signedAttrs.encodedValue, toArrayBuffer(canonical)];
     } else {
+      // RFC 5652 section 5.4 makes the content itself the signature input, which
+      // leaves the question of whose content. A CMS may carry its own eContent,
+      // and a signature over those bytes says nothing about the caller's.
+      // Preferring the embedded copy silently re-attributes the verdict to data
+      // the signer never saw, so the caller's bytes win and an embedded copy is
+      // only ever a duplicate of them.
       const eContent = signedData.encapContentInfo.eContent;
-      const body = eContent ? new Uint8Array(eContent.valueBlock.valueHexView) : content;
+      const embedded = eContent ? new Uint8Array(eContent.valueBlock.valueHexView) : undefined;
+      if (content && embedded && !bytesEqual(embedded, content)) {
+        return unverifiable("embedded CMS content differs from the data being verified");
+      }
+      const body = content ?? embedded;
       if (!body) return unverifiable("no signed attributes and no content to verify");
       signatureInputs = [toArrayBuffer(body)];
     }
+
+    // Without signed attributes there is no messageDigest for the caller to
+    // re-check, so this flag is the whole integrity argument downstream. It may
+    // only be raised when the bytes fed to the signature were the ones the
+    // caller asked about.
+    const coversCallerContent = !signedAttrs && content !== null;
 
     // SignedData.verify() performs its own signer-certificate lookup. For an
     // SKI SignerIdentifier, PKIjs 3.4.0 hashes SubjectPublicKey instead of
@@ -344,7 +362,7 @@ export async function verifySignerSignature(
       return {
         valid: false,
         signerCertificateBound: false,
-        coversContent: !signedAttrs,
+        coversContent: coversCallerContent,
         detail: "Signature INVALID -- does not verify against the signer certificate",
       };
     }
@@ -364,7 +382,7 @@ export async function verifySignerSignature(
     return {
       valid: true,
       signerCertificateBound: binding === "match",
-      coversContent: !signedAttrs,
+      coversContent: coversCallerContent,
       detail: "Signature OK -- signer signature verifies",
     };
   } catch (error) {

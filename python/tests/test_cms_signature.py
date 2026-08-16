@@ -516,6 +516,33 @@ def test_rejects_tampered_content_without_signed_attributes():
     assert result["valid"] is False
 
 
+def test_attached_content_does_not_vouch_for_unrelated_data():
+    """An attached CMS must not certify bytes it never covered.
+
+    The fixture is a genuine signature over its own embedded eContent. Presenting
+    it alongside a different document must not borrow that verdict: without
+    signed attributes there is no messageDigest to re-check, so a "valid"
+    signature is the entire integrity argument the caller gets.
+    """
+    cms_der = _fixture("cms_no_attrs_attached.der")
+    result = verify_detached_signature(b"an unrelated document", cms_der)
+
+    assert result["signature_valid"] is not True
+    assert result["hash_ok"] is not True
+    assert result["valid"] is not True
+
+
+def test_attached_content_still_verifies_on_its_own_terms():
+    # Pins the rejection above to the mismatch rather than a fixture that could
+    # never verify at all.
+    payload = b"payload the signer actually signed"
+    result = verify_detached_signature(payload, _fixture("cms_no_attrs_attached.der"))
+
+    assert result["signature_valid"] is True
+    assert result["hash_ok"] is True
+    assert result["valid"] is True
+
+
 def _signed_pdf() -> bytes:
     pdf = pikepdf.Pdf.new()
     pdf.add_blank_page()
@@ -524,6 +551,28 @@ def _signed_pdf() -> bytes:
     prepared, hex_start, hex_len = prepare_pdf_with_sig_field(stream.getvalue(), visible=False)
     signed_data = prepared[:hex_start] + prepared[hex_start + hex_len + 1 :]
     return insert_cms(prepared, hex_start, hex_len, _real_cms(signed_data))
+
+
+def test_embedded_signature_does_not_inherit_attached_content_verdict():
+    """The same mismatch must be caught through the PDF path, not just detached.
+
+    A document carrying an attached CMS in its /Contents slot signs its own
+    embedded bytes, never the ByteRange around it. Reading that as a verdict on
+    the document is how a signed-looking PDF gets assembled out of someone
+    else's signature.
+    """
+    pdf = pikepdf.Pdf.new()
+    pdf.add_blank_page()
+    stream = io.BytesIO()
+    pdf.save(stream)
+    prepared, hex_start, hex_len = prepare_pdf_with_sig_field(stream.getvalue(), visible=False)
+    document = insert_cms(prepared, hex_start, hex_len, _fixture("cms_no_attrs_attached.der"))
+
+    result = verify_embedded_signature(document)
+
+    assert result["signature_valid"] is not True
+    assert result["hash_ok"] is not True
+    assert result["valid"] is not True
 
 
 def test_reports_whole_file_coverage_for_a_single_signature():
