@@ -33,20 +33,119 @@ _OID_REVOCATION_VALUES = "1.2.840.113549.1.9.16.2.24"
 class LtvStatus:
     """Result of LTV status check on a CMS signature."""
 
+    #: True only when well-formed revocation material travels inside the signer's
+    #: *signed* attributes, so the signer committed to it. Material anyone can
+    #: append after the fact never raises this, whatever it claims to be.
     ltv_enabled: bool
     has_crl: bool
     has_ocsp: bool
     has_revocation_archival: bool
+    #: Revocation material that is present but outside the signature: unsigned
+    #: attributes and the ``crls`` field, neither of which the signer signed.
+    #: Reported so it is visible, never counted as evidence.
+    has_unauthenticated_material: bool
     details: list[str]
 
 
-def check_ltv_status(cms_der: bytes) -> LtvStatus:
-    """Check if a CMS signature contains LTV (Long Term Validation) data.
+#: A universal, constructed SEQUENCE -- the outer shape of an Adobe
+#: RevocationInfoArchival value (and of the CAdES revocation attributes).
+_ASN1_UNIVERSAL_CLASS = 0
+_ASN1_SEQUENCE_TAG = 16
+_ASN1_CONSTRUCTED = 1
 
-    Inspects the CMS SignedData structure for:
-    1. Embedded CRLs in the ``crls`` field
-    2. OCSP responses (via Adobe RevocationInfoArchival or CAdES attributes)
-    3. Revocation references in signed/unsigned attributes
+
+_ASN1_CONTEXT_CLASS = 2
+#: RevocationInfoArchival ::= SEQUENCE { crl [0], ocsp [1], otherRevInfo [2] }
+_ARCHIVAL_CRL_TAG = 0
+_ARCHIVAL_OCSP_TAG = 1
+
+
+def _revocation_container_members(attr: object) -> tuple[bool, bool] | None:
+    """Read an attribute value as revocation material: ``(has_crl, has_ocsp)``.
+
+    ``None`` when the value is not that kind of structure at all. The OID proves
+    nothing on its own: an attribute is a container, and whoever writes one
+    chooses what goes inside. This says which members are present, not whether
+    the revocation data inside them is genuine -- that check does not exist yet.
+    """
+    from asn1crypto import core
+
+    values = attr["values"]  # pyright: ignore[reportIndexIssue]
+    if not values:
+        return None
+    try:
+        value = core.load(values[0].dump(), strict=True)
+    except (ValueError, TypeError, IndexError):
+        return None
+    if not (
+        value.class_ == _ASN1_UNIVERSAL_CLASS
+        and value.tag == _ASN1_SEQUENCE_TAG
+        and value.method == _ASN1_CONSTRUCTED
+    ):
+        return None
+
+    present = _context_tags(value.contents)
+    return _ARCHIVAL_CRL_TAG in present, _ARCHIVAL_OCSP_TAG in present
+
+
+#: DER identifier octet: bits 8-7 are the class, bit 6 the constructed flag, and
+#: bits 5-1 the tag number (X.690 8.1.2). 0x1F in the tag bits means the number
+#: continues into further octets, which this structure never uses.
+_DER_CLASS_MASK = 0xC0
+_DER_CONTEXT_CLASS = 0x80
+_DER_TAG_MASK = 0x1F
+_DER_LONG_FORM_TAG = 0x1F
+_DER_LONG_FORM_LENGTH = 0x80
+_DER_LENGTH_COUNT_MASK = 0x7F
+#: Enough for any sane member; a longer length field means the value is not one.
+_DER_MAX_LENGTH_OCTETS = 4
+
+
+def _context_tags(contents: bytes) -> set[int]:
+    """Tag numbers of the immediate context-class children of a DER structure.
+
+    A deliberately small reader: asn1crypto will not decode a bare context-tagged
+    element without a full spec, and specifying RevocationInfoArchival properly
+    trips over its own handling of consecutive optional explicit fields -- an
+    archival carrying only OCSP, the ordinary Adobe shape, fails to parse. Only
+    the member framing is read here; nothing inside a member is interpreted.
+    """
+    tags: set[int] = set()
+    offset = 0
+    while offset < len(contents):
+        identifier = contents[offset]
+        tag_number = identifier & _DER_TAG_MASK
+        offset += 1
+        if tag_number == _DER_LONG_FORM_TAG or offset >= len(contents):
+            break
+        length_octet = contents[offset]
+        offset += 1
+        if length_octet & _DER_LONG_FORM_LENGTH:
+            count = length_octet & _DER_LENGTH_COUNT_MASK
+            if count == 0 or count > _DER_MAX_LENGTH_OCTETS or offset + count > len(contents):
+                break
+            length = int.from_bytes(contents[offset : offset + count], "big")
+            offset += count
+        else:
+            length = length_octet
+        if identifier & _DER_CLASS_MASK == _DER_CONTEXT_CLASS:
+            tags.add(tag_number)
+        offset += length
+    return tags
+
+
+def check_ltv_status(cms_der: bytes) -> LtvStatus:
+    """Check whether a CMS signature carries long-term-validation evidence.
+
+    Only material the signer actually signed can count as evidence. The CMS
+    ``crls`` field and the signer's *unsigned* attributes are outside the
+    signature: a third party can add either to a finished document without
+    invalidating it, so they are reported as present and explicitly not counted.
+
+    Note that this reports the *presence* of well-formed material, not its
+    validity: the responses and CRLs are not yet checked against the signer's
+    chain, so a true ``ltv_enabled`` means "the signer embedded revocation
+    evidence", not "the evidence was verified".
 
     Args:
         cms_der: DER-encoded CMS/PKCS#7 signature blob.
@@ -58,6 +157,8 @@ def check_ltv_status(cms_der: bytes) -> LtvStatus:
     has_crl = False
     has_ocsp = False
     has_revocation_archival = False
+    has_unauthenticated_material = False
+    authenticated_material = False
 
     try:
         from asn1crypto import cms as asn1_cms
@@ -72,15 +173,19 @@ def check_ltv_status(cms_der: bytes) -> LtvStatus:
             has_crl=False,
             has_ocsp=False,
             has_revocation_archival=False,
+            has_unauthenticated_material=False,
             details=details,
         )
 
-    # Check for embedded CRLs
+    # The crls field sits beside the signature rather than inside it: RFC 5652
+    # puts the signature over the signed attributes, never over this collection.
+    # Anyone can add or drop entries here without disturbing the signature.
     try:
         crls = signed_data["crls"]
         if crls is not None and len(crls) > 0:
             has_crl = True
-            details.append(f"Embedded CRLs: {len(crls)}")
+            has_unauthenticated_material = True
+            details.append(f"Embedded CRLs: {len(crls)} (outside the signature, not counted)")
     except (KeyError, TypeError, ValueError):
         pass
 
@@ -96,39 +201,55 @@ def check_ltv_status(cms_der: bytes) -> LtvStatus:
         if signer_infos:
             signer_info = signer_infos[0]
 
-            # Check signed attributes
+            # Signed attributes are the signature input, so what is found here is
+            # material the signer committed to.
             signed_attrs = signer_info["signed_attrs"]
             if signed_attrs is not None:
                 for attr in signed_attrs:
                     oid = attr["type"].dotted
-                    if oid in revocation_oids:
-                        details.append(f"Signed attribute: {revocation_oids[oid]}")
-                        if oid == _OID_REVOCATION_INFO_ARCHIVAL:
-                            has_revocation_archival = True
-                            has_ocsp = True
+                    if oid not in revocation_oids:
+                        continue
+                    members = _revocation_container_members(attr)
+                    if members is None:
+                        details.append(
+                            f"Signed attribute: {revocation_oids[oid]} (malformed, not counted)"
+                        )
+                        continue
+                    member_crl, member_ocsp = members
+                    details.append(f"Signed attribute: {revocation_oids[oid]}")
+                    authenticated_material = True
+                    has_crl = has_crl or member_crl
+                    has_ocsp = has_ocsp or member_ocsp
+                    if oid == _OID_REVOCATION_INFO_ARCHIVAL:
+                        has_revocation_archival = True
 
-            # Check unsigned attributes
+            # Unsigned attributes are not covered by the signature: a third party
+            # can staple one onto a finished document. Whatever they carry is
+            # reported and never counted.
             unsigned_attrs = signer_info["unsigned_attrs"]
             if unsigned_attrs is not None:
                 for attr in unsigned_attrs:
                     oid = attr["type"].dotted
-                    if oid in revocation_oids:
-                        details.append(f"Unsigned attribute: {revocation_oids[oid]}")
-                        if oid == _OID_REVOCATION_INFO_ARCHIVAL:
-                            has_revocation_archival = True
-                            has_ocsp = True
+                    if oid not in revocation_oids:
+                        continue
+                    has_unauthenticated_material = True
+                    details.append(
+                        f"Unsigned attribute: {revocation_oids[oid]} "
+                        "(outside the signature, not counted)"
+                    )
     except (KeyError, TypeError, ValueError, IndexError):
         _logger.debug("Cannot check signer attributes for LTV", exc_info=True)
 
-    ltv_enabled = has_crl or has_ocsp or has_revocation_archival
+    ltv_enabled = authenticated_material
 
     if not ltv_enabled:
-        details.append("No embedded revocation data (CRL/OCSP)")
+        details.append("No signed revocation data (CRL/OCSP)")
 
     return LtvStatus(
         ltv_enabled=ltv_enabled,
         has_crl=has_crl,
         has_ocsp=has_ocsp,
         has_revocation_archival=has_revocation_archival,
+        has_unauthenticated_material=has_unauthenticated_material,
         details=details,
     )

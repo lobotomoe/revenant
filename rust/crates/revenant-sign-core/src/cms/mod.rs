@@ -29,7 +29,7 @@ pub use extraction::{
     find_byteranges, ByteRange, ByteRangeCoverage, BYTERANGE_PATTERN,
 };
 pub use inspect::{extract_signer_info, inspect_cms_blob, CmsInspection};
-pub use ltv::{check_ltv_status, LtvStatus};
+pub use ltv::{check_ltv_status, LtvStatus, RevocationMaterial};
 pub use signature::{
     has_signed_attributes, signer_certificate, verify_signer_signature, SignatureStatus,
 };

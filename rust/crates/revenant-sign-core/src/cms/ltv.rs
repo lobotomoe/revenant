@@ -30,19 +30,51 @@ pub struct LtvStatus {
     /// itemized here -- an archival container is reported via
     /// `has_revocation_archival`, so this stays `false` for it.
     pub has_ocsp: bool,
-    /// The Adobe `RevocationInfoArchival` signed attribute is present (it holds
-    /// CRLs and/or OCSP responses; either way the signature is LTV-enabled).
+    /// The Adobe `RevocationInfoArchival` attribute is present, wherever it was
+    /// found. Presence alone is not evidence -- see `has_unauthenticated_material`.
     pub has_revocation_archival: bool,
+    /// Where the revocation material was found, which is what decides whether it
+    /// counts for anything.
+    pub material: RevocationMaterial,
     pub details: Vec<String>,
 }
 
+/// Where a signature's revocation material came from.
+///
+/// The distinction is the whole point: RFC 5652 puts the signature over the
+/// signed attributes, so the `crls` field and the unsigned attributes sit
+/// outside it and a third party can add either to a finished document without
+/// invalidating the signature.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum RevocationMaterial {
+    /// No revocation material at all.
+    None,
+    /// Present, but only where anyone could have put it.
+    Unauthenticated,
+    /// Present in the signer's signed attributes, so the signer committed to it.
+    Signed,
+}
+
 impl LtvStatus {
-    /// Whether any long-term-validation revocation data (CRL or OCSP) is
-    /// embedded. Derived from the individual flags rather than stored, so it
-    /// cannot drift out of sync with them.
+    /// Whether the signer embedded long-term-validation revocation data.
+    ///
+    /// Only material inside the signed attributes counts. The `crls` field and
+    /// the unsigned attributes sit outside the signature -- RFC 5652 signs the
+    /// signed attributes, not the surrounding structure -- so a third party can
+    /// add either to a finished document without invalidating it. Presence there
+    /// is reported through `has_unauthenticated_material` and never counted.
+    ///
+    /// True means the signer embedded revocation evidence, not that the evidence
+    /// was checked against the signer's chain; that validation does not exist yet.
     #[must_use]
     pub fn ltv_enabled(&self) -> bool {
-        self.has_crl || self.has_ocsp || self.has_revocation_archival
+        self.material == RevocationMaterial::Signed
+    }
+
+    /// Whether revocation material is present that nothing vouches for.
+    #[must_use]
+    pub fn has_unauthenticated_material(&self) -> bool {
+        self.material == RevocationMaterial::Unauthenticated
     }
 }
 
@@ -60,11 +92,18 @@ fn revocation_label(oid: &ObjectIdentifier) -> Option<&'static str> {
 /// Scan one attribute set for revocation OIDs, appending a `"{kind} attribute:
 /// {label}"` detail for each recognized one. Returns whether the Adobe
 /// `RevocationInfoArchival` attribute was present.
-fn scan_revocation_attrs(attrs: &Attributes, kind: &str, details: &mut Vec<String>) -> bool {
+/// `note` is appended to each reported line, so material found outside the
+/// signature says so where the operator reads it rather than only in a flag.
+fn scan_revocation_attrs(
+    attrs: &Attributes,
+    kind: &str,
+    note: &str,
+    details: &mut Vec<String>,
+) -> bool {
     let mut has_archival = false;
     for attr in attrs.iter() {
         if let Some(label) = revocation_label(&attr.oid) {
-            details.push(format!("{kind} attribute: {label}"));
+            details.push(format!("{kind} attribute: {label}{note}"));
             if attr.oid == OID_REVOCATION_INFO_ARCHIVAL {
                 has_archival = true;
             }
@@ -88,6 +127,7 @@ pub fn check_ltv_status(cms_der: &[u8]) -> LtvStatus {
             has_crl: false,
             has_ocsp: false,
             has_revocation_archival: false,
+            material: RevocationMaterial::None,
             details,
         };
     };
@@ -98,35 +138,54 @@ pub fn check_ltv_status(cms_der: &[u8]) -> LtvStatus {
     let has_ocsp = false;
     let mut has_revocation_archival = false;
 
+    let mut material = RevocationMaterial::None;
+
+    // The crls field sits beside the signature rather than inside it, so its
+    // contents prove nothing about what the signer intended.
     if let Some(crls) = signed_data.crls.as_ref() {
         let count = crls.0.len();
         if count > 0 {
             has_crl = true;
-            details.push(format!("Embedded CRLs: {count}"));
+            material = RevocationMaterial::Unauthenticated;
+            details.push(format!(
+                "Embedded CRLs: {count} (outside the signature, not counted)"
+            ));
         }
     }
 
     if let Some(signer_info) = signed_data.signer_infos.0.iter().next() {
-        let mut archival = false;
         if let Some(attrs) = signer_info.signed_attrs.as_ref() {
-            archival |= scan_revocation_attrs(attrs, "Signed", &mut details);
+            if scan_revocation_attrs(attrs, "Signed", "", &mut details) {
+                has_revocation_archival = true;
+                material = RevocationMaterial::Signed;
+            }
         }
+        // Unsigned attributes are not covered by the signature: a third party can
+        // staple one onto a finished document. Reported, never counted.
         if let Some(attrs) = signer_info.unsigned_attrs.as_ref() {
-            archival |= scan_revocation_attrs(attrs, "Unsigned", &mut details);
-        }
-        if archival {
-            has_revocation_archival = true;
+            if scan_revocation_attrs(
+                attrs,
+                "Unsigned",
+                " (outside the signature, not counted)",
+                &mut details,
+            ) {
+                has_revocation_archival = true;
+                if material == RevocationMaterial::None {
+                    material = RevocationMaterial::Unauthenticated;
+                }
+            }
         }
     }
 
-    if !(has_crl || has_ocsp || has_revocation_archival) {
-        details.push("No embedded revocation data (CRL/OCSP)".to_owned());
+    if material != RevocationMaterial::Signed {
+        details.push("No signed revocation data (CRL/OCSP)".to_owned());
     }
 
     LtvStatus {
         has_crl,
         has_ocsp,
         has_revocation_archival,
+        material,
         details,
     }
 }
@@ -138,6 +197,8 @@ mod tests {
     const CMS_PLAIN: &[u8] = include_bytes!("../pki/testdata/cms_leaf_direct.der");
     const CMS_WITH_CRL: &[u8] = include_bytes!("../pki/testdata/cms_with_crl.der");
     const CMS_WITH_ARCHIVAL: &[u8] = include_bytes!("../pki/testdata/cms_with_archival.der");
+    const CMS_UNSIGNED_ARCHIVAL: &[u8] =
+        include_bytes!("../pki/testdata/cms_with_unsigned_archival.der");
 
     #[test]
     fn plain_signature_is_not_ltv() {
@@ -148,18 +209,36 @@ mod tests {
         assert!(status
             .details
             .iter()
-            .any(|d| d.contains("No embedded revocation data")));
+            .any(|d| d.contains("No signed revocation data")));
     }
 
     #[test]
-    fn detects_embedded_crl() {
+    fn embedded_crls_are_reported_but_not_counted() {
+        // The crls field is not part of what the signer signed: RFC 5652 puts the
+        // signature over the signed attributes. Anyone can add entries here.
         let status = check_ltv_status(CMS_WITH_CRL);
         assert!(status.has_crl);
-        assert!(status.ltv_enabled());
+        assert!(!status.ltv_enabled(), "unsigned material must not count");
+        assert!(status.has_unauthenticated_material());
         assert!(status
             .details
             .iter()
-            .any(|d| d.starts_with("Embedded CRLs:")));
+            .any(|d| d.contains("outside the signature")));
+    }
+
+    #[test]
+    fn an_unsigned_archival_attribute_is_not_evidence() {
+        // The reported attack: unsigned attributes are outside the signature, so
+        // a third party can staple one onto a finished document and the signature
+        // still verifies. Nothing there speaks for the signer.
+        let status = check_ltv_status(CMS_UNSIGNED_ARCHIVAL);
+
+        assert!(!status.ltv_enabled(), "unsigned material must not count");
+        assert!(status.has_unauthenticated_material());
+        assert!(status
+            .details
+            .iter()
+            .any(|d| d.contains("outside the signature")));
     }
 
     #[test]

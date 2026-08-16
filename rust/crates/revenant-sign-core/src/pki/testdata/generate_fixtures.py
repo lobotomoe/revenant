@@ -773,6 +773,28 @@ def build_cms_with_archival(signer: x509.Certificate, signer_key: rsa.RSAPrivate
     return content_info.dump()
 
 
+def build_cms_with_unsigned_archival(
+    signer: x509.Certificate,
+    signer_key: rsa.RSAPrivateKey,
+) -> bytes:
+    """A CMS whose RevocationInfoArchival sits in the *unsigned* attributes.
+
+    Unsigned attributes are outside the signature, so this is what an attacker
+    staples onto a finished document: the signature still verifies and the blob
+    now claims to carry revocation evidence the signer never saw.
+    """
+    content_info = acms.ContentInfo.load(build_cms(signer, signer_key))
+    signer_info = content_info["content"]["signer_infos"][0]
+    archival = acms.CMSAttribute(
+        {
+            "type": OID_REVOCATION_INFO_ARCHIVAL,
+            "values": [core.Any(core.OctetString(b"\x01"))],
+        }
+    )
+    signer_info["unsigned_attrs"] = acms.CMSAttributes([archival])
+    return content_info.dump(force=True)
+
+
 def write(name: str, data: bytes) -> None:
     (OUT_DIR / name).write_bytes(data)
     print(f"wrote {name} ({len(data)} bytes)")
@@ -843,6 +865,10 @@ def main(*, ess_only: bool = False, identity_only: bool = False, aia_only: bool 
             build_cms_with_crl(leaf_direct, leaf_direct_key, root, root_key),
         )
         write("cms_with_archival.der", build_cms_with_archival(leaf_direct, leaf_direct_key))
+        write(
+            "cms_with_unsigned_archival.der",
+            build_cms_with_unsigned_archival(leaf_direct, leaf_direct_key),
+        )
         write_identity_hardening_fixtures()
         write_test_signer_material()
 

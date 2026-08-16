@@ -62,11 +62,15 @@ def test_ltv_no_revocation_data():
     assert result.ltv_enabled is False
     assert result.has_crl is False
     assert result.has_ocsp is False
-    assert any("No embedded revocation" in d for d in result.details)
+    assert any("No signed revocation" in d for d in result.details)
 
 
 def test_ltv_with_crls():
-    """CMS with embedded CRLs should detect has_crl=True."""
+    """Embedded CRLs are reported but never counted as evidence.
+
+    The ``crls`` field sits beside the signature, not inside it: RFC 5652 signs
+    the signed attributes, so anyone can add entries here afterwards.
+    """
     from ._cert_factory import build_cms_with_certs, make_leaf, make_root_ca
 
     root_cert, root_key = make_root_ca()
@@ -83,26 +87,67 @@ def test_ltv_with_crls():
         result = check_ltv_status(cms_der)
 
     assert result.has_crl is True
-    assert result.ltv_enabled is True
+    assert result.ltv_enabled is False
+    assert result.has_unauthenticated_material is True
+    assert any("outside the signature" in d for d in result.details)
 
 
-def test_ltv_signer_attrs_with_revocation_archival():
-    """Signed attribute with Adobe RevocationInfoArchival should set has_ocsp."""
+def _cms_with_archival(*, signed: bool, value_der: bytes) -> bytes:
+    """Real CMS carrying a RevocationInfoArchival attribute with a chosen value."""
+    from asn1crypto import cms as asn1_cms
+    from asn1crypto import core
+
     from ._cert_factory import build_cms_with_certs, make_leaf, make_root_ca
 
     root_cert, root_key = make_root_ca()
     leaf_cert, leaf_key = make_leaf(root_cert, root_key)
-    cms_der = build_cms_with_certs(leaf_cert, leaf_key)
+    content_info = asn1_cms.ContentInfo.load(build_cms_with_certs(leaf_cert, leaf_key))
+    signer_info = content_info["content"]["signer_infos"][0]
+    attribute = asn1_cms.CMSAttribute(
+        {
+            "type": asn1_cms.CMSAttributeType("1.2.840.113583.1.1.8"),
+            "values": [core.Any.load(value_der)],
+        }
+    )
+    field = "signed_attrs" if signed else "unsigned_attrs"
+    signer_info[field] = asn1_cms.CMSAttributes([attribute])
+    return content_info.dump(force=True)
 
-    signer = _mock_signer(signed_oids=["1.2.840.113583.1.1.8"])
-    ci = _mock_ci({"crls": None, "signer_infos": [signer]})
 
-    with patch("asn1crypto.cms.ContentInfo.load", return_value=ci):
-        result = check_ltv_status(cms_der)
+#: RevocationInfoArchival ::= SEQUENCE { ocsp [1] SEQUENCE OF ... }
+_ARCHIVAL_WITH_OCSP = bytes.fromhex("3007a1053003020101")
 
+
+def test_ltv_archival_in_signed_attributes_counts():
+    result = check_ltv_status(_cms_with_archival(signed=True, value_der=_ARCHIVAL_WITH_OCSP))
+
+    assert result.ltv_enabled is True
     assert result.has_revocation_archival is True
     assert result.has_ocsp is True
-    assert result.ltv_enabled is True
+
+
+def test_ltv_archival_in_unsigned_attributes_is_not_evidence():
+    """The reported attack: an unsigned attribute is stapled on after signing.
+
+    Nothing in an unsigned attribute is covered by the signer's signature, so a
+    third party can add one to a finished document without breaking it.
+    """
+    result = check_ltv_status(_cms_with_archival(signed=False, value_der=_ARCHIVAL_WITH_OCSP))
+
+    assert result.ltv_enabled is False
+    assert result.has_unauthenticated_material is True
+    assert any("outside the signature" in d for d in result.details)
+
+
+def test_ltv_bogus_archival_value_is_not_evidence():
+    """The OID is a label on a container; the contents decide what it holds."""
+    bogus = b"\x04\x15bogus-not-ocsp-or-crl"
+
+    result = check_ltv_status(_cms_with_archival(signed=True, value_der=bogus))
+
+    assert result.ltv_enabled is False
+    assert result.has_ocsp is False
+    assert any("malformed" in d for d in result.details)
 
 
 def test_ltv_unsigned_attrs_with_revocation_values():
