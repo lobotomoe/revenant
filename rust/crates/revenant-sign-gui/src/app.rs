@@ -137,7 +137,8 @@ impl RevenantApp {
                     succeeded,
                     failed,
                     aborted,
-                } => self.on_batch_done(succeeded, failed, aborted),
+                    renamed,
+                } => self.on_batch_done(succeeded, failed, aborted, &renamed),
             }
         }
     }
@@ -450,7 +451,13 @@ impl RevenantApp {
         });
     }
 
-    fn on_batch_done(&mut self, succeeded: usize, failed: usize, aborted: Option<String>) {
+    fn on_batch_done(
+        &mut self,
+        succeeded: usize,
+        failed: usize,
+        aborted: Option<String>,
+        renamed: &[(String, String)],
+    ) {
         let (message, ok) = match aborted {
             Some(reason) => (crate::friendly::friendly(&self.l10n, &reason), false),
             None => (
@@ -464,7 +471,8 @@ impl RevenantApp {
                 failed == 0,
             ),
         };
-        self.sign_form.on_batch_done(message, ok);
+        self.sign_form
+            .on_batch_done(append_renamed(message, renamed), ok);
     }
 
     fn browse_verify_pdf(&mut self) {
@@ -768,6 +776,23 @@ impl eframe::App for RevenantApp {
         self.dialogs(&ctx);
         self.confirm_dialog(&ctx);
     }
+}
+
+/// Append one `input -> written` line per output that could not take its
+/// derived name, so a batch never leaves the user guessing where a file went.
+///
+/// The names and the arrow are data, not prose, so this deliberately adds no
+/// translated string: `contract.pdf -> contract_signed_2.pdf` reads the same in
+/// every language the app ships.
+fn append_renamed(message: String, renamed: &[(String, String)]) -> String {
+    let mut message = message;
+    for (input, written) in renamed {
+        message.push('\n');
+        message.push_str(input);
+        message.push_str(" -> ");
+        message.push_str(written);
+    }
+    message
 }
 
 /// Whether a dropped/selected path looks like a PDF (case-insensitive extension).

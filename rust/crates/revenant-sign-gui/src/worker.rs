@@ -71,10 +71,16 @@ pub(crate) enum WorkerMsg {
     },
     /// A batch job finished. `aborted` carries the reason when a fatal error
     /// (bad credentials, TLS failure) stopped the whole batch early.
+    ///
+    /// `renamed` lists the inputs whose result could not take its derived name
+    /// because something already held it, as `(input, written)` file names. The
+    /// batch never overwrites, so without this the user is left guessing which
+    /// `_2` belongs to which document.
     BatchDone {
         succeeded: usize,
         failed: usize,
         aborted: Option<String>,
+        renamed: Vec<(String, String)>,
     },
 }
 

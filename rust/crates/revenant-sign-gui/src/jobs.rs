@@ -141,6 +141,7 @@ pub(crate) fn batch_sign(
             succeeded: 0,
             failed: 0,
             aborted: Some(ctx.no_credentials_message.to_owned()),
+            renamed: Vec::new(),
         });
         return;
     };
@@ -149,6 +150,7 @@ pub(crate) fn batch_sign(
     let outputs = batch_output_paths(files, ctx.output_dir, ctx.detached);
     let mut succeeded = 0;
     let mut failed = 0;
+    let mut renamed = Vec::new();
     for (index, (path, output)) in files.iter().zip(outputs).enumerate() {
         if cancel.load(Ordering::Relaxed) {
             break;
@@ -176,19 +178,42 @@ pub(crate) fn batch_sign(
                     succeeded,
                     failed,
                     aborted: Some(err.to_string()),
+                    renamed,
                 });
                 return;
             }
-            Ok(bytes) if write_unique_file(&output, &bytes).is_ok() => succeeded += 1,
-            // A non-fatal signing error or a failed write: count it and continue.
-            _ => failed += 1,
+            Ok(bytes) => match write_unique_file(&output, &bytes) {
+                Ok(written) => {
+                    succeeded += 1;
+                    // Only a name the user would not have predicted is worth
+                    // reporting; the derived one speaks for itself. The input is
+                    // named by its full path: a collision usually means two
+                    // inputs share a file name, and the directory is the only
+                    // thing that tells them apart.
+                    if written != output.base {
+                        renamed.push((path.display().to_string(), file_name_of(&written)));
+                    }
+                }
+                Err(_) => failed += 1,
+            },
+            // A non-fatal signing error: count it and continue.
+            Err(_) => failed += 1,
         }
     }
     emit(WorkerMsg::BatchDone {
         succeeded,
         failed,
         aborted: None,
+        renamed,
     });
+}
+
+/// The final component of `path`, or the whole thing when it has none.
+fn file_name_of(path: &Path) -> String {
+    path.file_name()
+        .unwrap_or(path.as_os_str())
+        .to_string_lossy()
+        .into_owned()
 }
 
 struct BatchOutputPath {
@@ -274,7 +299,19 @@ fn write_unique_file(output: &BatchOutputPath, data: &[u8]) -> io::Result<PathBu
             .open(&candidate)
         {
             Ok(mut file) => {
-                file.write_all(data)?;
+                if let Err(err) = file.write_all(data) {
+                    // The exclusive create already claimed the name, so bailing
+                    // out here would leave a short file that looks exactly like a
+                    // signed document. Take the name back instead.
+                    drop(file);
+                    if let Err(cleanup) = std::fs::remove_file(&candidate) {
+                        log::error!(
+                            "failed to remove the partial output {}: {cleanup}",
+                            candidate.display()
+                        );
+                    }
+                    return Err(err);
+                }
                 return Ok(candidate);
             }
             Err(err) if err.kind() == io::ErrorKind::AlreadyExists => {
@@ -518,12 +555,23 @@ mod tests {
             succeeded,
             failed,
             aborted,
+            renamed,
         }) = messages.last()
         else {
             panic!("batch must emit a final tally");
         };
         assert_eq!((*succeeded, *failed), (2, 0));
         assert!(aborted.is_none());
+        // The second input's derived name was taken by the first, so its result
+        // is reported under the name it actually got. Both inputs are called
+        // contract.pdf, which is exactly why the full path has to be the label.
+        assert_eq!(
+            renamed.as_slice(),
+            [(
+                second_dir.join("contract.pdf").display().to_string(),
+                "contract_signed_2.pdf".to_owned()
+            )]
+        );
         assert_eq!(
             std::fs::read(output.path().join("contract_signed.pdf")).unwrap(),
             b"signed:first pdf"
@@ -533,5 +581,60 @@ mod tests {
             b"signed:second pdf"
         );
         assert_eq!(std::fs::read_dir(output.path()).unwrap().count(), 2);
+    }
+
+    #[test]
+    fn an_earlier_output_never_consumes_a_later_queued_input() {
+        // The reported case, end to end: the queue holds contract.pdf followed by
+        // contract_signed.pdf and the user picks their own directory as the
+        // output, so the first file's derived name is the second file's input.
+        // Signing the first must not replace the second, and the second must be
+        // signed as itself rather than as the first one's result.
+        let dir = tempfile::tempdir().unwrap();
+        let first = dir.path().join("contract.pdf");
+        let second = dir.path().join("contract_signed.pdf");
+        std::fs::write(&first, b"first pdf").unwrap();
+        std::fs::write(&second, b"second pdf").unwrap();
+
+        let store = ConfigStore::new();
+        store.set_session_credentials("test-user", "test-password");
+        let transport = Arc::new(Transport::new());
+        let options = EmbeddedSignatureOptions::default();
+        let sign = |pdf: &[u8]| {
+            let mut signed = b"signed:".to_vec();
+            signed.extend_from_slice(pdf);
+            Ok(signed)
+        };
+        let ctx = BatchContext {
+            store: &store,
+            transport: &transport,
+            detached: false,
+            options: &options,
+            output_dir: dir.path(),
+            no_credentials_message: "missing credentials",
+            sign_override: Some(&sign),
+        };
+        let messages = RefCell::new(Vec::new());
+
+        batch_sign(
+            &|message| messages.borrow_mut().push(message),
+            &ctx,
+            &[first, second.clone()],
+            &AtomicBool::new(false),
+        );
+
+        assert_eq!(
+            std::fs::read(&second).unwrap(),
+            b"second pdf",
+            "an earlier output overwrote a later queued input"
+        );
+        assert_eq!(
+            std::fs::read(dir.path().join("contract_signed_2.pdf")).unwrap(),
+            b"signed:first pdf"
+        );
+        assert_eq!(
+            std::fs::read(dir.path().join("contract_signed_signed.pdf")).unwrap(),
+            b"signed:second pdf"
+        );
     }
 }
