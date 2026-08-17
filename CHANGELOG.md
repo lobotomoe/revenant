@@ -7,6 +7,33 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+
+- **A cancelled connection can no longer become the active server.** Dismissing
+  the Connect dialog did not stop the server test already running, and neither
+  GUI checked, when the answer arrived, whether it was still wanted. A slow
+  endpoint could return success after the user backed out and be saved as the
+  active profile, so later credentials and signing requests went somewhere the
+  user had declined. Both GUIs now tag each attempt and drop a result that no
+  longer belongs to the dialog on screen. Reported by peyuaa; found during that
+  fix to affect the Python GUI as well.
+- **A saved password can no longer be pre-filled into a different login.** The
+  Rust GUI read the saved password in the background and applied whatever came
+  back to whichever login was open, so cancelling one login and starting another
+  could put the first account's password into the second. The read is now bound
+  to the login and username that asked for it, and a password box the user has
+  typed in and cleared is never silently re-filled. The same fix covers identity
+  discovery, which could otherwise save one login's signer certificate under
+  another's. Reported by peyuaa.
+- **Signing no longer writes through a symlink at the output path.** When a
+  sandbox forbids creating a temporary file, both the Python and Rust clients
+  fall back to writing the output directly. That fallback followed a symlink
+  left at a predictable output name (`<stem>_signed.pdf`) and truncated whatever
+  it pointed at, where the normal path replaces the link instead. The fallback
+  now refuses to follow links, refuses anything that is not a regular file, and
+  fails outright on platforms that cannot express either. Reported by peyuaa
+  against the Python client; the Rust CLI carried the same flaw.
+
 ## [3.0.4] - 2026-08-18
 
 Security release. Three fixes in what the desktop apps report about a

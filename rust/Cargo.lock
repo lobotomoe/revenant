@@ -3748,6 +3748,7 @@ version = "3.0.4"
 dependencies = [
  "clap",
  "env_logger",
+ "libc",
  "log",
  "revenant-sign-core",
  "rpassword",

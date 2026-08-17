@@ -2,12 +2,15 @@
 
 from __future__ import annotations
 
+import errno
+import os
+import stat
 from pathlib import Path
 from unittest.mock import MagicMock, patch
 
 import pytest
 
-from revenant.errors import AuthError
+from revenant.errors import AuthError, RevenantError
 from revenant.ui.helpers import (
     atomic_write,
     confirm_choice,
@@ -255,6 +258,115 @@ def test_atomic_write_no_partial_on_error(tmp_path: Path):
         pytest.raises(OSError, match="disk full"),
     ):
         atomic_write(target, b"data")
+    assert not target.exists()
+
+
+def test_atomic_write_replaces_a_symlink_rather_than_its_target(tmp_path: Path):
+    """The normal path renames over the output, so the link itself is replaced."""
+    victim = tmp_path / "victim.txt"
+    victim.write_bytes(b"important")
+    target = tmp_path / "output.pdf"
+    target.symlink_to(victim)
+
+    atomic_write(target, b"signed")
+
+    assert victim.read_bytes() == b"important"
+    assert not target.is_symlink()
+    assert target.read_bytes() == b"signed"
+
+
+def test_sandbox_fallback_refuses_to_write_through_a_symlink(tmp_path: Path):
+    """GHSA-x548: the fallback must not truncate a symlink's target.
+
+    Reproduces the macOS Save Panel boundary the way the report did -- only
+    `mkstemp` is denied, which is what pushes `atomic_write` onto the direct
+    path -- with an attacker-planted link at the predictable output name.
+    """
+    victim = tmp_path / "victim.txt"
+    victim.write_bytes(b"important")
+    target = tmp_path / "document_signed.pdf"
+    target.symlink_to(victim)
+
+    # ELOOP has no dedicated OSError subclass and its strerror is
+    # platform-specific, so the match is on the filename Python appends and the
+    # errno carries the real assertion.
+    with (
+        patch("tempfile.mkstemp", side_effect=PermissionError("sandbox")),
+        pytest.raises(OSError, match="document_signed") as excinfo,
+    ):
+        atomic_write(target, b"signed")
+
+    # FreeBSD reports EMLINK where macOS and Linux report ELOOP.
+    assert excinfo.value.errno in (errno.ELOOP, errno.EMLINK), excinfo.value
+    assert victim.read_bytes() == b"important", "signed bytes reached the link target"
+    assert target.is_symlink(), "the link itself must be left alone"
+
+
+def test_sandbox_fallback_writes_a_regular_file(tmp_path: Path):
+    """The fallback still has to work where it is actually needed."""
+    target = tmp_path / "document_signed.pdf"
+
+    with patch("tempfile.mkstemp", side_effect=PermissionError("sandbox")):
+        atomic_write(target, b"signed")
+
+    assert target.read_bytes() == b"signed"
+    assert stat.S_IMODE(target.stat().st_mode) == 0o600
+
+
+def test_sandbox_fallback_overwrites_an_existing_regular_file(tmp_path: Path):
+    """Re-signing over a previous output is ordinary use, not an attack."""
+    target = tmp_path / "document_signed.pdf"
+    target.write_bytes(b"older and longer content")
+
+    with patch("tempfile.mkstemp", side_effect=PermissionError("sandbox")):
+        atomic_write(target, b"signed")
+
+    assert target.read_bytes() == b"signed"
+
+
+def test_sandbox_fallback_does_not_block_on_a_fifo(tmp_path: Path):
+    """O_NOFOLLOW does not cover a FIFO, and O_WRONLY on one blocks forever.
+
+    O_NONBLOCK turns that hang into an immediate ENXIO, so a FIFO planted at the
+    output path stalls nothing.
+    """
+    target = tmp_path / "document_signed.pdf"
+    os.mkfifo(target)
+
+    with (
+        patch("tempfile.mkstemp", side_effect=PermissionError("sandbox")),
+        pytest.raises(OSError, match="document_signed") as excinfo,
+    ):
+        atomic_write(target, b"signed")
+
+    assert excinfo.value.errno == errno.ENXIO, excinfo.value
+
+
+def test_sandbox_fallback_refuses_a_non_regular_file(tmp_path: Path):
+    """The fstat check backstops anything O_NOFOLLOW/O_NONBLOCK let through."""
+    target = tmp_path / "document_signed.pdf"
+    target.write_bytes(b"existing")
+    not_regular = os.stat_result((stat.S_IFCHR | 0o600, 0, 0, 1, 0, 0, 0, 0, 0, 0))
+
+    with (
+        patch("tempfile.mkstemp", side_effect=PermissionError("sandbox")),
+        patch("os.fstat", return_value=not_regular),
+        pytest.raises(RevenantError, match="not a regular file"),
+    ):
+        atomic_write(target, b"signed")
+
+
+def test_sandbox_fallback_refuses_when_the_platform_cannot_avoid_symlinks(tmp_path: Path):
+    """Fail closed rather than silently degrading to a following open."""
+    target = tmp_path / "document_signed.pdf"
+
+    with (
+        patch("revenant.ui.helpers._O_NOFOLLOW", None),
+        patch("tempfile.mkstemp", side_effect=PermissionError("sandbox")),
+        pytest.raises(RevenantError, match="without following symlinks"),
+    ):
+        atomic_write(target, b"signed")
+
     assert not target.exists()
 
 

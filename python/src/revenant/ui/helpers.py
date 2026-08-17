@@ -8,10 +8,13 @@ Extracted patterns from cli_setup.py and cli_sign.py to eliminate duplication.
 from __future__ import annotations
 
 import os
+import stat
 import sys
 import tempfile
 from pathlib import Path
 from typing import TYPE_CHECKING
+
+from ..errors import RevenantError
 
 if TYPE_CHECKING:
     from ..config import ServerProfile
@@ -32,6 +35,10 @@ __all__ = [
 ]
 
 _BYTES_PER_KB = 1024  # Local constant avoids importing BYTES_PER_MB for a KB conversion
+
+# POSIX-only; absent on Windows. `None` means we cannot promise not to follow a
+# symlink, and the direct-write path refuses rather than guessing.
+_O_NOFOLLOW: int | None = getattr(os, "O_NOFOLLOW", None)
 
 
 def format_size_kb(size_bytes: int) -> str:
@@ -216,6 +223,54 @@ def offer_save_credentials(username: str, password: str) -> None:
         print("Credentials not saved.")
 
 
+def _write_no_follow(path: Path, data: bytes) -> None:
+    """Write data straight to `path`, refusing to follow a symlink placed there.
+
+    The atomic path renames over the output, which replaces a symlink sitting at
+    that name. A plain ``open(path, "wb")`` instead writes *through* it and
+    truncates whatever it points at, so anyone able to plant a file at a
+    predictable output name ('<stem>_signed.pdf') could redirect signed bytes
+    onto another file the user can write (GHSA-x548).
+
+    ``O_NOFOLLOW`` refuses the open outright rather than testing first, so there
+    is no window between the check and the open for the path to be swapped.
+
+    Args:
+        path: Target file path.
+        data: Bytes to write.
+
+    Raises:
+        RevenantError: If the platform cannot express "do not follow symlinks",
+            or the path is not a regular file.
+        OSError: If the path is a symlink (``ELOOP``) or cannot be opened.
+    """
+    if _O_NOFOLLOW is None:
+        raise RevenantError(
+            f"Cannot safely write {path}: this platform cannot open a file "
+            "without following symlinks."
+        )
+    # O_NONBLOCK so a FIFO left at the output path fails fast instead of
+    # blocking the open forever, before the regular-file check can run. It has
+    # no effect on regular files.
+    flags = os.O_WRONLY | os.O_CREAT | os.O_TRUNC | _O_NOFOLLOW | os.O_NONBLOCK
+    # 0o600 matches what the atomic path produces: `mkstemp` creates the temp
+    # file 0o600 and `replace` carries that mode onto the output.
+    fd = os.open(path, flags, 0o600)
+    try:
+        is_regular = stat.S_ISREG(os.fstat(fd).st_mode)
+    except BaseException:
+        os.close(fd)
+        raise
+    if not is_regular:
+        os.close(fd)
+        raise RevenantError(f"Refusing to write {path}: not a regular file.")
+    # fdopen takes ownership of fd and closes it, including on error.
+    with os.fdopen(fd, "wb") as f:
+        f.write(data)
+        f.flush()
+        os.fsync(f.fileno())
+
+
 def atomic_write(path: Path, data: bytes) -> None:
     """Write data to a file atomically using temp file + rename.
 
@@ -224,7 +279,8 @@ def atomic_write(path: Path, data: bytes) -> None:
 
     On sandboxed macOS (MAS/TestFlight) the Save Panel grants write access
     only to the specific chosen file, not to creating temp files in the same
-    directory.  In that case we fall back to a direct write.
+    directory.  In that case we fall back to a direct, non-atomic write that
+    still refuses to follow a symlink at the output path.
 
     Args:
         path: Target file path.
@@ -234,10 +290,7 @@ def atomic_write(path: Path, data: bytes) -> None:
         fd, tmp_path = tempfile.mkstemp(dir=path.parent, suffix=".tmp")
     except PermissionError:
         # Sandbox: can only write to the exact path from the Save Panel.
-        with open(path, "wb") as f:
-            f.write(data)
-            f.flush()
-            os.fsync(f.fileno())
+        _write_no_follow(path, data)
         return
 
     tmp = Path(tmp_path)

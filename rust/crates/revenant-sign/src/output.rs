@@ -6,7 +6,6 @@
 //! rename, with a direct-write fallback when a sandbox forbids creating the temp
 //! file).
 
-use std::fs::File;
 use std::io::{self, Write};
 use std::path::{Path, PathBuf};
 
@@ -88,12 +87,54 @@ pub(crate) fn atomic_write(path: &Path, data: &[u8]) -> io::Result<()> {
     }
 }
 
-/// Write directly to `path`, flushing to disk.
+/// Write directly to `path`, refusing to follow a symlink placed there.
+///
+/// The atomic path renames over the output, which replaces a symlink sitting at
+/// that name. `File::create` instead writes *through* it and truncates whatever
+/// it points at, so anyone able to plant a file at a predictable output name
+/// (`<stem>_signed.pdf`) could redirect signed bytes onto another file the user
+/// can write (GHSA-x548). `O_NOFOLLOW` refuses the open outright rather than
+/// testing first, leaving no window for the path to be swapped in between.
+#[cfg(unix)]
 fn direct_write(path: &Path, data: &[u8]) -> io::Result<()> {
-    let mut file = File::create(path)?;
+    use std::os::unix::fs::OpenOptionsExt;
+
+    let mut file = std::fs::OpenOptions::new()
+        .write(true)
+        .create(true)
+        .truncate(true)
+        // Matches what the atomic path produces: the temp file is created 0o600
+        // and `persist` carries that mode onto the output.
+        .mode(0o600)
+        // O_NONBLOCK so a FIFO left at the output path fails fast instead of
+        // blocking the open forever. No effect on regular files.
+        .custom_flags(libc::O_NOFOLLOW | libc::O_NONBLOCK)
+        .open(path)?;
+    // O_NOFOLLOW rejects symlinks but not every other non-regular entry; only a
+    // regular file may take signed bytes.
+    if !file.metadata()?.file_type().is_file() {
+        return Err(io::Error::new(
+            io::ErrorKind::InvalidInput,
+            format!("refusing to write {}: not a regular file", path.display()),
+        ));
+    }
     file.write_all(data)?;
     file.sync_all()?;
     Ok(())
+}
+
+/// Fail closed where the platform cannot open a file without following
+/// symlinks, rather than silently degrading to a following write.
+#[cfg(not(unix))]
+fn direct_write(path: &Path, _data: &[u8]) -> io::Result<()> {
+    Err(io::Error::new(
+        io::ErrorKind::Unsupported,
+        format!(
+            "cannot safely write {}: this platform cannot open a file without \
+             following symlinks",
+            path.display()
+        ),
+    ))
 }
 
 #[cfg(test)]
@@ -146,5 +187,77 @@ mod tests {
         std::fs::write(&path, b"old data here").unwrap();
         atomic_write(&path, b"new").unwrap();
         assert_eq!(std::fs::read(&path).unwrap(), b"new");
+    }
+
+    /// The atomic path renames over the output, so a symlink there is replaced
+    /// rather than written through. This is the control for the test below.
+    #[cfg(unix)]
+    #[test]
+    fn atomic_write_replaces_a_symlink_rather_than_its_target() {
+        let dir = tempfile::tempdir().unwrap();
+        let victim = dir.path().join("victim.txt");
+        std::fs::write(&victim, b"important").unwrap();
+        let path = dir.path().join("document_signed.pdf");
+        std::os::unix::fs::symlink(&victim, &path).unwrap();
+
+        atomic_write(&path, b"signed").unwrap();
+
+        assert_eq!(std::fs::read(&victim).unwrap(), b"important");
+        assert_eq!(std::fs::read(&path).unwrap(), b"signed");
+        assert!(!path.symlink_metadata().unwrap().file_type().is_symlink());
+    }
+
+    /// GHSA-x548: the sandbox fallback must not truncate a symlink's target.
+    /// `direct_write` is what `atomic_write` falls back to when the directory
+    /// refuses a temp file, so exercising it directly exercises that path.
+    #[cfg(unix)]
+    #[test]
+    fn direct_write_refuses_to_write_through_a_symlink() {
+        let dir = tempfile::tempdir().unwrap();
+        let victim = dir.path().join("victim.txt");
+        std::fs::write(&victim, b"important").unwrap();
+        let path = dir.path().join("document_signed.pdf");
+        std::os::unix::fs::symlink(&victim, &path).unwrap();
+
+        let err = direct_write(&path, b"signed").expect_err("must refuse the symlink");
+
+        // FreeBSD reports EMLINK where macOS and Linux report ELOOP.
+        assert!(
+            matches!(err.raw_os_error(), Some(libc::ELOOP | libc::EMLINK)),
+            "unexpected error: {err}"
+        );
+        assert_eq!(
+            std::fs::read(&victim).unwrap(),
+            b"important",
+            "signed bytes reached the link target"
+        );
+        assert!(path.symlink_metadata().unwrap().file_type().is_symlink());
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn direct_write_writes_a_regular_file() {
+        use std::os::unix::fs::PermissionsExt;
+
+        let dir = tempfile::tempdir().unwrap();
+        let path = dir.path().join("document_signed.pdf");
+
+        direct_write(&path, b"signed").unwrap();
+
+        assert_eq!(std::fs::read(&path).unwrap(), b"signed");
+        let mode = std::fs::metadata(&path).unwrap().permissions().mode();
+        assert_eq!(mode & 0o777, 0o600);
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn direct_write_overwrites_an_existing_regular_file() {
+        let dir = tempfile::tempdir().unwrap();
+        let path = dir.path().join("document_signed.pdf");
+        std::fs::write(&path, b"older and longer content").unwrap();
+
+        direct_write(&path, b"signed").unwrap();
+
+        assert_eq!(std::fs::read(&path).unwrap(), b"signed");
     }
 }

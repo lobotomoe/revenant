@@ -30,5 +30,9 @@ url.workspace = true
 # CLI-only: hidden password entry for the setup wizard.
 rpassword = "7"
 
+# O_NOFOLLOW for the sandbox direct-write path; std has no portable spelling.
+[target.'cfg(unix)'.dependencies]
+libc = "0.2"
+
 [lints]
 workspace = true
