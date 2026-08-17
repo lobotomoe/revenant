@@ -431,3 +431,75 @@ def test_a_currently_valid_certificate_is_still_normal():
 
     assert color == "gray"
     assert "days remaining" in text
+
+
+# ── ConnectDialog ping-token guard (GHSA-285g) ──────────────────────────
+
+
+class _StubWindow:
+    """Stands in for the dialog's Toplevel so the guard runs without a display."""
+
+    def __init__(self) -> None:
+        self.destroyed = False
+
+    def destroy(self) -> None:
+        self.destroyed = True
+
+
+def _dialog_without_tk():
+    """A ConnectDialog with __init__ (and its Tk window) skipped."""
+    from revenant.ui.gui.connect_dialog import ConnectDialog
+
+    dialog = object.__new__(ConnectDialog)
+    dialog._ping_token = None
+    dialog._win = _StubWindow()
+    return dialog
+
+
+def test_connect_dialog_awaits_its_own_ping():
+    dialog = _dialog_without_tk()
+    token = object()
+    dialog._ping_token = token
+    assert dialog._awaiting(token) is True
+
+
+def test_connect_dialog_awaits_a_ping_only_once():
+    dialog = _dialog_without_tk()
+    token = object()
+    dialog._ping_token = token
+    assert dialog._awaiting(token) is True
+    assert dialog._awaiting(token) is False
+
+
+def test_connect_dialog_ignores_a_superseded_ping():
+    dialog = _dialog_without_tk()
+    first = object()
+    dialog._ping_token = first
+    second = object()
+    dialog._ping_token = second
+
+    assert dialog._awaiting(first) is False
+    assert dialog._awaiting(second) is True
+
+
+def test_connect_dialog_does_not_save_a_cancelled_server():
+    """GHSA-285g: a delayed success must not persist a declined server.
+
+    Destroying the window does not cancel a callback already scheduled with
+    after(), so the callback still runs -- the token guard is what stops it
+    reaching save_server_config.
+    """
+    from revenant.config import make_custom_profile
+
+    dialog = _dialog_without_tk()
+    token = object()
+    dialog._ping_token = token
+    profile = make_custom_profile("https://attacker-controlled.example/SAPIWS/DSS.asmx")
+
+    dialog._cancel()
+
+    with patch("revenant.ui.gui.connect_dialog.save_server_config") as save:
+        dialog._on_ping_ok(token, profile, (True, "200 OK"))
+
+    assert dialog._win.destroyed
+    save.assert_not_called()

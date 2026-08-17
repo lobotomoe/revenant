@@ -14,6 +14,33 @@ use revenant_sign_core::net::ServerVerifyResult;
 use revenant_sign_core::pdf::VerificationResult;
 use revenant_sign_core::pki::CertInfo;
 
+/// Identifies one background request so its result can be matched back to the
+/// state that asked for it.
+///
+/// The UI polls the worker channel each frame, so a result can arrive long after
+/// whoever asked for it was cancelled or replaced. Untagged, a handler cannot
+/// tell "this is my answer" from "this is someone else's answer" and applies it
+/// to whatever state happens to be live -- which is how a cancelled server got
+/// persisted (GHSA-285g) and one account's saved password reached another's
+/// login (GHSA-53v5).
+#[derive(Clone, Copy, PartialEq, Eq, Debug)]
+pub(crate) struct RequestId(u64);
+
+/// Issues [`RequestId`]s. One per app; ids are never reused within a run, so a
+/// stale result can never collide with a later request.
+#[derive(Default)]
+pub(crate) struct RequestIds {
+    issued: u64,
+}
+
+impl RequestIds {
+    /// Issue the next id.
+    pub(crate) fn issue(&mut self) -> RequestId {
+        self.issued += 1;
+        RequestId(self.issued)
+    }
+}
+
 /// Outcome of a background signer-identity discovery. Errors are pre-classified
 /// on the worker thread so the UI thread only has to pick the localized message;
 /// the detail string is the raw error text to interpolate.
@@ -53,12 +80,26 @@ pub(crate) enum VerifyOutcome {
 /// Result of a completed background job, tagged so the UI thread can route it.
 pub(crate) enum WorkerMsg {
     /// A server ping finished: whether it succeeded and a human-readable detail.
-    Ping { ok: bool, detail: String },
+    Ping {
+        request: RequestId,
+        ok: bool,
+        detail: String,
+    },
     /// A signer-identity discovery finished.
-    Identity(IdentityOutcome),
+    Identity {
+        request: RequestId,
+        outcome: IdentityOutcome,
+    },
     /// A background read of the saved password finished, for login pre-fill.
     /// `None` when nothing is stored. The password is never logged.
-    SavedPassword(Option<String>),
+    SavedPassword {
+        request: RequestId,
+        /// The username the read was issued for. Carried so the result cannot be
+        /// applied to a login that has since switched accounts -- the request id
+        /// alone would not catch a username edited within the same wizard.
+        username: String,
+        password: Option<String>,
+    },
     /// A signing job finished.
     Signed(SignedOutcome),
     /// A verification job finished.

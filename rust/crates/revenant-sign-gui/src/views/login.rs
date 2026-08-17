@@ -13,6 +13,7 @@ use revenant_sign_core::pki::CertInfo;
 
 use crate::i18n::Localizer;
 use crate::theme;
+use crate::worker::RequestId;
 
 const STEP_COUNT: &str = "3";
 
@@ -71,6 +72,14 @@ pub(crate) struct LoginState {
     manual: Manual,
     /// Inline validation warning for the current step, if any.
     warning: Option<String>,
+    /// The saved-password read this wizard is waiting for, if any.
+    prefill: Option<RequestId>,
+    /// The discovery run this wizard is waiting for, if any.
+    discovery_request: Option<RequestId>,
+    /// Set once the user touches the password box. A read still in flight must
+    /// not refill a field the user deliberately cleared -- emptiness alone does
+    /// not distinguish "never typed" from "typed, then erased".
+    password_edited: bool,
 }
 
 impl LoginState {
@@ -91,7 +100,15 @@ impl LoginState {
             identity: None,
             manual: Manual::default(),
             warning: None,
+            prefill: None,
+            discovery_request: None,
+            password_edited: false,
         }
+    }
+
+    /// Record that `request` is reading this wizard's saved password.
+    pub(crate) fn expect_prefill(&mut self, request: RequestId) {
+        self.prefill = Some(request);
     }
 
     /// The entered username, trimmed of incidental whitespace.
@@ -104,13 +121,31 @@ impl LoginState {
         self.password.trim()
     }
 
-    /// Pre-fill the password from saved credentials read in the background. Only
-    /// applies while the user is still on the credentials step and has not typed
-    /// one, so a slow keychain read never clobbers live input.
-    pub(crate) fn prefill_password(&mut self, password: String) {
-        if self.step == Step::Credentials && self.password.is_empty() {
-            self.password = password;
+    /// Pre-fill the password from saved credentials read in the background.
+    ///
+    /// Applies only to the read this wizard is actually waiting for, only for
+    /// the username it was issued against, and only while the user is still on
+    /// the credentials step with an untouched password box. A read that outlives
+    /// its login -- cancelled, reopened, or the account switched under it -- is
+    /// dropped rather than handed to whoever is on screen now (GHSA-53v5).
+    pub(crate) fn prefill_password(
+        &mut self,
+        request: RequestId,
+        username: &str,
+        password: String,
+    ) {
+        if self.prefill != Some(request) {
+            return;
         }
+        // Consumed either way: a read answers exactly one wizard, once.
+        self.prefill = None;
+        if self.step != Step::Credentials || self.password_edited || !self.password.is_empty() {
+            return;
+        }
+        if self.username.trim() != username {
+            return;
+        }
+        self.password = password;
     }
 
     pub(crate) fn should_save_credentials(&self) -> bool {
@@ -126,6 +161,25 @@ impl LoginState {
         self.discovery = Discovery::Running;
         self.identity = None;
         self.warning = None;
+    }
+
+    /// Record that `request` is the discovery run this wizard is waiting for.
+    pub(crate) fn expect_discovery(&mut self, request: RequestId) {
+        self.discovery_request = Some(request);
+    }
+
+    /// Claim `request`'s discovery result, reporting whether this wizard is
+    /// still waiting for it.
+    ///
+    /// A run that outlived the wizard that started it must not deliver an
+    /// identity here: `Finish` persists whatever identity this state holds, so
+    /// a stale result would save one login's signer certificate under another's.
+    pub(crate) fn claim_discovery(&mut self, request: RequestId) -> bool {
+        if self.discovery_request != Some(request) {
+            return false;
+        }
+        self.discovery_request = None;
+        true
     }
 
     /// Fold in a discovered certificate. A cert without a usable name is treated
@@ -305,11 +359,16 @@ impl LoginState {
                 ui.end_row();
 
                 ui.label(l10n.t("gui.password_label"));
-                ui.add(
+                let password_box = ui.add(
                     egui::TextEdit::singleline(&mut self.password)
                         .password(!self.show_password)
                         .desired_width(f32::INFINITY),
                 );
+                // `changed()` fires only on user edits, not on a programmatic
+                // pre-fill, so this marks the box as the user's to own.
+                if password_box.changed() {
+                    self.password_edited = true;
+                }
                 ui.end_row();
             });
         ui.checkbox(&mut self.show_password, l10n.t("gui.show_password"));
@@ -495,33 +554,109 @@ pub(crate) fn show(ctx: &egui::Context, l10n: &Localizer, state: &mut LoginState
 #[cfg(test)]
 mod tests {
     use super::{LoginState, Step};
+    use crate::worker::RequestIds;
     use revenant_sign_core::config::ServerProfile;
 
-    fn state() -> LoginState {
+    /// A wizard for `user` already awaiting saved-password read `request`.
+    fn state() -> (LoginState, RequestIds, super::RequestId) {
         let profile = ServerProfile::builtin("ekeng").expect("ekeng profile");
-        LoginState::new(profile, Some("user".to_owned()), "keychain".to_owned())
+        let mut requests = RequestIds::default();
+        let request = requests.issue();
+        let mut login = LoginState::new(profile, Some("user".to_owned()), "keychain".to_owned());
+        login.expect_prefill(request);
+        (login, requests, request)
     }
 
     #[test]
     fn prefill_fills_empty_password_on_credentials_step() {
-        let mut login = state();
-        login.prefill_password("secret".to_owned());
+        let (mut login, _requests, request) = state();
+        login.prefill_password(request, "user", "secret".to_owned());
         assert_eq!(login.password, "secret");
     }
 
     #[test]
     fn prefill_skips_when_user_already_typed() {
-        let mut login = state();
+        let (mut login, _requests, request) = state();
         login.password = "typed".to_owned();
-        login.prefill_password("secret".to_owned());
+        login.prefill_password(request, "user", "secret".to_owned());
         assert_eq!(login.password, "typed");
     }
 
     #[test]
     fn prefill_skips_past_the_credentials_step() {
-        let mut login = state();
+        let (mut login, _requests, request) = state();
         login.step = Step::Identity;
-        login.prefill_password("secret".to_owned());
+        login.prefill_password(request, "user", "secret".to_owned());
         assert!(login.password.is_empty());
+    }
+
+    /// GHSA-53v5: login A is cancelled and login B opened; A's delayed read must
+    /// not land in B. B never issued that request, so the tag no longer matches.
+    #[test]
+    fn prefill_rejects_a_read_belonging_to_an_earlier_login() {
+        let (_login_a, mut requests, request_a) = state();
+        // The user cancels A (dropping it) and opens B, which starts its own read.
+        let profile = ServerProfile::builtin("ekeng").expect("ekeng profile");
+        let mut login_b = LoginState::new(profile, Some("bob".to_owned()), "keychain".to_owned());
+        login_b.expect_prefill(requests.issue());
+
+        login_b.prefill_password(request_a, "alice", "alice-secret".to_owned());
+
+        assert!(
+            login_b.password.is_empty(),
+            "one login's saved password must never reach another's field"
+        );
+    }
+
+    /// GHSA-53v5: the username was edited after the read was issued, so the
+    /// password in flight belongs to a different account.
+    #[test]
+    fn prefill_skips_when_the_username_no_longer_matches() {
+        let (mut login, _requests, request) = state();
+        login.username = "someone-else".to_owned();
+        login.prefill_password(request, "user", "secret".to_owned());
+        assert!(login.password.is_empty());
+    }
+
+    /// GHSA-53v5: emptiness alone cannot distinguish "never typed" from "typed,
+    /// then deliberately cleared". The latter must not be refilled.
+    #[test]
+    fn prefill_skips_a_field_the_user_typed_into_and_cleared() {
+        let (mut login, _requests, request) = state();
+        login.password_edited = true;
+        login.password.clear();
+        login.prefill_password(request, "user", "secret".to_owned());
+        assert!(login.password.is_empty());
+    }
+
+    /// A read answers exactly one wizard, once -- a replayed message cannot
+    /// refill a field the user has since cleared.
+    #[test]
+    fn prefill_consumes_its_request() {
+        let (mut login, _requests, request) = state();
+        login.prefill_password(request, "user", "secret".to_owned());
+        login.password.clear();
+        login.prefill_password(request, "user", "secret".to_owned());
+        assert!(login.password.is_empty());
+    }
+
+    /// A discovery result may only be folded into the wizard that started it,
+    /// since `Finish` persists whatever identity the state holds.
+    #[test]
+    fn discovery_is_claimed_once_and_only_by_its_own_wizard() {
+        let (mut login, mut requests, _request) = state();
+        let discovery = requests.issue();
+        login.expect_discovery(discovery);
+
+        let stale = requests.issue();
+        assert!(
+            !login.claim_discovery(stale),
+            "foreign result must not apply"
+        );
+        assert!(login.claim_discovery(discovery), "own result must apply");
+        assert!(
+            !login.claim_discovery(discovery),
+            "a claimed result must not apply twice"
+        );
     }
 }

@@ -28,7 +28,9 @@ use crate::views::{
     self, AccountAction, ConnectAction, ConnectState, LoginAction, LoginState, SettingsAction,
     SignAction, SignForm, VerifyAction, VerifyState,
 };
-use crate::worker::{IdentityOutcome, SignedOutcome, VerifyOutcome, Worker, WorkerMsg};
+use crate::worker::{
+    IdentityOutcome, RequestId, RequestIds, SignedOutcome, VerifyOutcome, Worker, WorkerMsg,
+};
 
 /// PDF extension accepted by the file picker and drag-and-drop.
 const PDF_EXTENSION: &str = "pdf";
@@ -64,6 +66,9 @@ pub(crate) struct RevenantApp {
     transport: Arc<Transport>,
     l10n: Localizer,
     worker: Worker,
+    /// Issues the tags that let a worker result be matched back to the state
+    /// that asked for it, so a result outliving its requester is dropped.
+    requests: RequestIds,
     tab: Tab,
     dialog: Option<Dialog>,
     connect: ConnectState,
@@ -98,6 +103,7 @@ impl RevenantApp {
             transport,
             l10n,
             worker,
+            requests: RequestIds::default(),
             tab: Tab::Sign,
             dialog: None,
             connect: ConnectState::new(),
@@ -123,9 +129,19 @@ impl RevenantApp {
     fn process_worker_results(&mut self) {
         for msg in self.worker.drain() {
             match msg {
-                WorkerMsg::Ping { ok, detail } => self.on_ping_result(ok, &detail),
-                WorkerMsg::Identity(outcome) => self.on_identity_result(outcome),
-                WorkerMsg::SavedPassword(password) => self.on_saved_password(password),
+                WorkerMsg::Ping {
+                    request,
+                    ok,
+                    detail,
+                } => self.on_ping_result(request, ok, &detail),
+                WorkerMsg::Identity { request, outcome } => {
+                    self.on_identity_result(request, outcome);
+                }
+                WorkerMsg::SavedPassword {
+                    request,
+                    username,
+                    password,
+                } => self.on_saved_password(request, &username, password),
                 WorkerMsg::Signed(outcome) => self.on_signed(outcome),
                 WorkerMsg::Verified(outcome) => self.on_verified(outcome),
                 WorkerMsg::BatchProgress {
@@ -143,17 +159,24 @@ impl RevenantApp {
         }
     }
 
-    fn on_ping_result(&mut self, ok: bool, detail: &str) {
+    fn on_ping_result(&mut self, request: RequestId, ok: bool, detail: &str) {
+        // Claiming the request is what rejects a ping the user already walked
+        // away from; the profile comes back with it, so success can only ever
+        // persist the server that was actually tested.
+        let Some(profile) = self.connect.claim_ping(request) else {
+            log::debug!("ignoring ping result for a cancelled or superseded request");
+            return;
+        };
         if !ok {
-            self.connect.on_ping_failed(detail);
+            self.connect.show_failure(detail);
             return;
         }
-        match self.store.save_server_config(&self.connect.pending) {
+        match self.store.save_server_config(&profile) {
             Ok(()) => {
                 register_active_profile_tls(&self.transport, &self.store);
                 self.dialog = None;
             }
-            Err(err) => self.connect.on_ping_failed(&err.to_string()),
+            Err(err) => self.connect.show_failure(&err.to_string()),
         }
     }
 
@@ -163,13 +186,18 @@ impl RevenantApp {
         let transport = Arc::clone(&self.transport);
         let url = profile.url.clone();
         let timeout = Duration::from_secs(u64::from(profile.timeout));
-        self.connect.begin_ping(profile);
+        let request = self.requests.issue();
+        self.connect.begin_ping(request, profile);
         self.worker.spawn(move || {
             let (ok, detail) = match ping_server(&transport, &url, timeout) {
                 PingOutcome::Ok(detail) => (true, detail),
                 PingOutcome::Failed(detail) => (false, detail),
             };
-            WorkerMsg::Ping { ok, detail }
+            WorkerMsg::Ping {
+                request,
+                ok,
+                detail,
+            }
         });
     }
 
@@ -180,39 +208,49 @@ impl RevenantApp {
             return;
         };
         let saved_username = self.store.saved_username();
-        let has_saved_credentials = saved_username.is_some();
         let storage_info = self.store.credential_storage_info();
-        self.login = Some(LoginState::new(profile, saved_username, storage_info));
-        self.dialog = Some(Dialog::Login);
+        let mut login = LoginState::new(profile, saved_username.clone(), storage_info);
         // Pre-fill the saved password in the background: keychain reads can
-        // block or prompt, and the result only lands if the user has not begun
-        // typing (see `LoginState::prefill_password`).
-        if has_saved_credentials {
+        // block or prompt. The read is tagged with this wizard's request and the
+        // username it is for, so a result that arrives after the user cancels or
+        // switches accounts is discarded (see `LoginState::prefill_password`).
+        if let Some(username) = saved_username {
+            let request = self.requests.issue();
+            login.expect_prefill(request);
             let store = Arc::clone(&self.store);
             self.worker.spawn(move || {
                 let password = store
                     .get_credentials()
                     .password
                     .map(|secret| secret.expose().to_owned());
-                WorkerMsg::SavedPassword(password)
+                WorkerMsg::SavedPassword {
+                    request,
+                    username,
+                    password,
+                }
             });
         }
+        self.login = Some(login);
+        self.dialog = Some(Dialog::Login);
     }
 
-    fn on_saved_password(&mut self, password: Option<String>) {
-        if let (Some(login), Some(password)) = (self.login.as_mut(), password) {
-            login.prefill_password(password);
-        }
+    fn on_saved_password(&mut self, request: RequestId, username: &str, password: Option<String>) {
+        let (Some(login), Some(password)) = (self.login.as_mut(), password) else {
+            return;
+        };
+        login.prefill_password(request, username, password);
     }
 
     /// Discover the signer identity in the background using the entered
     /// credentials against the active profile.
     fn start_discovery(&mut self) {
-        let Some(login) = &self.login else { return };
         let Some(profile) = self.store.active_profile() else {
             log::error!("login discovery started without an active profile");
             return;
         };
+        let request = self.requests.issue();
+        let Some(login) = &mut self.login else { return };
+        login.expect_discovery(request);
         // EKENG needs its legacy TLS stack registered before the SOAP call.
         register_active_profile_tls(&self.transport, &self.store);
         let transport = Arc::clone(&self.transport);
@@ -227,11 +265,11 @@ impl RevenantApp {
                 Ok(info) => IdentityOutcome::Ok(Box::new(info)),
                 Err(err) => jobs::categorize_identity_error(&err),
             };
-            WorkerMsg::Identity(outcome)
+            WorkerMsg::Identity { request, outcome }
         });
     }
 
-    fn on_identity_result(&mut self, outcome: IdentityOutcome) {
+    fn on_identity_result(&mut self, request: RequestId, outcome: IdentityOutcome) {
         // Localize the status line first so the mutable `login` borrow below does
         // not overlap the immutable `l10n` borrow.
         let status = match &outcome {
@@ -250,6 +288,12 @@ impl RevenantApp {
             }
         };
         let Some(login) = &mut self.login else { return };
+        // A discovery that outlived its wizard must not hand an identity to a
+        // login that never asked for it -- `Finish` persists whatever is here.
+        if !login.claim_discovery(request) {
+            log::debug!("ignoring identity result for a cancelled or superseded request");
+            return;
+        }
         match outcome {
             IdentityOutcome::Ok(info) => login.on_identity_found(*info, status),
             _ => login.on_discovery_failed(status),
@@ -646,7 +690,13 @@ impl RevenantApp {
         };
         match dialog {
             Dialog::Connect => match views::connect::show(ctx, &self.l10n, &mut self.connect) {
-                ConnectAction::Cancel => self.dialog = None,
+                ConnectAction::Cancel => {
+                    // Abandon any ping still running: dismissing the dialog is a
+                    // decision not to use that server, and a late success must
+                    // not quietly persist it anyway.
+                    self.connect.cancel();
+                    self.dialog = None;
+                }
                 ConnectAction::Ping(profile) => self.start_ping(*profile),
                 ConnectAction::None => {}
             },

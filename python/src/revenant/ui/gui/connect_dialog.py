@@ -40,7 +40,10 @@ class ConnectDialog:
         self._tk = tk
         self._ttk = ttk
         self._on_complete_action = on_complete_action
-        self._profile: ServerProfile | None = None
+        # Identifies the ping currently being awaited. Cleared on cancel and on
+        # completion, so a result that arrives afterwards is recognisably stale
+        # and can be dropped instead of acted on (GHSA-285g).
+        self._ping_token: object | None = None
 
         # Window
         self._win = tk.Toplevel(parent)
@@ -76,6 +79,10 @@ class ConnectDialog:
         ttk.Button(nav, text=_("gui.cancel"), command=self._cancel).pack(side="right", padx=(8, 0))
         self._connect_btn = ttk.Button(nav, text=_("gui.connect"), command=self._on_connect)
         self._connect_btn.pack(side="right")
+
+        # The title-bar close button destroys the window directly, which would
+        # skip _cancel and leave a ping still owning the dialog.
+        self._win.protocol("WM_DELETE_WINDOW", self._cancel)
 
         from . import center_on_parent
 
@@ -148,25 +155,42 @@ class ConnectDialog:
                 messagebox.showwarning(_("gui.connect"), _("gui.select_a_server"), parent=self._win)
                 return
 
-        self._profile = profile
         register_profile_tls_mode(profile)
 
-        # Start ping
+        # Start ping. The token and the profile travel with the callbacks rather
+        # than through the dialog, so a result can never be matched against one
+        # attempt and applied to another.
+        token = object()
+        self._ping_token = token
         self._connect_btn.configure(state="disabled")
         self._status_var.set(_("gui.connecting_to_url_ellipsis").format(url=profile.url))
 
         run_in_thread(
             self._win,
             lambda: ping_server(profile.url, timeout=DEFAULT_TIMEOUT_HTTP_GET),
-            self._on_ping_ok,
-            self._on_ping_fail,
+            lambda result: self._on_ping_ok(token, profile, result),
+            lambda exc: self._on_ping_fail(token, exc),
         )
 
-    def _on_ping_ok(self, result: tuple[bool, str]) -> None:
+    def _awaiting(self, token: object) -> bool:
+        """Whether `token` is still the ping this dialog is waiting for.
+
+        Destroying the window does not cancel work already scheduled with
+        ``after()``, so a cancelled dialog's callbacks still run and would
+        otherwise persist a server the user declined.
+        """
+        if token is not self._ping_token:
+            return False
+        self._ping_token = None
+        return True
+
+    def _on_ping_ok(self, token: object, profile: ServerProfile, result: tuple[bool, str]) -> None:
+        if not self._awaiting(token):
+            return
         ok, info = result
         if ok:
             # Show TLS info
-            host = urlparse(self._profile.url).hostname if self._profile else None
+            host = urlparse(profile.url).hostname
             tls_info = get_host_tls_info(host) if host else None
             status = _("gui.connected_info").format(info=info)
             if tls_info:
@@ -174,8 +198,7 @@ class ConnectDialog:
             self._status_var.set(status)
 
             # Save and close
-            if self._profile is not None:
-                save_server_config(self._profile)
+            save_server_config(profile)
             self._win.destroy()
             if self._on_complete_action is not None:
                 self._on_complete_action()
@@ -183,9 +206,14 @@ class ConnectDialog:
             self._status_var.set(_("gui.failed_info").format(info=info))
             self._connect_btn.configure(state="normal")
 
-    def _on_ping_fail(self, exc: Exception) -> None:
+    def _on_ping_fail(self, token: object, exc: Exception) -> None:
+        if not self._awaiting(token):
+            return
         self._status_var.set(_("gui.error_error").format(error=exc))
         self._connect_btn.configure(state="normal")
 
     def _cancel(self) -> None:
+        # Abandon any ping in flight: dismissing the dialog is a decision not to
+        # use that server, and a late success must not persist it anyway.
+        self._ping_token = None
         self._win.destroy()
