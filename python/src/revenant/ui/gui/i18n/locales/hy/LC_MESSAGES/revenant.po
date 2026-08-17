@@ -762,6 +762,9 @@ msgstr "{start} - {end} ({days} օր մնացել է!)"
 msgid "gui.cert_expired_range"
 msgstr "ԺԱՄԿԵՏՆ ԱՆՑԱԾ: {start} - {end} ({days} օր առաջ)"
 
+msgid "gui.cert_not_yet_valid_range"
+msgstr "ԴԵՌ ՎԱՎԵՐ ՉԷ: {start} - {end}"
+
 #. EN: Bottom center
 msgid "gui.pos_bottom_center"
 msgstr "Ներքև կենտրոն"

@@ -569,6 +569,9 @@ msgstr "{start} - {end} (დარჩა {days} დღე!)"
 msgid "gui.cert_expired_range"
 msgstr "ვადაგასულია: {start} - {end} ({days} დღის წინ)"
 
+msgid "gui.cert_not_yet_valid_range"
+msgstr "ჯერ არ არის ძალაში: {start} - {end}"
+
 msgid "gui.pos_bottom_center"
 msgstr "ქვემოთ შუაში"
 

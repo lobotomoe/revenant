@@ -569,6 +569,9 @@ msgstr "{start} - {end} ({days} days left!)"
 msgid "gui.cert_expired_range"
 msgstr "EXPIRED: {start} - {end} ({days} days ago)"
 
+msgid "gui.cert_not_yet_valid_range"
+msgstr "NOT YET VALID: {start} - {end}"
+
 msgid "gui.pos_bottom_center"
 msgstr "Bottom center"
 

@@ -161,6 +161,44 @@ fn render_report(ui: &mut egui::Ui, l10n: &Localizer, report: &Report) {
     });
 }
 
+/// What the verify view says about one signature.
+struct Verdict {
+    label: &'static str,
+    color: egui::Color32,
+    /// Whether the embedded signer identity and chain trust may be presented as
+    /// applying to this document.
+    identity_applies: bool,
+}
+
+/// Decide the primary verdict for one signature.
+///
+/// The verdict is [`VerificationResult::valid`] and never the bare CMS signature
+/// status. Those differ precisely in the tampered-document case: an attacker can
+/// alter bytes the ByteRange covers while leaving the CMS object intact, so the
+/// signer's signature over the signed attributes still verifies while the
+/// document digest no longer matches. Reading only the CMS status rendered a
+/// green "Signature VALID" above a red integrity line, and showed the embedded
+/// certificate as the signer of bytes it never signed (GHSA-m267).
+///
+/// Trust is deliberately not part of this: a genuine signature from a
+/// certificate outside the profile's anchors is still a genuine signature, and
+/// the trust row says so on its own.
+fn verdict_for(result: &VerificationResult) -> Verdict {
+    if result.valid() {
+        Verdict {
+            label: "gui.signature_valid",
+            color: theme::OK,
+            identity_applies: true,
+        }
+    } else {
+        Verdict {
+            label: "gui.signature_failed",
+            color: theme::ERROR,
+            identity_applies: false,
+        }
+    }
+}
+
 fn render_signature(
     ui: &mut egui::Ui,
     l10n: &Localizer,
@@ -168,9 +206,13 @@ fn render_signature(
     current: usize,
     total: usize,
 ) {
+    let verdict = verdict_for(result);
+    // An unnamed signer for a failed signature, rather than a name the failure
+    // means we cannot attribute. The certificate is still in the details below.
     let signer = result
         .signer
         .as_ref()
+        .filter(|_| verdict.identity_applies)
         .and_then(|cert| cert.name.as_deref())
         .unwrap_or("?");
     ui.strong(l10n.tf(
@@ -183,16 +225,11 @@ fn render_signature(
     ));
 
     // Signature verdict.
-    let (verdict_key, verdict_color) = if result.signature.is_valid() {
-        ("gui.signature_valid", theme::OK)
-    } else {
-        ("gui.signature_failed", theme::ERROR)
-    };
     labeled(ui, l10n.t("gui.verify_signature_label"), |ui| {
-        ui.colored_label(verdict_color, l10n.t(verdict_key));
+        ui.colored_label(verdict.color, l10n.t(verdict.label));
     });
 
-    // Integrity.
+    // Integrity, as the subordinate line saying which half failed.
     let (integrity_key, integrity_color) = if result.integrity_ok() {
         ("gui.verify_integrity_ok", theme::OK)
     } else {
@@ -200,21 +237,24 @@ fn render_signature(
     };
     ui.colored_label(integrity_color, l10n.t(integrity_key));
 
-    // Organization (when present).
-    if let Some(org) = result
-        .signer
-        .as_ref()
-        .and_then(|cert| cert.organization.as_deref())
-    {
-        labeled(ui, l10n.t("gui.verify_org_label"), |ui| {
-            ui.label(org);
+    // Organization and trust describe the embedded certificate. For a signature
+    // that did not verify, neither is a statement about this document, so they
+    // are left to the details rather than shown as findings.
+    if verdict.identity_applies {
+        if let Some(org) = result
+            .signer
+            .as_ref()
+            .and_then(|cert| cert.organization.as_deref())
+        {
+            labeled(ui, l10n.t("gui.verify_org_label"), |ui| {
+                ui.label(org);
+            });
+        }
+
+        labeled(ui, l10n.t("gui.verify_trust_label"), |ui| {
+            ui.label(trust_text(l10n, result));
         });
     }
-
-    // Trust.
-    labeled(ui, l10n.t("gui.verify_trust_label"), |ui| {
-        ui.label(trust_text(l10n, result));
-    });
 
     // Technical details.
     if !result.details.is_empty() {
@@ -270,4 +310,95 @@ fn labeled(ui: &mut egui::Ui, label: &str, content: impl FnOnce(&mut egui::Ui)) 
         ui.label(label);
         content(ui);
     });
+}
+
+#[cfg(test)]
+mod tests {
+    use revenant_sign_core::cms::ByteRangeCoverage;
+    use revenant_sign_core::cms::SignatureStatus;
+    use revenant_sign_core::pki::CertInfo;
+
+    use super::*;
+
+    /// A result whose CMS signature verifies and whose document is intact.
+    fn genuine() -> VerificationResult {
+        VerificationResult {
+            structure_ok: true,
+            hash_ok: true,
+            signature: SignatureStatus::Valid,
+            coverage: ByteRangeCoverage::default(),
+            ltv_enabled: false,
+            details: Vec::new(),
+            signer: Some(CertInfo {
+                name: Some("Victim Signer".to_owned()),
+                organization: Some("Victim Org".to_owned()),
+                ..CertInfo::default()
+            }),
+            trust_anchor: Some("Example Trusted CA".to_owned()),
+            trust_status: Some(TrustStatus::Trusted),
+        }
+    }
+
+    #[test]
+    fn a_tampered_document_is_not_reported_valid() {
+        // The state the report describes: bytes the ByteRange covers were
+        // altered while the CMS object was left intact, so the signature over
+        // the signed attributes still verifies and only the digest disagrees.
+        let mut result = genuine();
+        result.hash_ok = false;
+
+        assert!(
+            result.signature.is_valid(),
+            "precondition: CMS still verifies"
+        );
+        assert!(
+            !result.integrity_ok(),
+            "precondition: the document does not"
+        );
+
+        let verdict = verdict_for(&result);
+        assert_eq!(verdict.label, "gui.signature_failed");
+        assert_eq!(verdict.color, theme::ERROR);
+    }
+
+    #[test]
+    fn a_failed_signature_does_not_name_a_signer_or_a_trust_anchor() {
+        // The certificate is trusted and carries a name, but neither is a
+        // statement about a document the signature does not cover.
+        let mut result = genuine();
+        result.hash_ok = false;
+
+        assert!(!verdict_for(&result).identity_applies);
+    }
+
+    #[test]
+    fn a_genuine_signature_still_presents_its_signer() {
+        let verdict = verdict_for(&genuine());
+        assert_eq!(verdict.label, "gui.signature_valid");
+        assert_eq!(verdict.color, theme::OK);
+        assert!(verdict.identity_applies);
+    }
+
+    #[test]
+    fn an_untrusted_chain_does_not_invalidate_a_genuine_signature() {
+        // Trust is reported on its own line; a real signature from a
+        // certificate outside the profile's anchors is still a real signature.
+        let mut result = genuine();
+        result.trust_status = Some(TrustStatus::Untrusted);
+        result.trust_anchor = None;
+
+        let verdict = verdict_for(&result);
+        assert_eq!(verdict.label, "gui.signature_valid");
+        assert!(verdict.identity_applies);
+    }
+
+    #[test]
+    fn an_unverifiable_signature_is_a_failure_not_a_pass() {
+        let mut result = genuine();
+        result.signature = SignatureStatus::Unverifiable("no signer certificate");
+
+        let verdict = verdict_for(&result);
+        assert_eq!(verdict.label, "gui.signature_failed");
+        assert!(!verdict.identity_applies);
+    }
 }

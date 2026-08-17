@@ -569,6 +569,9 @@ msgstr "{start} - {end} ({days} روز باقی‌مانده!)"
 msgid "gui.cert_expired_range"
 msgstr "منقضی شده: {start} - {end} ({days} روز پیش)"
 
+msgid "gui.cert_not_yet_valid_range"
+msgstr "هنوز معتبر نیست: {start} - {end}"
+
 msgid "gui.pos_bottom_center"
 msgstr "پایین وسط"
 

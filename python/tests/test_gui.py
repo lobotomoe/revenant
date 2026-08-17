@@ -332,3 +332,102 @@ def test_run_in_thread_error():
     started_threads[0].join(timeout=5)
 
     assert len(captured_callback) == 1
+
+
+# ── Verdict presentation (GHSA-m267 / GHSA-f928 / GHSA-2cxp) ────────────
+
+
+def _render(result: VerificationResult) -> tuple[str, list[tuple[str, str | None]]]:
+    """Run format_results and return the flat text plus the tagged segments."""
+    from revenant.ui.gui.verify_dialog import format_results
+
+    lines: list[tuple[str, str | None]] = []
+
+    def mock_append(text: str, tag: str | None = None) -> None:
+        lines.append((text, tag))
+
+    format_results(mock_append, [result])
+    return "".join(text for text, _ in lines), lines
+
+
+def _tampered() -> VerificationResult:
+    """A PDF whose covered bytes changed while its CMS stayed intact.
+
+    The signature over the signed attributes still verifies, so the chain
+    validates and names a trusted anchor; only the ByteRange digest disagrees.
+    """
+    return {
+        "valid": False,
+        "structure_ok": True,
+        "hash_ok": False,
+        "signer": {
+            "name": "Victim Signer",
+            "email": None,
+            "organization": "Victim Org",
+            "dn": None,
+        },
+        "chain_valid": True,
+        "trust_anchor": "Example Trusted CA",
+        "details": ["Integrity: FAILED"],
+    }
+
+
+def test_tampered_pdf_is_not_credited_to_a_trusted_signer():
+    """A failed signature must not print a green trust line for its certificate."""
+    all_text, lines = _render(_tampered())
+
+    assert "Example Trusted CA" not in all_text
+    assert not any(tag == "trust_ok" for _, tag in lines)
+
+
+def test_tampered_pdf_does_not_name_its_signer_or_organization():
+    all_text, _lines = _render(_tampered())
+
+    assert "Victim Signer" not in all_text
+    assert "Victim Org" not in all_text
+    assert "FAILED" in all_text
+
+
+def test_a_valid_signature_still_shows_signer_and_trust():
+    """The fix must not strip identity from signatures that did verify."""
+    result: VerificationResult = dict(_tampered())
+    result["valid"] = True
+    result["hash_ok"] = True
+
+    all_text, lines = _render(result)
+
+    assert "Victim Signer" in all_text
+    assert "Victim Org" in all_text
+    assert "Example Trusted CA" in all_text
+    assert any(tag == "trust_ok" for _, tag in lines)
+
+
+def test_certificate_that_has_not_started_is_not_shown_as_normal():
+    """A notBefore in the future must not render with the plain styling."""
+    import datetime
+
+    from revenant.ui.gui.sign_panels import format_cert_validity
+
+    now = datetime.datetime.now(datetime.timezone.utc)
+    start = (now + datetime.timedelta(days=90)).isoformat()
+    end = (now + datetime.timedelta(days=365)).isoformat()
+
+    text, color = format_cert_validity(start, end)
+
+    assert color == "red"
+    assert "days remaining" not in text
+
+
+def test_a_currently_valid_certificate_is_still_normal():
+    import datetime
+
+    from revenant.ui.gui.sign_panels import format_cert_validity
+
+    now = datetime.datetime.now(datetime.timezone.utc)
+    start = (now - datetime.timedelta(days=10)).isoformat()
+    end = (now + datetime.timedelta(days=365)).isoformat()
+
+    text, color = format_cert_validity(start, end)
+
+    assert color == "gray"
+    assert "days remaining" in text

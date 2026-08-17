@@ -35,12 +35,18 @@ def days_remaining(not_after_iso: str) -> int:
 def expiry_status(not_after_iso: str, warn_days: int = EXPIRY_WARNING_DAYS) -> ExpiryStatus:
     """Determine the expiration status of a certificate.
 
+    Only the end of the validity period is considered, so "valid" here means
+    "not expired" and not "usable now" -- a certificate whose period has not
+    started yet also reaches the end of this function.  Callers presenting a
+    status to a user must consult :func:`not_yet_valid` as well; treating this
+    result as the whole answer is what showed a future certificate as normal.
+
     Args:
         not_after_iso: Certificate notAfter in ISO 8601 format.
         warn_days: Number of days before expiry to start warning.
 
     Returns:
-        One of: "valid", "expiring_soon", "expired", "not_yet_valid".
+        One of: "valid", "expiring_soon", "expired".
     """
     remaining = days_remaining(not_after_iso)
     if remaining < 0:

@@ -17,7 +17,7 @@ import datetime
 
 from ...config import get_active_profile, get_credential_storage_info
 from ...core.appearance import extract_cert_fields
-from ...core.cert_expiry import days_remaining, expiry_status
+from ...core.cert_expiry import days_remaining, expiry_status, not_yet_valid
 from .i18n import _
 
 
@@ -39,6 +39,14 @@ def format_cert_validity(not_before: str | None, not_after: str | None) -> tuple
     end = dt_end.strftime("%Y-%m-%d")
     remaining = days_remaining(not_after)
     status = expiry_status(not_after)
+
+    # A certificate whose period has not started is as unusable as an expired
+    # one, but expiry_status() only reads notAfter and so calls it "valid".
+    # Checked first, or a certificate dated a year out shows the normal styling
+    # with a reassuring "N days remaining".
+    if not_before and not_yet_valid(not_before):
+        text = _("gui.cert_not_yet_valid_range").format(start=start, end=end)
+        return text, "red"
 
     if status == "expired":
         text = _("gui.cert_expired_range").format(start=start, end=end, days=abs(remaining))

@@ -569,6 +569,9 @@ msgstr "{start} - {end} ({days} gün kaldı!)"
 msgid "gui.cert_expired_range"
 msgstr "SÜRESİ DOLMUŞ: {start} - {end} ({days} gün önce)"
 
+msgid "gui.cert_not_yet_valid_range"
+msgstr "HENÜZ GEÇERLİ DEĞİL: {start} - {end}"
+
 msgid "gui.pos_bottom_center"
 msgstr "Alt orta"
 

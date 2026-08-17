@@ -762,6 +762,9 @@ msgstr "{start} - {end} ({days} дн. осталось!)"
 msgid "gui.cert_expired_range"
 msgstr "ИСТЕК: {start} - {end} ({days} дн. назад)"
 
+msgid "gui.cert_not_yet_valid_range"
+msgstr "ЕЩЁ НЕ ДЕЙСТВИТЕЛЕН: {start} - {end}"
+
 #. EN: Bottom center
 msgid "gui.pos_bottom_center"
 msgstr "Снизу по центру"

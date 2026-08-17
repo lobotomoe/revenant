@@ -75,6 +75,20 @@ def _format_trust_line(entry: object) -> tuple[str, str]:
     return _("gui.verify_trust_not_checked"), "trust_none"
 
 
+def _presentable_signer(entry: object) -> str:
+    """The signer name to show, or "?" when the signature does not carry one.
+
+    A failed signature has no signer to name.  The certificate is still in the
+    technical details; what it must not do is appear as the authenticated author
+    of bytes the signature does not cover.
+    """
+    from ..workflows import VerifyEntry
+
+    if isinstance(entry, VerifyEntry) and entry.valid:
+        return entry.signer_name
+    return "?"
+
+
 def _format_entry_summary(append: AppendFn, entry: object) -> None:
     """Render the human-readable summary block for one signature."""
     from ..workflows import VerifyEntry
@@ -84,12 +98,7 @@ def _format_entry_summary(append: AppendFn, entry: object) -> None:
 
     # Signer
     append(_("gui.verify_signer_label") + " ", "header")
-    append(entry.signer_name + "\n")
-
-    # Organization
-    if entry.signer_org:
-        append(_("gui.verify_org_label") + " ", "header")
-        append(entry.signer_org + "\n")
+    append(_presentable_signer(entry) + "\n")
 
     # Signature integrity
     append(_("gui.verify_signature_label") + " ", "header")
@@ -98,10 +107,19 @@ def _format_entry_summary(append: AppendFn, entry: object) -> None:
     else:
         append(_("gui.verify_integrity_failed") + "\n", "failed")
 
-    # Trust chain
-    append(_("gui.verify_trust_label") + " ", "header")
-    trust_text, trust_tag = _format_trust_line(entry)
-    append(trust_text + "\n", trust_tag)
+    # Organization and trust describe the embedded certificate, not this
+    # document.  A tampered PDF keeps its CMS intact, so the chain can still
+    # validate and print a green "Trusted (CA)" beside a failed integrity check
+    # -- true of the certificate, and meaningless as authentication here.
+    # Reported only for a signature that actually verified (GHSA-f928).
+    if entry.valid:
+        if entry.signer_org:
+            append(_("gui.verify_org_label") + " ", "header")
+            append(entry.signer_org + "\n")
+
+        append(_("gui.verify_trust_label") + " ", "header")
+        trust_text, trust_tag = _format_trust_line(entry)
+        append(trust_text + "\n", trust_tag)
 
 
 def format_results(
@@ -120,7 +138,9 @@ def format_results(
         if vr.total_count > 1:
             append(
                 _("gui.signature_current_total_signer").format(
-                    current=entry.index + 1, total=entry.total, signer=entry.signer_name
+                    current=entry.index + 1,
+                    total=entry.total,
+                    signer=_presentable_signer(entry),
                 )
                 + "\n",
                 "header",
