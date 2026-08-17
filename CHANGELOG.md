@@ -7,6 +7,35 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [3.0.4] - 2026-08-18
+
+Security release. Three fixes in what the desktop apps report about a
+signature. The command-line tools were not affected and their verdicts are
+unchanged.
+
+### Fixed
+
+- **A tampered PDF is no longer shown as a valid signature.** The Rust GUI took
+  its green verdict from the CMS signature alone. Altering bytes the ByteRange
+  covers while leaving the CMS object intact keeps that signature verifiable, so
+  a modified document rendered `Signature VALID` in green with a red integrity
+  failure beneath it, and named the embedded certificate as its signer. The
+  verdict is now the full result -- integrity and signature -- which is what the
+  core library already meant by valid, and what the CLI has always reported.
+  Reported by peyuaa.
+- **A failed signature no longer carries a trusted signer.** The Python GUI
+  printed `Signature: Integrity check FAILED` directly above a green
+  `Trust: Trusted (CA)`, because the trust line read only the chain result. The
+  chain may genuinely be trusted; that is a fact about the certificate and not
+  about a document the signature does not cover. Signer, organization and trust
+  are now reported only for a signature that verified, on both the embedded and
+  detached paths. Reported by peyuaa.
+- **A certificate that is not yet valid is no longer styled as normal.** The
+  Python GUI classified certificates by `notAfter` only, so one whose validity
+  period had not started showed the ordinary presentation and a reassuring
+  count of days remaining. It is now flagged like an expired certificate, since
+  neither can be used. Reported by peyuaa.
+
 ## [3.0.3] - 2026-08-17
 
 Security release completing a fix that 3.0.2 landed in only one of the three
@@ -573,7 +602,8 @@ entry point -- but their verification behaviour changes, as described below.
 - Pyright strict mode type checking with 0 errors
 - 96%+ test coverage (600+ tests)
 
-[Unreleased]: https://github.com/lobotomoe/revenant/compare/v3.0.3...HEAD
+[Unreleased]: https://github.com/lobotomoe/revenant/compare/v3.0.4...HEAD
+[3.0.4]: https://github.com/lobotomoe/revenant/compare/v3.0.3...v3.0.4
 [3.0.3]: https://github.com/lobotomoe/revenant/compare/v3.0.2...v3.0.3
 [3.0.2]: https://github.com/lobotomoe/revenant/compare/v3.0.1...v3.0.2
 [3.0.1]: https://github.com/lobotomoe/revenant/compare/v3.0.0...v3.0.1

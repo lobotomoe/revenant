@@ -70,6 +70,26 @@
   </branding>
 
   <releases>
+    <release version="3.0.4" date="2026-08-18">
+      <description>
+        <p>
+          Security release. Corrects what the app reports about a signature;
+          the command-line tool was not affected.
+        </p>
+        <ul>
+          <li>
+            A document altered after signing is no longer reported as a valid
+            signature. The verdict came from the signature alone, so a modified
+            file could show a green result with the integrity failure listed
+            separately beneath it.
+          </li>
+          <li>
+            A signature that failed to verify no longer shows a signer name or
+            a trusted certificate authority alongside the failure.
+          </li>
+        </ul>
+      </description>
+    </release>
     <release version="3.0.3" date="2026-08-17">
       <description>
         <p>
