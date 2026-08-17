@@ -1,0 +1,10 @@
+# macOS-only extra for the CI screenshot job: python/scripts/_capture.py uses
+# Quartz to capture native window frames. Kept out of dev.in because it does not
+# install on Linux or Windows, and resolved on macOS because that is its only
+# target platform.
+#
+# Regenerate with:
+#   uv pip compile --generate-hashes \
+#     --output-file=.github/requirements/screenshots-macos.txt \
+#     .github/requirements/screenshots-macos.in
+pyobjc-framework-Quartz>=10.0,<13

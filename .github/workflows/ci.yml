@@ -688,7 +688,7 @@ jobs:
 
       - name: Install Quartz bridge (macOS native window capture)
         if: runner.os == 'macOS'
-        run: pip install pyobjc-framework-Quartz
+        run: pip install --require-hashes -r ../.github/requirements/screenshots-macos.txt
 
       - name: Compile translations
         run: python scripts/compile_translations.py

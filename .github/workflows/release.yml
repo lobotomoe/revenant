@@ -16,6 +16,12 @@ on:
 
 permissions: read-all
 
+env:
+  # The npm CLI used by the trusted-publishing jobs. Pinned, not `@latest`: those
+  # jobs hold `id-token: write`, so the CLI they run must not be redirectable by a
+  # dist-tag move. Floor is 11.5.1 (OIDC support); bump deliberately.
+  NPM_CLI_VERSION: "12.0.2"
+
 concurrency:
   group: release-${{ github.ref }}
   cancel-in-progress: false
@@ -712,16 +718,26 @@ jobs:
       # Trusted publishing (OIDC) needs npm CLI >= 11.5.1; Node 22 ships an older
       # npm, and pnpm's OIDC path is currently broken (publishes 404). So publish
       # with the npm CLI directly -- auth comes from the id-token, no NODE_AUTH_TOKEN.
-      - name: Upgrade npm for trusted publishing
-        run: npm install -g npm@latest
+      # Pinned rather than `@latest`: this job can mint a publish credential, so the
+      # CLI it runs must not be a moving target that a dist-tag change can redirect.
+      - name: Install npm for trusted publishing
+        run: npm install -g npm@${{ env.NPM_CLI_VERSION }}
 
+      # `--ignore-scripts` keeps `prepublishOnly` (tsup + tsc + vitest, all
+      # third-party) from executing while this job can mint a publish credential.
+      # Nothing is lost: `Build` above produced dist/, `files` ships only dist/,
+      # and the `ci` job already type-checked and tested this commit.
       - name: Publish
         run: |
           PKG_VERSION="${GITHUB_REF_NAME#v}"
+          if [ ! -s dist/index.js ]; then
+            echo "::error::dist/ is missing or empty -- the Build step did not produce a package"
+            exit 1
+          fi
           if npm view "revenant-sign@$PKG_VERSION" version 2>/dev/null; then
             echo "Version $PKG_VERSION already published, skipping"
           else
-            npm publish --provenance --access public
+            npm publish --provenance --access public --ignore-scripts
           fi
 
   publish-npm-prerelease:
@@ -770,12 +786,18 @@ jobs:
       - name: Build
         run: pnpm build
 
-      # See the stable publish job: OIDC trusted publishing via the npm CLI.
-      - name: Upgrade npm for trusted publishing
-        run: npm install -g npm@latest
+      # See the stable publish job: OIDC trusted publishing via the npm CLI,
+      # pinned CLI, and no lifecycle scripts while a credential can be minted.
+      - name: Install npm for trusted publishing
+        run: npm install -g npm@${{ env.NPM_CLI_VERSION }}
 
       - name: Publish
-        run: npm publish --provenance --access public --tag next
+        run: |
+          if [ ! -s dist/index.js ]; then
+            echo "::error::dist/ is missing or empty -- the Build step did not produce a package"
+            exit 1
+          fi
+          npm publish --provenance --access public --tag next --ignore-scripts
 
   # -- crates.io: publish the Rust library + CLI crates via OIDC --------------
   # Tokenless trusted publishing, same model as npm/PyPI: crates-io-auth-action
@@ -819,14 +841,24 @@ jobs:
         with:
           workspaces: rust
 
+      # Verification compiles the packaged crates, which runs their build graph's
+      # build scripts and proc macros. That must happen before the publish token
+      # exists, or any one of them could read it out of the environment.
+      # `--workspace` resolves the internal path deps locally, so this verifies a
+      # version that is not on the index yet.
+      - name: Verify packages (no credentials in scope)
+        run: cargo publish --workspace --dry-run --locked
+
       - name: Authenticate to crates.io (OIDC trusted publishing)
         id: auth
         uses: rust-lang/crates-io-auth-action@c6f97d42243bad5fab37ca0427f495c86d5b1a18 # v1.0.5
 
-      # Publish in dependency order (tls -> core -> cli). `cargo publish` waits
-      # for each crate to appear on the index before returning, so the next one
-      # resolves it. Each publish is guarded so a re-run after a partial failure
-      # skips crates that already landed.
+      # Upload only -- `--no-verify` keeps this step from compiling anything while
+      # the token is in scope, since the step above already verified these exact
+      # packages. Order still matters because crates.io rejects a crate whose
+      # dependencies are not on the index yet, and `cargo publish` waits for each
+      # one to land. Each upload is guarded so a re-run after a partial failure
+      # skips crates that already went out.
       - name: Publish crates
         env:
           CARGO_REGISTRY_TOKEN: ${{ steps.auth.outputs.token }}
@@ -840,7 +872,7 @@ jobs:
               echo "$crate@$ver already published, skipping"
             else
               echo "Publishing $crate@$ver..."
-              cargo publish -p "$crate"
+              cargo publish -p "$crate" --locked --no-verify
             fi
           }
           publish_crate revenant-sign-tls
