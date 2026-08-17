@@ -1,0 +1,230 @@
+name: Update distribution taps
+
+# Publishes a released version to the third-party package managers: the Homebrew
+# tap (macOS CLI) and the Scoop bucket (Windows CLI + GUI). Called by release.yml
+# on a stable tag, and dispatchable for a chosen tag so a tap can be repaired or
+# backfilled without cutting a release -- both taps sat at 2.0.0 for five
+# releases because the only job that updated them lived in a workflow that was
+# mothballed, which is a failure mode worth being able to fix directly.
+
+on:
+  workflow_call:
+    inputs:
+      tag:
+        description: Release tag to publish (e.g. v3.0.3)
+        required: true
+        type: string
+    secrets:
+      DIST_TAP_TOKEN:
+        description: Write access to the tap and bucket repositories
+        required: true
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: Release tag to publish (e.g. v3.0.3)
+        required: true
+        type: string
+
+permissions: read-all
+
+concurrency:
+  group: update-taps-${{ inputs.tag }}
+  cancel-in-progress: false
+
+jobs:
+  homebrew:
+    name: Update Homebrew Tap
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      contents: read
+
+    steps:
+      - uses: step-security/harden-runner@bf7454d06d71f1098171f2acdf0cd4708d7b5920 # v2.20.0
+        with:
+          egress-policy: audit
+
+      # The tag lands in Ruby source that every downstream `brew` operation
+      # evaluates, so it is refused here unless it is a plain release version.
+      # `git check-ref-format` accepts quotes and semicolons, and a tag like
+      # `v1.0.0";system("...")#` produced valid, executable Ruby (GHSA-f39f).
+      - name: Validate tag
+        env:
+          TAG: ${{ inputs.tag }}
+        run: |
+          if ! printf '%s' "$TAG" | grep -Eq '^v[0-9]+\.[0-9]+\.[0-9]+$'; then
+            echo "::error::refusing to publish tap from tag '$TAG'; expected vMAJOR.MINOR.PATCH"
+            exit 1
+          fi
+
+      - name: Download the macOS CLI binary and release checksums
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+          TAG: ${{ inputs.tag }}
+        run: |
+          gh release download "$TAG" \
+            --repo "$GITHUB_REPOSITORY" \
+            --pattern "revenant-cli-macos-universal" \
+            --pattern "SHA256SUMS.txt" \
+            --dir .
+
+      # The formula's sha256 is what pins the download for every user, so check
+      # the asset against the checksums published with the release rather than
+      # trusting whatever arrived.
+      - name: Verify the binary against the release checksums
+        run: |
+          grep ' \./revenant-cli-macos-universal$' SHA256SUMS.txt | sha256sum -c -
+
+      # Rendered by Python, not by a shell heredoc: the values are re-validated
+      # here and inserted by string substitution, so no quoting mistake in this
+      # file can put arbitrary text into the formula.
+      - name: Render formula
+        env:
+          TAG: ${{ inputs.tag }}
+        run: |
+          python3 - <<'PY' > /tmp/revenant.rb
+          import hashlib
+          import os
+          import re
+
+          version = os.environ["TAG"].removeprefix("v")
+          if not re.fullmatch(r"[0-9]+\.[0-9]+\.[0-9]+", version):
+              raise SystemExit(f"refusing to render formula for version {version!r}")
+
+          digest = hashlib.sha256(open("revenant-cli-macos-universal", "rb").read()).hexdigest()
+
+          print(f'''class Revenant < Formula
+            desc "Electronic document signing with ARX CoSign (SOAP/DSS)"
+            homepage "https://github.com/lobotomoe/revenant"
+            license "Apache-2.0"
+            version "{version}"
+
+            url "https://github.com/lobotomoe/revenant/releases/download/v#{{version}}/revenant-cli-macos-universal"
+            sha256 "{digest}"
+
+            depends_on :macos
+
+            def install
+              bin.install "revenant-cli-macos-universal" => "revenant"
+            end
+
+            test do
+              assert_match version.to_s, shell_output("#{{bin}}/revenant --version")
+            end
+          end''')
+          PY
+          cat /tmp/revenant.rb
+
+      # A syntax error here is only discovered by users running `brew`, so parse
+      # the formula before it is committed. `ruby -c` needs no Homebrew present.
+      - name: Check the formula parses
+        run: ruby -c /tmp/revenant.rb
+
+      - name: Commit formula to the tap
+        env:
+          GH_TOKEN: ${{ secrets.DIST_TAP_TOKEN }}
+          TAG: ${{ inputs.tag }}
+        run: |
+          VERSION="${TAG#v}"
+          FILE_SHA=$(gh api repos/lobotomoe/homebrew-revenant/contents/Formula/revenant.rb --jq '.sha')
+          gh api repos/lobotomoe/homebrew-revenant/contents/Formula/revenant.rb \
+            --method PUT \
+            --field message="revenant $VERSION" \
+            --field content="$(base64 -w 0 /tmp/revenant.rb)" \
+            --field sha="$FILE_SHA"
+
+  scoop:
+    name: Update Scoop Bucket
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      contents: read
+
+    steps:
+      - uses: step-security/harden-runner@bf7454d06d71f1098171f2acdf0cd4708d7b5920 # v2.20.0
+        with:
+          egress-policy: audit
+
+      # The tag reached the manifest through `sed` replacement text, where `&`
+      # and `/` are metacharacters. Refused here for the same reason as above.
+      - name: Validate tag
+        env:
+          TAG: ${{ inputs.tag }}
+        run: |
+          if ! printf '%s' "$TAG" | grep -Eq '^v[0-9]+\.[0-9]+\.[0-9]+$'; then
+            echo "::error::refusing to publish bucket from tag '$TAG'; expected vMAJOR.MINOR.PATCH"
+            exit 1
+          fi
+
+      - name: Download the Windows archive and release checksums
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+          TAG: ${{ inputs.tag }}
+        run: |
+          gh release download "$TAG" \
+            --repo "$GITHUB_REPOSITORY" \
+            --pattern "revenant-windows-x64.zip" \
+            --pattern "SHA256SUMS.txt" \
+            --dir .
+
+      - name: Verify the archive against the release checksums
+        run: |
+          grep ' \./revenant-windows-x64\.zip$' SHA256SUMS.txt | sha256sum -c -
+
+      # Built with json.dump, so the structure cannot be broken by the values --
+      # the previous version substituted placeholders with `sed`.
+      - name: Render manifest
+        env:
+          TAG: ${{ inputs.tag }}
+        run: |
+          python3 - <<'PY' > /tmp/revenant.json
+          import hashlib
+          import json
+          import os
+          import re
+
+          version = os.environ["TAG"].removeprefix("v")
+          if not re.fullmatch(r"[0-9]+\.[0-9]+\.[0-9]+", version):
+              raise SystemExit(f"refusing to render manifest for version {version!r}")
+
+          digest = hashlib.sha256(open("revenant-windows-x64.zip", "rb").read()).hexdigest()
+          base = "https://github.com/lobotomoe/revenant/releases/download"
+
+          print(json.dumps({
+              "version": version,
+              "description": "Electronic document signing with ARX CoSign (SOAP/DSS)",
+              "homepage": "https://github.com/lobotomoe/revenant",
+              "license": "Apache-2.0",
+              "architecture": {
+                  "64bit": {
+                      "url": f"{base}/v{version}/revenant-windows-x64.zip",
+                      "hash": digest,
+                  },
+              },
+              "bin": ["revenant.exe", "revenant-gui.exe"],
+              "shortcuts": [["revenant-gui.exe", "Revenant Sign"]],
+              "checkver": {"github": "https://github.com/lobotomoe/revenant"},
+              "autoupdate": {
+                  "architecture": {
+                      "64bit": {
+                          "url": f"{base}/v$version/revenant-windows-x64.zip",
+                      },
+                  },
+              },
+          }, indent=4))
+          PY
+          python3 -c "import json; json.load(open('/tmp/revenant.json'))"
+          cat /tmp/revenant.json
+
+      - name: Commit manifest to the bucket
+        env:
+          GH_TOKEN: ${{ secrets.DIST_TAP_TOKEN }}
+          TAG: ${{ inputs.tag }}
+        run: |
+          VERSION="${TAG#v}"
+          FILE_SHA=$(gh api repos/lobotomoe/scoop-revenant/contents/bucket/revenant.json --jq '.sha')
+          gh api repos/lobotomoe/scoop-revenant/contents/bucket/revenant.json \
+            --method PUT \
+            --field message="revenant $VERSION" \
+            --field content="$(base64 -w 0 /tmp/revenant.json)" \
+            --field sha="$FILE_SHA"

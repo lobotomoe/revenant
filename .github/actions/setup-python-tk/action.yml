@@ -1,23 +1,24 @@
 name: Set up Python with Tk 9.0
 description: >
-  Install Homebrew Python + python-tk@3.13 (linked to Tk 9.0), patch the Tk
-  dylib to remove private API references (NSWindowDidOrderOnScreenNotification /
-  NSWindowWillOrderOnScreenNotification) that cause Mac App Store rejection
-  (Guideline 2.5.1), and create a venv ready for py2app.
+  Install Homebrew Python + python-tk@3.13 (linked to Tk 9.0) and create a venv,
+  for jobs that need a real native Tk on macOS -- the screenshot gallery and the
+  py2app build test.
 
 inputs:
   cache-key-prefix:
     description: Prefix for the pip cache key (must be unique per job)
     required: false
     default: pip-mac
-  arch:
-    description: Target architecture for Tk build (arm64 or x86_64). Defaults to runner native.
-    required: false
-    default: ""
 
 runs:
   using: composite
   steps:
+    # Tk comes from Homebrew as-is. This used to compile Tk from an unverified
+    # upstream tarball to strip two private-API symbols that trip Mac App Store
+    # guideline 2.5.1, which mattered only while the Python .app was submitted to
+    # the store. The Rust GUI took over that submission, so the build-from-source
+    # step and its unauthenticated download were removed with the Python desktop
+    # release pipeline (GHSA-2qrm, GHSA-j66j).
     - name: Install Homebrew Python + Tk 9.0
       shell: bash
       run: |
@@ -25,11 +26,6 @@ runs:
         PYTHON="$(brew --prefix python@3.13)/bin/python3.13"
         "$PYTHON" -m venv /tmp/venv-tk9
         echo "/tmp/venv-tk9/bin" >> "$GITHUB_PATH"
-
-    - name: Build and install patched Tk dylib
-      uses: ./.github/actions/build-patched-tk
-      with:
-        arch: ${{ inputs.arch }}
 
     - name: Cache pip downloads
       uses: actions/cache@5a3ec84eff668545956fd18022155c47e93e2684 # v4

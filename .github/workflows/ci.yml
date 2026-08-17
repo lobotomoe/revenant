@@ -621,18 +621,9 @@ jobs:
         if: runner.os == 'macOS'
         run: python scripts/build.py mac --no-dmg
 
-      - name: Patch private API symbols in bundled Tk (macOS)
-        if: runner.os == 'macOS'
-        uses: ./.github/actions/patch-tk-private-api
-        with:
-          app-path: python/dist/Revenant.app
-
-      - name: Verify no private API in bundled Tk (macOS)
-        if: runner.os == 'macOS'
-        uses: ./.github/actions/verify-no-private-api
-        with:
-          app-path: python/dist/Revenant.app
-
+      # The bundled Tk is no longer scrubbed of the two private-API symbols that
+      # trip Mac App Store guideline 2.5.1: this .app is a packaging smoke test,
+      # not a store submission. The Rust GUI is what ships to the store now.
       - name: Test CLI binary (Unix)
         if: runner.os != 'Windows'
         run: ./dist/revenant --help

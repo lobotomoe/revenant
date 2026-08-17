@@ -6,8 +6,13 @@ name: Release
 # publishes a GitHub Release. The Python library (PyPI) and TypeScript library
 # (npm) are still published here from python/ and typescript/.
 #
-# The Python DESKTOP-APP packaging was retired from this pipeline and preserved,
-# runnable on demand, in release-python-desktop-legacy.yml (workflow_dispatch).
+# The Python DESKTOP-APP packaging is retired. It lived on as a manually
+# dispatchable workflow until it became a liability rather than a fallback: it
+# was never run once after being mothballed, yet held the only Homebrew/Scoop
+# publishing path (with a tag-to-Ruby injection, GHSA-f39f) and built Tk from an
+# unauthenticated tarball into signed artifacts (GHSA-2qrm, GHSA-j66j). Deleted
+# in favour of the tap jobs below. `git log -- .github/workflows/` has it if the
+# Python .app ever needs rebuilding.
 
 on:
   push:
@@ -798,6 +803,20 @@ jobs:
             exit 1
           fi
           npm publish --provenance --access public --tag next --ignore-scripts
+
+  # -- Homebrew tap + Scoop bucket --------------------------------------------
+  # Implemented in its own workflow so the same code is reachable by hand for a
+  # chosen tag; see the note there about both taps having gone stale at 2.0.0.
+  # Only DIST_TAP_TOKEN is passed, not `secrets: inherit`.
+  update-taps:
+    name: Update distribution taps
+    needs: release
+    if: ${{ !contains(github.ref_name, '-') }}
+    uses: ./.github/workflows/update-taps.yml
+    with:
+      tag: ${{ github.ref_name }}
+    secrets:
+      DIST_TAP_TOKEN: ${{ secrets.DIST_TAP_TOKEN }}
 
   # -- crates.io: publish the Rust library + CLI crates via OIDC --------------
   # Tokenless trusted publishing, same model as npm/PyPI: crates-io-auth-action
