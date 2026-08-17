@@ -70,6 +70,21 @@
   </branding>
 
   <releases>
+    <release version="3.0.3" date="2026-08-17">
+      <description>
+        <p>
+          Security release. Completes a size-limit fix that 3.0.2 applied to
+          only one of the three clients.
+        </p>
+        <ul>
+          <li>
+            An oversized signature is refused before it is decoded in the Rust
+            client too, not only in the JavaScript one. A crafted document could
+            still exhaust memory during verification on this build.
+          </li>
+        </ul>
+      </description>
+    </release>
     <release version="3.0.2" date="2026-08-16">
       <description>
         <p>

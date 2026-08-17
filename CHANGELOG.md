@@ -7,6 +7,23 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [3.0.3] - 2026-08-17
+
+Security release completing a fix that 3.0.2 landed in only one of the three
+clients. Users of the Python package or the Rust crates should upgrade.
+
+### Fixed
+
+- **The BER size bound now covers Python and Rust as well.** 3.0.2 fixed this
+  in the TypeScript client because the report named only the npm package, but
+  the flaw was identical in the other two: the 16 MiB ceiling sat in the
+  definite-length branch, past the point where an indefinite-length header
+  returns, and the `/Contents` gap was decoded to a string with no bound at all.
+  A crafted `/ByteRange` therefore allocated the whole gap before anything
+  rejected it. Both clients now refuse an oversized gap and an oversized input
+  up front, against the same shared ceiling, matching TypeScript. Originally
+  reported by peyuaa.
+
 ## [3.0.2] - 2026-08-16
 
 Security release. Three reported vulnerabilities in signature verification,
@@ -45,6 +62,8 @@ plus a batch-signing fix in the desktop app. Upgrading is recommended.
   discovered only on reaching the end marker -- a crafted PDF allocated its
   entire `/Contents` gap regardless of the limit. Both the extractor and the PDF
   path now refuse an oversized gap up front, against the same exported ceiling.
+  Fixed here in the TypeScript client only, which is what the report named; the
+  Python and Rust clients carried the same flaw and are fixed in 3.0.3.
   Reported by peyuaa.
 - **Batch signing no longer overwrites files it did not create.** Every
   destination is reserved before the first signing request and written with
@@ -554,7 +573,8 @@ entry point -- but their verification behaviour changes, as described below.
 - Pyright strict mode type checking with 0 errors
 - 96%+ test coverage (600+ tests)
 
-[Unreleased]: https://github.com/lobotomoe/revenant/compare/v3.0.2...HEAD
+[Unreleased]: https://github.com/lobotomoe/revenant/compare/v3.0.3...HEAD
+[3.0.3]: https://github.com/lobotomoe/revenant/compare/v3.0.2...v3.0.3
 [3.0.2]: https://github.com/lobotomoe/revenant/compare/v3.0.1...v3.0.2
 [3.0.1]: https://github.com/lobotomoe/revenant/compare/v3.0.0...v3.0.1
 [3.0.0]: https://github.com/lobotomoe/revenant/compare/v2.1.2...v3.0.0
