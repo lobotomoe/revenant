@@ -11,7 +11,7 @@ use std::sync::LazyLock;
 
 use regex::bytes::Regex;
 
-use super::asn1::extract_der_from_padded_hex;
+use super::asn1::{extract_der_from_padded_hex, MAX_CMS_HEX_CHARS};
 use crate::{Result, RevenantError};
 
 /// Regex matching a `/ByteRange` array, tolerant of the whitespace variations
@@ -159,6 +159,18 @@ pub fn extract_cms_from_byterange(pdf_bytes: &[u8], len1: usize, off2: usize) ->
     if pdf_bytes.get(hex_end) != Some(&b'>') {
         return Err(RevenantError::Pdf(format!(
             "Expected '>' at offset {hex_end}"
+        )));
+    }
+
+    // Bound the gap before decoding it, not after: the `/Contents` span is
+    // whatever the document says it is, and turning it into a string is itself
+    // the allocation worth refusing.
+    let gap_length = hex_end.saturating_sub(hex_start);
+    if gap_length > MAX_CMS_HEX_CHARS {
+        return Err(RevenantError::Pdf(format!(
+            "Signature /Contents is {} bytes, exceeds maximum ({} bytes)",
+            gap_length / 2,
+            MAX_CMS_HEX_CHARS / 2
         )));
     }
 

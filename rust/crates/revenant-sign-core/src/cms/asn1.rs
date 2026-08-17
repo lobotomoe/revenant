@@ -22,8 +22,11 @@ pub const ASN1_SEQUENCE_TAG: u8 = 0x30;
 pub const MIN_CMS_SIZE: usize = 100;
 
 /// Maximum hex chars for a single CMS blob (16 MB DER = 32M hex chars).
-/// Guards against a malformed length field claiming an absurd size.
-const MAX_CMS_HEX_CHARS: usize = 32 * 1024 * 1024;
+///
+/// Bounds both a length field claiming an absurd size and an encoding that
+/// declares no size at all. Visible to the PDF extractor so it refuses an
+/// oversized `/Contents` gap against the same ceiling, before it decodes one.
+pub(super) const MAX_CMS_HEX_CHARS: usize = 32 * 1024 * 1024;
 
 /// End-of-contents octets terminating a BER indefinite-length encoding.
 const EOC_BYTES: [u8; 2] = [0x00, 0x00];
@@ -47,6 +50,18 @@ pub(crate) fn extract_der_from_padded_hex(hex_str: &str) -> Result<Vec<u8>, Stri
     // rejecting it up front keeps the byte-index slicing below panic-free.
     if !hex_str.is_ascii() {
         return Err("Hex string contains non-hex characters".to_owned());
+    }
+    // The cap has to bite before the encoding is examined. A definite length is
+    // checked against what it claims further down, but an indefinite one claims
+    // nothing: its size is discovered by walking to the end marker, and by then
+    // the bytes are already decoded. The input comes straight out of a document,
+    // so its length is the only bound available in advance.
+    if hex_str.len() > MAX_CMS_HEX_CHARS {
+        return Err(format!(
+            "ASN.1 input is {} bytes, exceeds maximum ({} bytes)",
+            hex_str.len() / 2,
+            MAX_CMS_HEX_CHARS / 2
+        ));
     }
 
     let tag = parse_hex_u8(&hex_str[0..2])?;
@@ -288,6 +303,20 @@ mod tests {
         let hex = hex::encode(der);
         let err = extract_der_from_padded_hex(&hex).unwrap_err();
         assert!(err.contains("EOC marker not found"), "{err}");
+    }
+
+    #[test]
+    fn refuses_oversized_indefinite_blob() {
+        // A definite length is checked against what it claims, but an indefinite
+        // one claims nothing: its extent is only known after walking to the end
+        // marker, by which point the bytes are decoded. So the input itself must
+        // be bounded. "3080" opens the BER indefinite form and the padding never
+        // reaches an EOC.
+        let mut oversized = String::from("3080");
+        oversized.push_str(&"AB".repeat(MAX_CMS_HEX_CHARS / 2));
+
+        let err = extract_der_from_padded_hex(&oversized).unwrap_err();
+        assert!(err.contains("exceeds maximum"), "{err}");
     }
 
     #[test]

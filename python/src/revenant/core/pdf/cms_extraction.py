@@ -7,7 +7,7 @@ import re
 from typing import NamedTuple
 
 from ...errors import PDFError
-from .asn1 import extract_der_from_padded_hex
+from .asn1 import MAX_CMS_HEX_CHARS, extract_der_from_padded_hex
 
 # Regex pattern to find ByteRange arrays in PDF
 BYTERANGE_PATTERN = rb"/ByteRange\s*\[\s*(\d+)\s+(\d+)\s+(\d+)\s+(\d+)\s*\]"
@@ -99,6 +99,16 @@ def extract_cms_from_byterange(
     if pdf_bytes[hex_end : hex_end + 1] != b">":
         raise PDFError(
             f"Expected '>' at offset {hex_end}, got {pdf_bytes[hex_end : hex_end + 1]!r}"
+        )
+
+    # Bound the gap before decoding it, not after: the /Contents span is whatever
+    # the document says it is, and turning it into a string is itself the
+    # allocation worth refusing.
+    gap_length = hex_end - hex_start
+    if gap_length > MAX_CMS_HEX_CHARS:
+        raise PDFError(
+            f"Signature /Contents is {gap_length // 2} bytes, exceeds maximum "
+            f"({MAX_CMS_HEX_CHARS // 2} bytes)"
         )
 
     hex_str = pdf_bytes[hex_start:hex_end].decode("ascii").strip()

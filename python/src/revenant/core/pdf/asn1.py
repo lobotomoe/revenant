@@ -7,8 +7,10 @@ from __future__ import annotations
 ASN1_SEQUENCE_TAG = 0x30
 
 # Maximum hex chars for a single CMS blob (16 MB DER = 32M hex chars).
-# Protects against malformed length fields claiming absurd sizes.
-_MAX_CMS_HEX_CHARS = 32 * 1024 * 1024
+# Bounds both a length field claiming an absurd size and an encoding that
+# declares no size at all.  Public so the PDF extractor refuses an oversized
+# /Contents gap against the same ceiling, before it decodes one.
+MAX_CMS_HEX_CHARS = 32 * 1024 * 1024
 
 # Minimum plausible CMS blob size in bytes (header + basic content)
 MIN_CMS_SIZE = 100
@@ -39,6 +41,17 @@ def extract_der_from_padded_hex(hex_str: str) -> bytes:
     """
     if len(hex_str) < 4:
         raise ValueError("Hex string too short for ASN.1 TLV header")
+
+    # The cap has to bite before the encoding is examined.  A definite length is
+    # checked against what it claims further down, but an indefinite one claims
+    # nothing: its size is discovered by walking to the end marker, and by then
+    # the bytes are already decoded.  The input comes straight out of a document,
+    # so its length is the only bound available in advance.
+    if len(hex_str) > MAX_CMS_HEX_CHARS:
+        raise ValueError(
+            f"ASN.1 input is {len(hex_str) // 2} bytes, exceeds maximum "
+            f"({MAX_CMS_HEX_CHARS // 2} bytes)"
+        )
 
     # Parse first two bytes (tag + length start) from hex
     tag = int(hex_str[0:2], 16)
@@ -74,10 +87,10 @@ def extract_der_from_padded_hex(hex_str: str) -> bytes:
     total_der_bytes = header_bytes + content_len
     total_hex_chars = total_der_bytes * 2
 
-    if total_hex_chars > _MAX_CMS_HEX_CHARS:
+    if total_hex_chars > MAX_CMS_HEX_CHARS:
         raise ValueError(
             f"ASN.1 claims {total_der_bytes} bytes, exceeds maximum "
-            f"({_MAX_CMS_HEX_CHARS // 2} bytes)"
+            f"({MAX_CMS_HEX_CHARS // 2} bytes)"
         )
 
     if total_hex_chars > len(hex_str):

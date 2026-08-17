@@ -26,7 +26,7 @@ from revenant.core.pdf import (
     verify_detached_signature,
     verify_embedded_signature,
 )
-from revenant.core.pdf.asn1 import extract_der_from_padded_hex
+from revenant.core.pdf.asn1 import MAX_CMS_HEX_CHARS, extract_der_from_padded_hex
 from revenant.core.pdf.cms_extraction import extract_signature_data
 from revenant.core.pdf.cms_info import extract_digest_info, extract_signer_info
 from revenant.core.pdf.incremental import (
@@ -2049,6 +2049,20 @@ def test_extract_der_exceeds_max_size():
     # Claim 32MB of content
     with pytest.raises(ValueError, match="exceeds maximum"):
         extract_der_from_padded_hex("308402000000" + "00" * 100)
+
+
+def test_extract_der_refuses_oversized_indefinite_blob():
+    """An indefinite-length blob is bounded by its input, before it is decoded.
+
+    A definite length is checked against what it claims, but an indefinite one
+    claims nothing: its extent is only known after walking to the end marker,
+    by which point the bytes are decoded. So the input itself must be bounded.
+    "3080" opens the BER indefinite form; the padding never reaches an EOC.
+    """
+    oversized = "3080" + "AB" * (MAX_CMS_HEX_CHARS // 2)
+
+    with pytest.raises(ValueError, match="exceeds maximum"):
+        extract_der_from_padded_hex(oversized)
 
 
 def test_extract_der_exceeds_available_data():
