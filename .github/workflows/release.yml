@@ -26,6 +26,10 @@ env:
   # jobs hold `id-token: write`, so the CLI they run must not be redirectable by a
   # dist-tag move. Floor is 11.5.1 (OIDC support); bump deliberately.
   NPM_CLI_VERSION: "12.0.2"
+  # The appimagetool release that packs the published Linux AppImages. Pinned to
+  # a tag and verified by digest (see build-linux); bump alongside the per-arch
+  # SHA-256s in that job's matrix, which are what actually enforce the pin.
+  APPIMAGETOOL_VERSION: "1.9.1"
 
 concurrency:
   group: release-${{ github.ref }}
@@ -105,10 +109,15 @@ jobs:
       fail-fast: false
       matrix:
         include:
+          # appimagetool_sha256: the digest of appimagetool-<arch>.AppImage from
+          # the APPIMAGETOOL_VERSION release. Re-derive with `shasum -a 256` on a
+          # freshly downloaded asset when bumping -- do not copy from a mirror.
           - runner: ubuntu-latest
             arch: x86_64
+            appimagetool_sha256: ed4ce84f0d9caff66f50bcca6ff6f35aae54ce8135408b3fa33abfc3cb384eb0
           - runner: ubuntu-24.04-arm
             arch: aarch64
+            appimagetool_sha256: f0837e7448a0c1e4e650a93bb3e85802546e60654ef287576f46c71c126a9158
     defaults:
       run:
         working-directory: rust
@@ -138,12 +147,23 @@ jobs:
         run: cargo build --release --locked -p revenant-sign -p revenant-sign-gui
 
       - name: Install appimagetool
-        # Not hash-pinned (appimagetool ships only a rolling "continuous" tag);
-        # harden with a pinned digest when one is published.
+        # This binary packs the AppImages we publish, so whatever it executes
+        # reaches users as a release artifact. It used to be fetched from the
+        # mutable `continuous` tag and marked executable sight unseen: the same
+        # URL serves different bytes over time, so there was nothing to compare
+        # against and a compromised build would have been packed in silently
+        # (GHSA-997q). Now pinned to a tagged release and checked against a
+        # known digest BEFORE it is made executable or put on PATH.
+        env:
+          APPIMAGETOOL_ARCH: ${{ matrix.arch }}
+          APPIMAGETOOL_SHA256: ${{ matrix.appimagetool_sha256 }}
         run: |
-          curl -fsSL -o /usr/local/bin/appimagetool \
-            "https://github.com/AppImage/appimagetool/releases/download/continuous/appimagetool-${{ matrix.arch }}.AppImage"
-          chmod +x /usr/local/bin/appimagetool
+          set -euo pipefail
+          download="$RUNNER_TEMP/appimagetool.download"
+          curl -fsSL --proto '=https' --proto-redir '=https' -o "$download" \
+            "https://github.com/AppImage/appimagetool/releases/download/${APPIMAGETOOL_VERSION}/appimagetool-${APPIMAGETOOL_ARCH}.AppImage"
+          echo "${APPIMAGETOOL_SHA256}  ${download}" | sha256sum -c -
+          install -m 0755 "$download" /usr/local/bin/appimagetool
 
       - name: Build AppImage
         env:
