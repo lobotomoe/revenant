@@ -70,6 +70,31 @@
   </branding>
 
   <releases>
+    <release version="3.0.5" date="2026-08-18">
+      <description>
+        <p>
+          Security release. Three fixes covering background results being
+          applied to the wrong thing, and one covering where signed files are
+          written.
+        </p>
+        <ul>
+          <li>
+            Cancelling the connection dialog now really cancels it. A slow
+            server could answer after you backed out and still be saved as the
+            active one, sending later logins and signing there.
+          </li>
+          <li>
+            A saved password is no longer pre-filled into a login it was not
+            read for, and a password box you cleared is not silently filled in
+            again.
+          </li>
+          <li>
+            Signing no longer writes through a shortcut left at the output
+            location, which could overwrite a different file of yours.
+          </li>
+        </ul>
+      </description>
+    </release>
     <release version="3.0.4" date="2026-08-18">
       <description>
         <p>

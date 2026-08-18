@@ -7,6 +7,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [3.0.5] - 2026-08-18
+
+Security release. Three fixes for background results being applied to state
+that did not ask for them, one for the output path a signed file is written to,
+and a hardened release pipeline.
+
 ### Fixed
 
 - **A cancelled connection can no longer become the active server.** Dismissing
@@ -33,6 +39,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   now refuses to follow links, refuses anything that is not a regular file, and
   fails outright on platforms that cannot express either. Reported by peyuaa
   against the Python client; the Rust CLI carried the same flaw.
+
+### Security
+
+- **The AppImage packaging tool is now pinned and verified.** The release job
+  fetched `appimagetool` from a mutable tag over plain HTTP(S) and marked it
+  executable without checking it, then used it to pack both published Linux
+  AppImages -- so whatever that URL served on release day ran inside the release
+  job and shipped to users. It is now pinned to a tagged release and checked
+  against a known digest before it is made executable. Reported by peyuaa.
 
 ## [3.0.4] - 2026-08-18
 
@@ -629,7 +644,8 @@ entry point -- but their verification behaviour changes, as described below.
 - Pyright strict mode type checking with 0 errors
 - 96%+ test coverage (600+ tests)
 
-[Unreleased]: https://github.com/lobotomoe/revenant/compare/v3.0.4...HEAD
+[Unreleased]: https://github.com/lobotomoe/revenant/compare/v3.0.5...HEAD
+[3.0.5]: https://github.com/lobotomoe/revenant/compare/v3.0.4...v3.0.5
 [3.0.4]: https://github.com/lobotomoe/revenant/compare/v3.0.3...v3.0.4
 [3.0.3]: https://github.com/lobotomoe/revenant/compare/v3.0.2...v3.0.3
 [3.0.2]: https://github.com/lobotomoe/revenant/compare/v3.0.1...v3.0.2
