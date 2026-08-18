@@ -107,8 +107,9 @@ pub(crate) struct VerifyArgs {
     /// PDF file
     pub(crate) pdf: String,
 
-    /// Signature file (default: <pdf>.p7s)
-    #[arg(short, long)]
+    // The CLI help is set explicitly rather than taken from a doc comment: it
+    // shows a `<pdf>` placeholder, which rustdoc parses as an HTML tag.
+    #[arg(short, long, help = "Signature file (default: <pdf>.p7s)")]
     pub(crate) signature: Option<String>,
 }
 
