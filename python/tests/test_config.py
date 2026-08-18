@@ -894,6 +894,12 @@ def test_get_profile_ekeng():
     assert profile.legacy_tls is True
 
 
+def test_ekeng_declares_latin_only_credentials():
+    """EKENG issues Latin-only logins, so the profile says so."""
+    profile = get_profile("ekeng")
+    assert profile.ascii_credentials_only is True
+
+
 def test_get_profile_case_insensitive():
     """get_profile is case-insensitive."""
     profile = get_profile("EKENG")
@@ -916,6 +922,9 @@ def test_make_custom_profile_https():
     assert profile.url == "https://example.com/DSS.asmx"
     assert profile.timeout == 60
     assert profile.legacy_tls is False
+    # Nothing is known about a custom deployment's account naming, so no
+    # character class is assumed for its credentials.
+    assert profile.ascii_credentials_only is False
 
 
 def test_make_custom_profile_legacy_tls_requires_a_pin():

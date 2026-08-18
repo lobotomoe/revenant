@@ -68,6 +68,11 @@ class ServerProfile:
             set, since that transport has no other way to tell the server
             apart from anyone speaking for it. Several pins may be listed to
             stage a key rotation.
+        ascii_credentials_only: Whether this deployment issues Latin-only
+            logins, making a non-ASCII entry a keyboard-layout slip rather
+            than a credential. Off unless a deployment is known to work that
+            way -- the SOAP envelope escapes and encodes credentials as UTF-8,
+            so the transport itself imposes no such limit.
     """
 
     name: str
@@ -79,6 +84,7 @@ class ServerProfile:
     tls_pins: tuple[str, ...] = ()
     ca_cert_markers: tuple[str, ...] = ()
     max_auth_attempts: int = 0
+    ascii_credentials_only: bool = False
     cert_fields: tuple[CertField, ...] = ()
     sig_fields: tuple[SigField, ...] = ()
     font: str = "noto-sans"
@@ -105,6 +111,10 @@ BUILTIN_PROFILES: dict[str, ServerProfile] = {
         identity_methods=("server", "manual"),
         ca_cert_markers=("ekeng", "\u0567\u056f\u0565\u0576\u0563"),
         max_auth_attempts=5,
+        # EKENG logins are Latin letters and digits. A Cyrillic or Armenian
+        # entry is the keyboard layout, not the account, and spending one of
+        # the five attempts above to prove it risks locking the account.
+        ascii_credentials_only=True,
         cert_fields=(
             CertField(id="name", label="Name", source="name", regex=r"^(.+?)\s+\d{5,}$"),
             # SSN is intentional. Social Services Number

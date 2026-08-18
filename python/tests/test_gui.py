@@ -503,3 +503,69 @@ def test_connect_dialog_does_not_save_a_cancelled_server():
 
     assert dialog._win.destroyed
     save.assert_not_called()
+
+
+# ── LoginDialog credential character class (issue #76) ──────────────────
+
+
+class _StubVar:
+    """Stands in for a tk.StringVar so the validation runs without a display."""
+
+    def __init__(self, value: str) -> None:
+        self._value = value
+
+    def get(self) -> str:
+        return self._value
+
+
+def _login_without_tk(profile, user: str, pwd: str):
+    """A LoginDialog on the credentials step with __init__ (and Tk) skipped."""
+    from revenant.ui.gui.setup import _LOGIN_STEP_CREDENTIALS, LoginDialog
+
+    dialog = object.__new__(LoginDialog)
+    dialog._step = _LOGIN_STEP_CREDENTIALS
+    dialog._profile = profile
+    dialog._user_var = _StubVar(user)
+    dialog._pass_var = _StubVar(pwd)
+    dialog._win = _StubWindow()
+    # Advancing renders the next page, which needs a real Tk window.
+    dialog._show_step = lambda: None
+    return dialog
+
+
+def test_login_rejects_non_ascii_credentials_on_an_ascii_only_profile():
+    """EKENG issues Latin-only logins, so non-ASCII is a keyboard-layout slip.
+
+    Stopping it here spends none of the profile's five-attempt lockout budget.
+    """
+    from revenant.config import get_profile
+    from revenant.ui.gui.setup import _LOGIN_STEP_CREDENTIALS
+
+    dialog = _login_without_tk(get_profile("ekeng"), "пользователь", "пароль")
+
+    with patch("tkinter.messagebox.showwarning") as warn:
+        dialog._go_next()
+
+    warn.assert_called_once()
+    assert dialog._step == _LOGIN_STEP_CREDENTIALS
+
+
+def test_login_accepts_non_ascii_credentials_on_a_custom_profile():
+    """Issue #76: the restriction describes EKENG, not CoSign.
+
+    A custom deployment may issue Unicode logins and the SOAP envelope carries
+    them, so the wizard must not be what blocks them.
+    """
+    from revenant.config import make_custom_profile
+    from revenant.ui.gui.setup import _LOGIN_STEP_CREDENTIALS
+
+    profile = make_custom_profile("https://cosign.example/DSS.asmx")
+    dialog = _login_without_tk(profile, "álïçé", "pässwörd")
+
+    with patch("tkinter.messagebox.showwarning") as warn:
+        dialog._go_next()
+
+    warn.assert_not_called()
+    assert dialog._step == _LOGIN_STEP_CREDENTIALS + 1
+    assert dialog._username == "álïçé"
+    assert dialog._password == "pässwörd"

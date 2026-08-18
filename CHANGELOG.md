@@ -7,6 +7,25 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+
+- **Custom servers now accept non-ASCII credentials.** Both GUIs refused a
+  username or password containing any non-Latin character, on every profile.
+  The restriction describes EKENG, whose logins are Latin letters and digits,
+  but it was applied to custom CoSign deployments too -- blocking credentials
+  the SOAP envelope escapes and carries as UTF-8 without trouble, and that both
+  CLIs already accepted. It is now a profile capability, off for custom servers
+  and on for EKENG, where a non-ASCII entry is a keyboard-layout slip and
+  refusing it spends none of that profile's five-attempt lockout budget.
+  Reported by peyuaa (#76).
+
+### Changed
+
+- `ServerProfile` in `revenant-sign-core` gains a public
+  `ascii_credentials_only` field. Profiles are meant to come from
+  `ServerProfile::builtin` / `::custom`, but downstream code that constructs
+  the struct literally will need to name the new field.
+
 ### Removed
 
 - **`python/scripts/merge_universal.py`.** The release workflow has lipo'd the

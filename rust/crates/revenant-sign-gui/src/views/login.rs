@@ -18,7 +18,7 @@ use crate::worker::RequestId;
 const STEP_COUNT: &str = "3";
 
 /// Which wizard page is showing.
-#[derive(Clone, Copy, PartialEq, Eq)]
+#[derive(Clone, Copy, PartialEq, Eq, Debug)]
 enum Step {
     Credentials,
     Identity,
@@ -273,7 +273,7 @@ impl LoginState {
             self.warning = Some(l10n.t("gui.username_and_password_are_required").to_owned());
             return LoginAction::None;
         }
-        if !user.is_ascii() || !pass.is_ascii() {
+        if self.profile.ascii_credentials_only && (!user.is_ascii() || !pass.is_ascii()) {
             self.warning = Some(
                 l10n.t("gui.credentials_must_contain_only_latin_characters_ple_e9a0742d")
                     .to_owned(),
@@ -553,7 +553,8 @@ pub(crate) fn show(ctx: &egui::Context, l10n: &Localizer, state: &mut LoginState
 
 #[cfg(test)]
 mod tests {
-    use super::{LoginState, Step};
+    use super::{LoginAction, LoginState, Step};
+    use crate::i18n::Localizer;
     use crate::worker::RequestIds;
     use revenant_sign_core::config::ServerProfile;
 
@@ -658,5 +659,42 @@ mod tests {
             !login.claim_discovery(discovery),
             "a claimed result must not apply twice"
         );
+    }
+
+    /// A wizard on the credentials step with `user`/`pass` already typed.
+    fn typed(profile: ServerProfile, user: &str, pass: &str) -> LoginState {
+        let mut login = LoginState::new(profile, None, "keychain".to_owned());
+        login.username = user.to_owned();
+        login.password = pass.to_owned();
+        login
+    }
+
+    /// EKENG logins are Latin-only, so non-ASCII is a keyboard-layout slip.
+    /// Stopping it here spends none of the profile's five-attempt budget.
+    #[test]
+    fn an_ascii_only_profile_rejects_non_ascii_credentials() {
+        let profile = ServerProfile::builtin("ekeng").expect("ekeng profile");
+        let mut login = typed(profile, "пользователь", "пароль");
+
+        let action = login.on_next(&Localizer::new("en"));
+
+        assert!(matches!(action, LoginAction::None));
+        assert_eq!(login.step, Step::Credentials, "must not advance");
+        assert!(login.warning.is_some(), "must explain why");
+    }
+
+    /// Issue #76: the restriction describes EKENG, not CoSign. A custom
+    /// deployment may issue Unicode logins, and the SOAP envelope carries
+    /// them, so the wizard must not be what blocks them.
+    #[test]
+    fn a_custom_profile_accepts_non_ascii_credentials() {
+        let profile =
+            ServerProfile::custom("https://cosign.example/DSS.asmx", 30).expect("custom profile");
+        let mut login = typed(profile, "álïçé", "pässwörd");
+
+        login.on_next(&Localizer::new("en"));
+
+        assert_eq!(login.step, Step::Identity, "must advance");
+        assert!(login.warning.is_none(), "nothing to warn about");
     }
 }

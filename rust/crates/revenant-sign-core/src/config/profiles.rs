@@ -158,6 +158,11 @@ pub struct ServerProfile {
     pub ca_cert_markers: Vec<String>,
     /// Account-lockout threshold; 0 means "unknown / not enforced".
     pub max_auth_attempts: u32,
+    /// Whether this deployment issues Latin-only logins, making a non-ASCII
+    /// entry a keyboard-layout slip rather than a credential. Off unless a
+    /// deployment is known to work that way -- the SOAP envelope escapes and
+    /// encodes credentials as UTF-8, so the transport imposes no such limit.
+    pub ascii_credentials_only: bool,
     /// Certificate fields to display and extract.
     pub cert_fields: Vec<CertField>,
     /// Signature-appearance layout.
@@ -220,6 +225,10 @@ fn ekeng_profile() -> ServerProfile {
             "\u{0567}\u{056f}\u{0565}\u{0576}\u{0563}".to_owned(),
         ],
         max_auth_attempts: 5,
+        // EKENG logins are Latin letters and digits. A Cyrillic or Armenian
+        // entry is the keyboard layout, not the account, and spending one of
+        // the five attempts above to prove it risks locking the account.
+        ascii_credentials_only: true,
         cert_fields: vec![
             CertField {
                 id: "name".to_owned(),
@@ -328,6 +337,7 @@ impl ServerProfile {
             tls_mode: TlsMode::Standard,
             ca_cert_markers: Vec::new(),
             max_auth_attempts: 0,
+            ascii_credentials_only: false,
             cert_fields: Vec::new(),
             sig_fields: Vec::new(),
             font: "noto-sans".to_owned(),
@@ -379,6 +389,7 @@ mod tests {
         assert_eq!(pins.len(), 1);
         assert_eq!(pins[0].len(), 64);
         assert_eq!(ekeng.max_auth_attempts, 5);
+        assert!(ekeng.ascii_credentials_only);
         assert_eq!(ekeng.font, "ghea-grapalat");
         // EKENG uses pinned trust anchors (the dead TSL is not a usable source).
         assert!(matches!(ekeng.trust, TrustAnchors::Pinned(_)));
@@ -429,6 +440,9 @@ mod tests {
         assert_eq!(https.name, "custom");
         assert_eq!(https.tls_mode, TlsMode::Standard);
         assert_eq!(https.timeout, 120);
+        // Nothing is known about a custom deployment's account naming, so no
+        // character class is assumed for its credentials.
+        assert!(!https.ascii_credentials_only);
         assert_eq!(https.display_name, "Custom (https://example.com/DSS.asmx)");
 
         let http_err = ServerProfile::custom_default("http://example.com/DSS.asmx").unwrap_err();

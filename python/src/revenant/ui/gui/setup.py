@@ -391,7 +391,8 @@ class LoginDialog:
                     _("gui.login"), _("gui.username_and_password_are_required"), parent=self._win
                 )
                 return
-            if not user.isascii() or not pwd.isascii():
+            ascii_only = self._profile is not None and self._profile.ascii_credentials_only
+            if ascii_only and (not user.isascii() or not pwd.isascii()):
                 messagebox.showwarning(
                     _("gui.login"),
                     _("gui.credentials_must_contain_only_latin_characters_ple_e9a0742d"),
