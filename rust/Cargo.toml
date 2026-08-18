@@ -33,7 +33,7 @@ homepage = "https://github.com/lobotomoe/revenant"
 # -- legacy TLS 1.0 + RC4-MD5 building blocks (from-scratch handshake) --------
 rc4 = "0.1"
 md-5 = "0.10"
-sha1 = "0.10"
+sha1 = "0.11"
 # SHA-2 for verifying a signature's ByteRange against the algorithm declared in
 # its CMS (CoSign uses SHA-1, but standalone verification auto-detects).
 sha2 = "0.10"
