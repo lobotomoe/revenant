@@ -5,6 +5,9 @@
 # Revenant
 
 [![CI](https://github.com/lobotomoe/revenant/actions/workflows/ci.yml/badge.svg)](https://github.com/lobotomoe/revenant/actions/workflows/ci.yml)
+[![crates.io](https://img.shields.io/crates/v/revenant-sign.svg)](https://crates.io/crates/revenant-sign)
+[![docs.rs](https://img.shields.io/docsrs/revenant-sign-core?label=docs.rs)](https://docs.rs/revenant-sign-core)
+[![Rust 1.85+](https://img.shields.io/badge/rust-1.85%2B-orange.svg)](https://www.rust-lang.org/)
 [![PyPI](https://img.shields.io/pypi/v/revenant.svg)](https://pypi.org/project/revenant/)
 [![npm](https://img.shields.io/npm/v/revenant-sign.svg)](https://www.npmjs.com/package/revenant-sign)
 [![Snap Store](https://snapcraft.io/revenant/badge.svg)](https://snapcraft.io/revenant)
