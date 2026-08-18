@@ -101,8 +101,8 @@ Signed PDFs verified against third-party services that accept EKENG digital sign
 
 - [x] [ekeng.am/sign_check](https://www.ekeng.am/en/sec_sub/sign_check) -- EKENG signature validator
 - [x] [e-request.am](https://e-request.am/) -- e-request.am document upload
+- [x] [file-online.taxservice.am](https://file-online.taxservice.am) -- Tax Service online filing
 - [ ] [self-portal.taxservice.am](https://self-portal.taxservice.am) -- Tax Service self-portal
-- [ ] [file-online.taxservice.am](https://file-online.taxservice.am) -- Tax Service online filing
 
 ## Documentation
 
