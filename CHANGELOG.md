@@ -7,6 +7,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Removed
+
+- **`python/scripts/merge_universal.py`.** The release workflow has lipo'd the
+  macOS universal binaries directly since the Rust pipeline landed, leaving the
+  script unreachable from every workflow and build script. Its fallback read a
+  `lipo -create` "same architectures" failure as proof that both inputs held
+  the same architecture set and copied the arm64 side, which for partially
+  overlapping inputs would have silently dropped the x86_64 slice. The live
+  path has no such fallback. Reported by peyuaa (#75).
+
 ## [3.0.5] - 2026-08-18
 
 Security release. Three fixes for background results being applied to state
