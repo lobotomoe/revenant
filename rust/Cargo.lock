@@ -857,13 +857,13 @@ dependencies = [
  "cbc 0.1.2",
  "cipher 0.4.4",
  "const-oid 0.9.6",
- "der",
+ "der 0.7.10",
  "rsa",
  "sha1",
  "sha2 0.10.9",
  "sha3",
  "signature",
- "spki",
+ "spki 0.7.3",
  "x509-cert",
  "zeroize",
 ]
@@ -1164,6 +1164,15 @@ dependencies = [
 ]
 
 [[package]]
+name = "der"
+version = "0.8.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "a69dedd701da44b0536442edf09c81a64b0ab97a7a4a5e3d1971f00027cbc63d"
+dependencies = [
+ "const-oid 0.10.2",
+]
+
+[[package]]
 name = "der_derive"
 version = "0.7.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1277,7 +1286,7 @@ version = "0.16.9"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "ee27f32b5c5292967d2d4a9d7f1e0b0aed2c15daded5a60300e4abb9d8020bca"
 dependencies = [
- "der",
+ "der 0.7.10",
  "digest 0.10.7",
  "elliptic-curve",
  "rfc6979",
@@ -3386,9 +3395,9 @@ version = "0.7.5"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "c8ffb9f10fa047879315e6625af03c164b16962a5368d724ed16323b68ace47f"
 dependencies = [
- "der",
+ "der 0.7.10",
  "pkcs8",
- "spki",
+ "spki 0.7.3",
 ]
 
 [[package]]
@@ -3397,8 +3406,8 @@ version = "0.10.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "f950b2377845cebe5cf8b5165cb3cc1a5e0fa5cfa3e1f7f55707d8fd82e0a7b7"
 dependencies = [
- "der",
- "spki",
+ "der 0.7.10",
+ "spki 0.7.3",
 ]
 
 [[package]]
@@ -3764,7 +3773,7 @@ dependencies = [
  "chrono",
  "cms",
  "const-oid 0.9.6",
- "der",
+ "der 0.7.10",
  "flate2",
  "hex",
  "image",
@@ -3778,7 +3787,7 @@ dependencies = [
  "serde_json",
  "sha1",
  "sha2 0.10.9",
- "spki",
+ "spki 0.8.0",
  "tempfile",
  "thiserror 2.0.19",
  "time",
@@ -3808,7 +3817,7 @@ name = "revenant-sign-tls"
 version = "3.0.5"
 dependencies = [
  "const-oid 0.9.6",
- "der",
+ "der 0.7.10",
  "hmac",
  "log",
  "md-5 0.10.6",
@@ -3817,7 +3826,7 @@ dependencies = [
  "rsa",
  "sha1",
  "sha2 0.10.9",
- "spki",
+ "spki 0.8.0",
  "subtle",
  "thiserror 2.0.19",
  "x509-cert",
@@ -3901,7 +3910,7 @@ dependencies = [
  "rand_core 0.6.4",
  "sha2 0.10.9",
  "signature",
- "spki",
+ "spki 0.7.3",
  "subtle",
  "zeroize",
 ]
@@ -4045,7 +4054,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "d3e97a565f76233a6003f9f5c54be1d9c5bdfa3eccfb189469f11ec4901c47dc"
 dependencies = [
  "base16ct",
- "der",
+ "der 0.7.10",
  "generic-array",
  "subtle",
  "zeroize",
@@ -4395,7 +4404,16 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "d91ed6c858b01f942cd56b37a94b3e0a1798290327d1236e4d9cf4eaca44d29d"
 dependencies = [
  "base64ct",
- "der",
+ "der 0.7.10",
+]
+
+[[package]]
+name = "spki"
+version = "0.8.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "1d9efca8738c78ee9484207732f728b1ef517bbb1833d6fc0879ca898a522f6f"
+dependencies = [
+ "der 0.8.1",
 ]
 
 [[package]]
@@ -5735,10 +5753,10 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "1301e935010a701ae5f8655edc0ad17c44bad3ac5ce8c39185f75453b720ae94"
 dependencies = [
  "const-oid 0.9.6",
- "der",
+ "der 0.7.10",
  "sha1",
  "signature",
- "spki",
+ "spki 0.7.3",
  "tls_codec",
 ]
 
@@ -5749,8 +5767,8 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "5e54e695a31f0fecb826cf59ae2093c941d7ef932a1f8508185dd23b29ce2e2e"
 dependencies = [
  "const-oid 0.9.6",
- "der",
- "spki",
+ "der 0.7.10",
+ "spki 0.7.3",
  "x509-cert",
 ]
 
@@ -5761,7 +5779,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "c43a49bf845cd2f3aff9603a4276409dbf2b8fa4454d3e9501bf5b0028342964"
 dependencies = [
  "const-oid 0.9.6",
- "der",
+ "der 0.7.10",
  "ecdsa",
  "ed25519-dalek",
  "k256",
@@ -5772,7 +5790,7 @@ dependencies = [
  "sha1",
  "sha2 0.10.9",
  "signature",
- "spki",
+ "spki 0.7.3",
  "x509-cert",
  "x509-ocsp",
 ]
