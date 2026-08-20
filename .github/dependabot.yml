@@ -23,6 +23,37 @@ updates:
       - "dependencies"
       - "rust"
     groups:
+      # Listed first: a dependency joins the first group it matches, so these
+      # crates must be claimed here before minor-and-patch can take them.
+      #
+      # The RustCrypto crates share trait definitions -- the hash/cipher set
+      # through `digest`/`crypto-common`, the ASN.1 set through `der`, and
+      # `rsa` through both (plus `rand`, whose RNG is handed to rsa::encrypt).
+      # A crate that moves to the next major stops type-checking against one
+      # that has not, so a single-crate bump cannot build: sha1 0.11 alone
+      # yields "the trait bound `Sha1: sha2::digest::core_api::CoreProxy` is
+      # not satisfied". Grouping them means the set is proposed together, once
+      # the whole stack has stable releases that agree -- which is also the
+      # pinning rule already documented in rust/Cargo.toml.
+      rustcrypto:
+        patterns:
+          - "sha1"
+          - "sha2"
+          - "md-5"
+          - "hmac"
+          - "rc4"
+          - "rsa"
+          - "rand"
+          - "der"
+          - "spki"
+          - "const-oid"
+          - "x509-cert"
+          - "x509-verify"
+          - "cms"
+        update-types:
+          - "major"
+          - "minor"
+          - "patch"
       minor-and-patch:
         update-types:
           - "minor"
