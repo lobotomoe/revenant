@@ -68,7 +68,8 @@ jobs:
   audit:
     name: Security Audit
     runs-on: ubuntu-latest
-    timeout-minutes: 10
+    # Higher than the other jobs: a cold cache has to build cargo-audit.
+    timeout-minutes: 25
     defaults:
       run:
         working-directory: python
@@ -105,6 +106,50 @@ jobs:
           # Re-evaluate: when a side-channel-hardened ecdsa lands or tlslite-ng drops the dep.
           # Last checked: 2026-07-17
           pip-audit --skip-editable --ignore-vuln CVE-2024-23342
+
+      # The Rust workspace is what ships in the desktop apps, the CLI, and the
+      # three published crates, so it is audited in the same required job as the
+      # Python tree rather than a separate one that would not gate a merge.
+      - name: Set up Rust
+        uses: dtolnay/rust-toolchain@6c977a6ca4077a0ceb28ffbe03f59d46e9ac8772 # master
+        with:
+          toolchain: stable
+
+      - uses: Swatinem/rust-cache@6323deb102c322ba6fcbdcafc7e3dddab59af2b6 # v2.9.2
+        with:
+          workspaces: rust
+
+      # Built from crates.io against its own lockfile rather than pulled from a
+      # third-party action: this job exists to catch supply-chain problems, so it
+      # should not add a supply-chain dependency to do it. rust-cache keeps the
+      # compiled binary, so only the first run pays for it.
+      - name: Install cargo-audit
+        run: cargo install cargo-audit --locked
+
+      - name: Run cargo-audit
+        working-directory: rust
+        run: |
+          # RUSTSEC-2023-0071: Marvin Attack, a timing sidechannel in `rsa`.
+          # No fixed version exists -- the fix lands in rsa 0.10, which is not
+          # released. Reachable in principle from the legacy-TLS handshake, which
+          # encrypts the premaster secret; an attacker would need to be the
+          # appliance and to time many handshakes.
+          # Tracking: https://github.com/RustCrypto/RSA/issues/626
+          # Re-evaluate: when rsa 0.10 ships (see the rustcrypto dependabot group).
+          #
+          # RUSTSEC-2026-0194 / RUSTSEC-2026-0195: DoS in `quick-xml` < 0.41.
+          # Our own SOAP and TSL parsing already uses 0.41. The flagged 0.39 copy
+          # is pulled by `wayland-scanner`, a build-time proc-macro that parses
+          # the vendored Wayland protocol definitions -- never runtime input --
+          # and it cannot be lifted while wayland-scanner requires ^0.39.
+          # Tracking: https://github.com/tafia/quick-xml/issues/969 and /970
+          # Re-evaluate: when smithay/winit ship a wayland-scanner on quick-xml 0.41.
+          #
+          # Last checked: 2026-08-20
+          cargo audit \
+            --ignore RUSTSEC-2023-0071 \
+            --ignore RUSTSEC-2026-0194 \
+            --ignore RUSTSEC-2026-0195
 
   dependency-review:
     name: Dependency Review

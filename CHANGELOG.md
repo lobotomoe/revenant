@@ -19,6 +19,21 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   refusing it spends none of that profile's five-attempt lockout budget.
   Reported by peyuaa (#76).
 
+### Security
+
+- **The desktop app no longer ships a browser-launching flaw.** `webbrowser`,
+  which the GUI stack uses to open links, honoured the Unix `BROWSER`
+  environment variable in a way that allowed argument injection
+  (RUSTSEC-2026-0257). Updated to 1.2.4.
+- **Rust dependencies are now audited in CI.** `cargo audit` runs beside
+  `pip-audit` in the required Security Audit job, so a known-vulnerable crate
+  fails the build instead of waiting for a weekly Scorecard alert nobody is
+  blocked on -- which is how the `webbrowser` advisory above went unnoticed.
+  Three findings are ignored with recorded reasons and re-evaluation triggers:
+  the `rsa` Marvin timing sidechannel, which has no released fix, and two
+  `quick-xml` DoS advisories that apply to a build-time proc-macro rather than
+  to our own XML parsing, which is already on the patched version.
+
 ### Changed
 
 - `ServerProfile` in `revenant-sign-core` gains a public
