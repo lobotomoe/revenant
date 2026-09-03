@@ -46,10 +46,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
-- `ServerProfile` in `revenant-sign-core` gains a public
-  `ascii_credentials_only` field. Profiles are meant to come from
-  `ServerProfile::builtin` / `::custom`, but downstream code that constructs
-  the struct literally will need to name the new field.
+- **`ServerProfile` in `revenant-sign-core` is now `#[non_exhaustive]`** and
+  gains a public `ascii_credentials_only` field. Profiles are meant to come from
+  `ServerProfile::builtin` / `::custom_default`, which fill in every capability
+  the deployment implies; code that constructed the struct literally must move
+  to those constructors. Marking it non-exhaustive is itself the breaking part,
+  and it is what keeps the next field addition off the major-version budget.
 
 ### Removed
 
