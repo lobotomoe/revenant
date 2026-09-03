@@ -18,6 +18,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   and on for EKENG, where a non-ASCII entry is a keyboard-layout slip and
   refusing it spends none of that profile's five-attempt lockout budget.
   Reported by peyuaa (#76).
+- **The macOS Dock no longer shows a black egui logo in place of the app icon.**
+  The desktop app deliberately left its runtime icon unset on macOS, so that the
+  Dock tile would stay with the bundle's `.icns`. eframe reads an unset icon the
+  other way round: it substitutes its own default egui artwork and pushes that
+  through `setApplicationIconImage`, taking over the tile for as long as the app
+  runs. It now passes an empty `IconData` -- egui's documented opt-out -- so the
+  installed icon survives launch.
 
 ### Security
 

@@ -24,8 +24,8 @@ const MIN_SIZE: [f32; 2] = [640.0, 480.0];
 
 /// The window/taskbar icon, embedded in the binary. Rendered from the same
 /// master (`packaging/icons/revenant.svg`) the app-store bundles use, so the
-/// running window matches the installed icon. Covers Windows (taskbar), Linux
-/// (window manager), and the bare-binary case.
+/// running window matches the installed icon. Covers Windows (taskbar) and
+/// Linux (window manager).
 ///
 /// Not compiled on macOS: there the Dock tile is owned by the `.app` bundle's
 /// `.icns` (the rounded, beveled artwork macOS expects). eframe forwards a
@@ -43,8 +43,7 @@ fn main() -> eframe::Result<()> {
         .with_title("Revenant")
         .with_app_id("io.github.lobotomoe.revenant");
 
-    // Set the window/taskbar icon everywhere except macOS, where the bundle's
-    // `.icns` provides the Dock tile (see APP_ICON_PNG).
+    // Windows (taskbar) and Linux (window manager) take the embedded PNG.
     #[cfg(not(target_os = "macos"))]
     let viewport = {
         // Committed, compile-time-embedded PNG, so a decode failure is a build
@@ -53,6 +52,14 @@ fn main() -> eframe::Result<()> {
             .expect("embedded app icon must be a valid PNG");
         viewport.with_icon(icon)
     };
+
+    // macOS keeps the bundle's `.icns` Dock tile -- but leaving the icon unset
+    // does not mean "leave it alone": eframe substitutes its own egui logo (a
+    // black hexagon) and pushes that through `setApplicationIconImage`, taking
+    // over the Dock tile for as long as the app runs. An empty `IconData` is
+    // egui's documented opt-out ("if you prefer the OS default").
+    #[cfg(target_os = "macos")]
+    let viewport = viewport.with_icon(eframe::egui::IconData::default());
 
     let native_options = eframe::NativeOptions {
         viewport,
