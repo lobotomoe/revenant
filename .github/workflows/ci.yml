@@ -137,19 +137,13 @@ jobs:
           # Tracking: https://github.com/RustCrypto/RSA/issues/626
           # Re-evaluate: when rsa 0.10 ships (see the rustcrypto dependabot group).
           #
-          # RUSTSEC-2026-0194 / RUSTSEC-2026-0195: DoS in `quick-xml` < 0.41.
-          # Our own SOAP and TSL parsing already uses 0.41. The flagged 0.39 copy
-          # is pulled by `wayland-scanner`, a build-time proc-macro that parses
-          # the vendored Wayland protocol definitions -- never runtime input --
-          # and it cannot be lifted while wayland-scanner requires ^0.39.
-          # Tracking: https://github.com/tafia/quick-xml/issues/969 and /970
-          # Re-evaluate: when smithay/winit ship a wayland-scanner on quick-xml 0.41.
+          # The `quick-xml` < 0.41 ignores (RUSTSEC-2026-0194 / -0195) are gone:
+          # wayland-scanner 0.31.11 moved to quick-xml 0.41, so the only copy in
+          # the lock is the patched one our own SOAP and TSL parsing uses. The
+          # guard is armed again -- a 0.39 copy reappearing now fails the build.
           #
-          # Last checked: 2026-08-20
-          cargo audit \
-            --ignore RUSTSEC-2023-0071 \
-            --ignore RUSTSEC-2026-0194 \
-            --ignore RUSTSEC-2026-0195
+          # Last checked: 2026-09-03
+          cargo audit --ignore RUSTSEC-2023-0071
 
   dependency-review:
     name: Dependency Review
