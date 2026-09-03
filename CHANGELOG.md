@@ -36,10 +36,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   `pip-audit` in the required Security Audit job, so a known-vulnerable crate
   fails the build instead of waiting for a weekly Scorecard alert nobody is
   blocked on -- which is how the `webbrowser` advisory above went unnoticed.
-  Three findings are ignored with recorded reasons and re-evaluation triggers:
-  the `rsa` Marvin timing sidechannel, which has no released fix, and two
-  `quick-xml` DoS advisories that apply to a build-time proc-macro rather than
-  to our own XML parsing, which is already on the patched version.
+  One finding is ignored with a recorded reason and a re-evaluation trigger: the
+  `rsa` Marvin timing sidechannel, which has no released fix.
+- **The Rust lockfile is refreshed to the latest compatible releases.** This
+  takes `chacha20` off a yanked 0.10.1, `event-listener` off the unsound 5.4.1
+  (RUSTSEC-2026-0221), and `wayland-scanner` onto a `quick-xml` 0.41 -- which
+  removes the last vulnerable copy of that crate from the tree and lets the two
+  `quick-xml` audit ignores go, arming that guard again.
 
 ### Changed
 
