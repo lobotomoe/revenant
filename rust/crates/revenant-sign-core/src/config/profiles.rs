@@ -40,7 +40,7 @@ pub enum CertFieldSource {
 /// whole source value is used.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct CertField {
-    /// Stable identifier, referenced by [`SigField::cert_field`].
+    /// Stable identifier, referenced by [`SigFieldValue::Cert`].
     pub id: String,
     /// Human-readable label, e.g. "Name" or "SSN".
     pub label: String,
@@ -140,7 +140,13 @@ pub enum TrustAnchors {
 }
 
 /// Describes a CoSign server deployment.
+///
+/// Non-exhaustive: profiles are meant to come from [`ServerProfile::builtin`]
+/// or [`ServerProfile::custom_default`], which fill in every capability the
+/// deployment implies. Marking it so keeps a later field addition -- the kind
+/// that turned 3.x into 4.0 -- out of the breaking-change budget.
 #[derive(Debug, Clone, PartialEq, Eq)]
+#[non_exhaustive]
 pub struct ServerProfile {
     /// Machine name / lookup key (e.g. "ekeng", "custom").
     pub name: String,
