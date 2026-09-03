@@ -70,6 +70,30 @@
   </branding>
 
   <releases>
+    <release version="4.0.0" date="2026-09-03">
+      <description>
+        <p>
+          Fixes for logging in to a non-EKENG server and for the app icon on
+          macOS, plus a dependency refresh. The major version reflects a
+          breaking change in the signing library, not in the app.
+        </p>
+        <ul>
+          <li>
+            Logging in to your own CoSign server now accepts a username or
+            password with non-Latin characters. The Latin-only rule describes
+            EKENG and is applied only there.
+          </li>
+          <li>
+            The macOS Dock shows the Revenant icon again instead of a black
+            placeholder.
+          </li>
+          <li>
+            Bundled dependencies were updated, clearing a withdrawn package and
+            two advisories.
+          </li>
+        </ul>
+      </description>
+    </release>
     <release version="3.0.5" date="2026-08-18">
       <description>
         <p>

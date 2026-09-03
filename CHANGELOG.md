@@ -7,6 +7,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [4.0.0] - 2026-09-03
+
+Two fixes -- logging in to a non-EKENG server, and the app icon on macOS -- plus
+a dependency refresh that clears a withdrawn package and two advisories.
+
+The major bump is required by one breaking change in the Rust crates:
+`ServerProfile` in `revenant-sign-core` gains a public field, and the struct is
+now `#[non_exhaustive]`. The Python and TypeScript packages keep their public
+surface, and nothing changes for users of the desktop app or the CLIs.
+
 ### Fixed
 
 - **Custom servers now accept non-ASCII credentials.** Both GUIs refused a
@@ -700,7 +710,8 @@ entry point -- but their verification behaviour changes, as described below.
 - Pyright strict mode type checking with 0 errors
 - 96%+ test coverage (600+ tests)
 
-[Unreleased]: https://github.com/lobotomoe/revenant/compare/v3.0.5...HEAD
+[Unreleased]: https://github.com/lobotomoe/revenant/compare/v4.0.0...HEAD
+[4.0.0]: https://github.com/lobotomoe/revenant/compare/v3.0.5...v4.0.0
 [3.0.5]: https://github.com/lobotomoe/revenant/compare/v3.0.4...v3.0.5
 [3.0.4]: https://github.com/lobotomoe/revenant/compare/v3.0.3...v3.0.4
 [3.0.3]: https://github.com/lobotomoe/revenant/compare/v3.0.2...v3.0.3
