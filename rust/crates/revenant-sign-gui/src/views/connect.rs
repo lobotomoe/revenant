@@ -80,7 +80,8 @@ impl ConnectState {
     }
 
     /// Surface why the connection attempt failed. Only called for a ping already
-    /// claimed by [`claim_ping`], so it needs no staleness check of its own.
+    /// claimed by [`ConnectState::claim_ping`], so it needs no staleness check
+    /// of its own.
     pub(crate) fn show_failure(&mut self, detail: &str) {
         self.status = Status::Failed(detail.to_owned());
     }
