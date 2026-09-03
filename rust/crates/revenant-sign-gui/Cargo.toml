@@ -24,7 +24,7 @@ path = "src/main.rs"
 revenant-sign-core = { path = "../revenant-sign-core", version = "4.0.0" }
 log.workspace = true
 env_logger.workspace = true
-eframe = "0.34"
+eframe = "0.36"
 sys-locale = "0.3.2"
 # Native file open/save dialogs on all three platforms (AppKit / Win32 / xdg).
 rfd = "0.17"
