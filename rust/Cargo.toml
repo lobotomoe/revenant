@@ -105,7 +105,7 @@ hex = "0.4"
 quick-xml = "0.41"
 
 # -- HTTP for the standard (non-legacy) TLS path -----------------------------
-ureq = "2.12"
+ureq = "3.4"
 url = "2.5"
 
 # -- Config persistence ------------------------------------------------------
