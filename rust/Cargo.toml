@@ -31,15 +31,15 @@ homepage = "https://github.com/lobotomoe/revenant"
 # majors across that set does not compile.
 [workspace.dependencies]
 # -- legacy TLS 1.0 + RC4-MD5 building blocks (from-scratch handshake) --------
-rc4 = "0.1"
-md-5 = "0.10"
-sha1 = "0.10"
+rc4 = "0.2"
+md-5 = "0.11"
+sha1 = "0.11"
 # SHA-2 for verifying a signature's ByteRange against the algorithm declared in
 # its CMS (CoSign uses SHA-1, but standalone verification auto-detects).
-sha2 = "0.10"
-hmac = "0.12"
+sha2 = "0.11"
+hmac = "0.13"
 rsa = "0.9"
-rand = "0.8"
+rand = "0.10"
 # Constant-time byte comparison for MAC verification -- data-independent, unlike
 # a hand-rolled loop the optimizer may legally short-circuit.
 subtle = "2"
@@ -49,10 +49,10 @@ subtle = "2"
 # cms, and x509-verify all have STABLE releases that share one `der`/`Certificate`
 # type. The der-0.8 family would force a `cms` pre-release, unacceptable for a
 # signing tool. See the Phase 4 notes in the port-status memory.
-der = "0.7"
-spki = "0.7"
-const-oid = "0.9"
-x509-cert = "0.2"
+der = "0.8"
+spki = "0.8"
+const-oid = "0.10"
+x509-cert = "0.3"
 cms = "0.2"
 # Per-link certificate signature verification (RFC 5280 path checking is done by
 # building the chain ourselves via SKI/AKI, then verifying each link's signature).
