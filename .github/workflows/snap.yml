@@ -10,10 +10,11 @@ name: Snap
 # manifest at all. Building it here keeps the Snap on the same tag as every
 # other channel.
 #
-# snapcraft runs in destructive mode on the runner itself. The manifest's base
-# is core24, so the runners are pinned to Ubuntu 24.04 rather than -latest:
-# destructive mode refuses a host that does not match the base. snapcore's
-# action-build is not used because it still runs on the deprecated Node 20.
+# snapcraft builds inside an LXD container, as the Snap Store's own build service
+# does. Destructive mode on the runner itself does not work: the runner already
+# has a Rust toolchain, so the rust plugin skips installing rustup and then fails
+# its own check for it. snapcore's action-build is not used because it still
+# runs on the deprecated Node 20.
 
 on:
   workflow_call:
@@ -35,7 +36,7 @@ jobs:
       fail-fast: false
       matrix:
         include:
-          - runner: ubuntu-24.04
+          - runner: ubuntu-latest
             arch: amd64
           - runner: ubuntu-24.04-arm
             arch: arm64
@@ -52,13 +53,21 @@ jobs:
         with:
           persist-credentials: false
 
-      - name: Install snapcraft
-        run: sudo snap install snapcraft --classic
+      - name: Install snapcraft and LXD
+        run: |
+          set -euo pipefail
+          sudo snap install snapcraft --classic
+          sudo snap install lxd || sudo snap refresh lxd
+          sudo lxd waitready
+          sudo lxd init --auto
+          # Docker on the runner sets the FORWARD policy to DROP, which cuts the
+          # LXD container off from the network.
+          sudo iptables -P FORWARD ACCEPT
 
       - name: Build Snap
         run: |
           set -euo pipefail
-          sudo snapcraft pack --destructive-mode --output "revenant_${{ matrix.arch }}.snap"
+          sudo snapcraft pack --use-lxd --output "revenant_${{ matrix.arch }}.snap"
           sudo chown "$USER" "revenant_${{ matrix.arch }}.snap"
 
       - name: Upload Snap
