@@ -16,6 +16,17 @@ publish = false
 name = "revenant-gui"
 path = "src/main.rs"
 
+# Renders the app-store screenshots from the real UI (see `store_screenshots`).
+# A release-pipeline tool, not part of the shipped app: it only builds with the
+# `store-screenshots` feature, which the packaging builds never enable.
+[[bin]]
+name = "store-screenshots"
+path = "src/bin/store_screenshots.rs"
+required-features = ["store-screenshots"]
+
+[features]
+store-screenshots = ["dep:egui_kittest", "dep:image", "dep:tempfile"]
+
 # GUI-only dependencies are pinned locally rather than in the workspace catalog:
 # unlike the crypto/formats stack (which must stay version-aligned across crates)
 # nothing else in the workspace depends on egui, so central pinning would only
@@ -31,6 +42,10 @@ rfd = "0.17"
 # Must track eframe's egui minor: 0.12 targets egui 0.34. (egui 0.35 has no
 # egui-phosphor release yet, which is why we cap eframe at 0.34.)
 egui-phosphor = "0.12"
+# Headless rendering for the store screenshots; tracks eframe's egui minor.
+egui_kittest = { version = "0.34.3", features = ["wgpu", "eframe"], optional = true }
+image = { version = "0.25", default-features = false, features = ["png"], optional = true }
+tempfile = { workspace = true, optional = true }
 
 [lints]
 workspace = true

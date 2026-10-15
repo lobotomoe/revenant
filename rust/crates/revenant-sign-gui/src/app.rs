@@ -32,6 +32,9 @@ use crate::worker::{
     IdentityOutcome, RequestId, RequestIds, SignedOutcome, VerifyOutcome, Worker, WorkerMsg,
 };
 
+#[cfg(feature = "store-screenshots")]
+pub(crate) mod stage;
+
 /// PDF extension accepted by the file picker and drag-and-drop.
 const PDF_EXTENSION: &str = "pdf";
 
@@ -85,9 +88,15 @@ pub(crate) struct RevenantApp {
 
 impl RevenantApp {
     pub(crate) fn new(cc: &eframe::CreationContext<'_>) -> Self {
+        Self::with_store(cc, ConfigStore::new())
+    }
+
+    /// Build the app over a given config store (the user's real one in
+    /// production, an isolated one when rendering store screenshots).
+    fn with_store(cc: &eframe::CreationContext<'_>, store: ConfigStore) -> Self {
         crate::fonts::install(&cc.egui_ctx);
         crate::style::install(&cc.egui_ctx);
-        let store = Arc::new(ConfigStore::new());
+        let store = Arc::new(store);
         let l10n = Localizer::new(&store.language());
         let transport = Arc::new(Transport::new());
         // Register the saved profile's TLS mode so pings and signing use the

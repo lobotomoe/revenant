@@ -17,9 +17,12 @@ mod theme;
 mod views;
 mod worker;
 
+#[cfg(feature = "store-screenshots")]
+pub mod store_screenshots;
+
 use app::RevenantApp;
 
-const INITIAL_SIZE: [f32; 2] = [940.0, 700.0];
+pub(crate) const INITIAL_SIZE: [f32; 2] = [940.0, 700.0];
 const MIN_SIZE: [f32; 2] = [640.0, 480.0];
 
 /// The window/taskbar icon, embedded in the binary. Rendered from the same
@@ -34,9 +37,12 @@ const MIN_SIZE: [f32; 2] = [640.0, 480.0];
 #[cfg(not(target_os = "macos"))]
 const APP_ICON_PNG: &[u8] = include_bytes!("../assets/icon-256.png");
 
-fn main() -> eframe::Result<()> {
-    env_logger::Builder::from_env(env_logger::Env::default().default_filter_or("info")).init();
-
+/// Open the main window and run the GUI until it is closed.
+///
+/// # Errors
+///
+/// Returns the eframe error when the window or its renderer cannot be created.
+pub fn run() -> eframe::Result<()> {
     let viewport = eframe::egui::ViewportBuilder::default()
         .with_inner_size(INITIAL_SIZE)
         .with_min_inner_size(MIN_SIZE)
