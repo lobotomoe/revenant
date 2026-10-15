@@ -136,7 +136,7 @@ pub(crate) const SHOTS: [Shot; 5] = [
     Shot {
         slug: "04-server",
         headline: "EKENG profile built in",
-        subline: "Or connect to any CoSign / DocuSign Signature Appliance server.",
+        subline: "Or connect to your organization's own signing server.",
         setup: Setup::Fresh,
         stage: || Stage::ChooseServer,
     },
