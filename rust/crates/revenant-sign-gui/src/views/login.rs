@@ -198,6 +198,22 @@ impl LoginState {
         }
     }
 
+    /// Bring the wizard to its summary page with `identity` resolved, where it
+    /// stands after a successful discovery and a click on Next. For the store
+    /// screenshots only: the real path needs a live server to discover from.
+    #[cfg(feature = "store-screenshots")]
+    pub(crate) fn show_summary_for(&mut self, identity: CertInfo) {
+        self.begin_discovery();
+        // The status line only shows when the identity has no name, which the
+        // assertion below rules out.
+        self.on_identity_found(identity, String::new());
+        assert!(
+            matches!(self.discovery, Discovery::Resolved),
+            "a staged identity must carry a name"
+        );
+        self.step = Step::Done;
+    }
+
     /// Fold in a discovery failure (already localized).
     pub(crate) fn on_discovery_failed(&mut self, status: String) {
         self.discovery = Discovery::Failed(status);

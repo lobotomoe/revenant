@@ -15,13 +15,14 @@ mod secret;
 mod settings;
 mod storage;
 
+use std::collections::HashMap;
 use std::fmt;
 use std::path::PathBuf;
 use std::sync::{Mutex, PoisonError};
 
 use crate::net::Transport;
 
-use credentials::{KeyringStore, SecretStore};
+use credentials::{KeyringStore, MemorySecretStore, SecretStore};
 use storage::Storage;
 
 pub use credentials::ResolvedCredentials;
@@ -50,11 +51,11 @@ struct SessionCredentials {
 ///
 /// Production reads the real process environment; tests inject a fixed set so
 /// env-precedence behavior is exercised deterministically without mutating the
-/// shared process environment (which would race across parallel tests).
+/// shared process environment (which would race across parallel tests), and an
+/// isolated store uses an empty set so the caller's environment cannot leak in.
 enum EnvSource {
     Process,
-    #[cfg(test)]
-    Fixed(std::collections::HashMap<String, String>),
+    Fixed(HashMap<String, String>),
 }
 
 impl EnvSource {
@@ -62,7 +63,6 @@ impl EnvSource {
     fn get(&self, key: &str) -> Option<String> {
         match self {
             EnvSource::Process => std::env::var(key).ok(),
-            #[cfg(test)]
             EnvSource::Fixed(vars) => vars.get(key).cloned(),
         }
     }
@@ -73,7 +73,6 @@ impl fmt::Debug for EnvSource {
         // Never render values: env may carry REVENANT_PASS.
         match self {
             EnvSource::Process => f.write_str("Process"),
-            #[cfg(test)]
             EnvSource::Fixed(vars) => write!(f, "Fixed({} vars)", vars.len()),
         }
     }
@@ -101,6 +100,24 @@ impl ConfigStore {
             storage: Storage::new(default_config_dir()),
             secrets: Box::new(KeyringStore::new(credentials::KEYRING_SERVICE)),
             env: EnvSource::Process,
+            session: Mutex::new(None),
+        }
+    }
+
+    /// Build a store detached from the user's machine: the config file lives in
+    /// `dir`, secrets are held in process memory, and environment overrides
+    /// (`REVENANT_URL`, `REVENANT_USER`, ...) are ignored.
+    ///
+    /// For anything that must drive the real UI or API without reading or
+    /// changing the user's setup -- rendering store screenshots, demos, embedding
+    /// tests. `keychain_name` is what [`ConfigStore::credential_storage_info`]
+    /// reports, standing in for the OS keychain the memory store replaces.
+    #[must_use]
+    pub fn isolated(dir: PathBuf, keychain_name: impl Into<String>) -> Self {
+        ConfigStore {
+            storage: Storage::new(dir),
+            secrets: Box::new(MemorySecretStore::new(keychain_name.into())),
+            env: EnvSource::Fixed(HashMap::new()),
             session: Mutex::new(None),
         }
     }
@@ -249,6 +266,25 @@ mod tests {
         store.set_session_credentials("user", "s3cr3t-pw");
         let rendered = format!("{store:?}");
         assert!(!rendered.contains("s3cr3t-pw"), "leaked: {rendered}");
+    }
+
+    #[test]
+    fn isolated_store_keeps_config_and_secrets_off_the_machine() {
+        let dir = tempfile::tempdir().expect("temp dir");
+        let store = ConfigStore::isolated(dir.path().to_path_buf(), "Test Keychain");
+        assert_eq!(store.config_file(), dir.path().join("config.json"));
+        assert_eq!(store.credential_storage_info(), "Test Keychain");
+
+        // Reported as secure, so the password goes to memory, not the file.
+        assert!(store.save_credentials("user", "s3cr3t-pw").unwrap());
+        let on_disk = std::fs::read_to_string(store.config_file()).unwrap();
+        assert!(
+            !on_disk.contains("s3cr3t-pw"),
+            "plaintext on disk: {on_disk}"
+        );
+        let resolved = store.get_credentials();
+        assert_eq!(resolved.username.as_deref(), Some("user"));
+        assert_eq!(resolved.password.unwrap().expose(), "s3cr3t-pw");
     }
 
     #[test]
