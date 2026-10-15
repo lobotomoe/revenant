@@ -3,7 +3,6 @@ name = "revenant-sign-gui"
 description = "Cross-platform desktop GUI for ARX CoSign / DocuSign Signature Appliance electronic signatures"
 version.workspace = true
 edition.workspace = true
-rust-version.workspace = true
 license.workspace = true
 authors.workspace = true
 repository.workspace = true
@@ -11,6 +10,8 @@ homepage.workspace = true
 # A desktop application distributed via the app stores (Mac App Store, Microsoft
 # Store, Snap, AppImage), not a library -- kept out of the crates.io publish set.
 publish = false
+# No rust-version: nothing depends on this crate, and it is built with the
+# toolchain pinned in rust-toolchain.toml (egui alone needs 1.92).
 
 [[bin]]
 name = "revenant-gui"

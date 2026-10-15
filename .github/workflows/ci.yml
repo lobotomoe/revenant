@@ -449,12 +449,19 @@ jobs:
         run: cargo test --workspace
 
   rs-msrv:
-    name: Rust MSRV (1.85)
+    name: Rust MSRV (1.88)
     runs-on: ubuntu-latest
     timeout-minutes: 15
     defaults:
       run:
         working-directory: rust
+    env:
+      # rust/rust-toolchain.toml pins `stable`, and a toolchain file outranks the
+      # runner's default toolchain; only RUSTUP_TOOLCHAIN outranks the file.
+      RUSTUP_TOOLCHAIN: "1.88"
+      # Resolve the way a downstream `cargo add` does on 1.88: newest versions
+      # whose rust-version fits, not the committed lock built for stable.
+      CARGO_RESOLVER_INCOMPATIBLE_RUST_VERSIONS: fallback
 
     steps:
       - uses: step-security/harden-runner@05e31511f85b41b11d1cf0ef85d0992719546e2c # v2.21.0
@@ -466,19 +473,25 @@ jobs:
       - name: Install libdbus (keyring Secret Service backend)
         run: sudo apt-get update && sudo apt-get install -y libdbus-1-dev pkg-config
 
-      - name: Set up Rust 1.85 (workspace MSRV)
+      - name: Set up Rust 1.88 (MSRV of the published crates)
         uses: dtolnay/rust-toolchain@6c977a6ca4077a0ceb28ffbe03f59d46e9ac8772 # master
         with:
-          toolchain: "1.85"
+          toolchain: "1.88"
+
+      - name: Resolve dependencies for 1.88
+        run: cargo generate-lockfile
 
       - uses: Swatinem/rust-cache@6323deb102c322ba6fcbdcafc7e3dddab59af2b6 # v2.9.2
         with:
           workspaces: rust
 
-      # Verifies the documented MSRV (rust-version = "1.85") still compiles the
-      # committed Cargo.lock -- a newer-stdlib slip or a dep MSRV bump fails here.
+      # Verifies the declared rust-version of the crates.io crates. The GUI is
+      # not published, is built with the pinned stable toolchain, and declares
+      # no MSRV, so it is not checked here.
       - name: Check (MSRV)
-        run: cargo check --workspace --all-targets
+        run: >-
+          cargo check --locked --all-targets
+          -p revenant-sign-tls -p revenant-sign-core -p revenant-sign
 
   rs-build:
     name: Rust Build

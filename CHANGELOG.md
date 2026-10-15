@@ -21,6 +21,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   environment overrides -- for driving the real UI or API without touching the
   user's setup.
 
+### Fixed
+
+- The Rust crates on crates.io now declare **Rust 1.88** as their minimum
+  version. They claimed 1.85 but have needed 1.88 since lopdf 0.44, and the CI
+  job meant to catch that was running the stable toolchain instead. It now
+  checks the published crates on 1.88, with dependencies resolved the way a
+  downstream project on 1.88 would resolve them.
+
 ### Security
 
 - **rustls 0.23.46** in the Rust desktop app, CLI and crates, clearing
