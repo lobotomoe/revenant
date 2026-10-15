@@ -932,14 +932,32 @@ jobs:
       # snapcraft exits non-zero for it; the release then has to be done by hand
       # once the store approves it. Each architecture is its own revision, so
       # one can go out while the other waits.
+      #
+      # Re-runnable: an architecture whose channel already serves this version is
+      # skipped. The store refuses a second upload of the same file, so without
+      # this a re-run after one architecture failed (v4.1.1: a dropped
+      # connection on amd64) fails again on the one that went out.
       - name: Upload and release
         env:
           SNAPCRAFT_STORE_CREDENTIALS: ${{ secrets.SNAPCRAFT_STORE_CREDENTIALS }}
           CHANNEL: ${{ contains(github.ref_name, '-') && 'candidate' || 'stable' }}
         run: |
           set -euo pipefail
+          version="${GITHUB_REF_NAME#v}"
+          version="${version%%-*}"
+          channel_map=$(curl -fsS --retry 3 -H 'Snap-Device-Series: 16' \
+            'https://api.snapcraft.io/v2/snaps/info/revenant?fields=version')
           failed=0
           for snap in snaps/*.snap; do
+            arch=$(basename "$snap" .snap)
+            arch="${arch#revenant_}"
+            served=$(jq -r --arg arch "$arch" --arg channel "$CHANNEL" \
+              '.["channel-map"][] | select(.channel.architecture == $arch and .channel.track == "latest" and .channel.risk == $channel) | .version' \
+              <<< "$channel_map")
+            if [ "$served" = "$version" ]; then
+              echo "${arch}: ${CHANNEL} already serves ${version}, skipping"
+              continue
+            fi
             if ! snapcraft upload --release="$CHANNEL" "$snap"; then
               echo "::error::${snap} was not released to ${CHANNEL}. If the output above says it needs manual review, wait for approval, then run: snapcraft list-revisions revenant && snapcraft release revenant <revision> ${CHANNEL}"
               failed=1
