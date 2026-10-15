@@ -64,6 +64,13 @@ jobs:
           # LXD container off from the network.
           sudo iptables -P FORWARD ACCEPT
 
+      - name: Diagnose rustup (temporary)
+        run: |
+          sudo snap install rustup --classic
+          sudo snap install gnome-46-2404-sdk
+          sudo bash -c 'rustup dump-testament >/tmp/o 2>&1; echo "plain rc=$?"; tail -3 /tmp/o'
+          sudo bash -c 'export LD_LIBRARY_PATH=/snap/gnome-46-2404-sdk/current/lib/x86_64-linux-gnu:/snap/gnome-46-2404-sdk/current/usr/lib/x86_64-linux-gnu; export PATH="/snap/gnome-46-2404-sdk/current/usr/bin:$PATH"; rustup dump-testament >/tmp/o 2>&1; echo "gnome-env rc=$?"; tail -5 /tmp/o; command -v rustup'
+
       - name: Build Snap
         run: |
           set -euo pipefail
