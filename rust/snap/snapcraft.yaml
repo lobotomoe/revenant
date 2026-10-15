@@ -82,12 +82,6 @@ parts:
       - crates/revenant-sign-gui
     parse-info:
       - packaging/linux/io.github.lobotomoe.revenant.metainfo.xml
-    # The plugin installs the rustup snap only when the host has no Rust of its
-    # own, yet always requires rustup to be present. A build host with Rust
-    # already installed (a CI runner) fails that check, so ask for it outright.
-    # The toolchain itself comes from rust-toolchain.toml.
-    build-snaps:
-      - rustup
     build-packages:
       - libdbus-1-dev
       - pkg-config
