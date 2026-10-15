@@ -8,7 +8,8 @@
 # Publish:                 snapcraft upload revenant_*.snap --release=stable
 # Prereq:                  sudo snap install snapcraft --classic
 #
-# Not buildable on macOS (snapcraft is Linux-only) -- validated in Linux CI.
+# Not buildable on macOS (snapcraft is Linux-only). Built in CI by
+# .github/workflows/snap.yml and published by release.yml.
 #
 # vs the Python manifest: the `revenant` part switches from the python plugin
 # (which bundled CPython + tkinter) to the rust plugin building the self-contained

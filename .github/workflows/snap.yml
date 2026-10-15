@@ -1,0 +1,69 @@
+name: Snap
+
+# Builds the Snap from rust/snap/snapcraft.yaml for both architectures. Called by
+# release.yml, which publishes what this produces, and run on pull requests that
+# touch the manifest so a broken Snap shows up before a tag does.
+#
+# The Snap Store sat on the Python client's 1.2.1 for every Rust release up to
+# 4.1.0: its own build service tracked the old root snap/snapcraft.yaml, which
+# moved to python/snap/ when the Rust app took over, and nothing built the Rust
+# manifest at all. Building it here keeps the Snap on the same tag as every
+# other channel.
+#
+# snapcraft runs in destructive mode on the runner itself. The manifest's base
+# is core24, so the runners are pinned to Ubuntu 24.04 rather than -latest:
+# destructive mode refuses a host that does not match the base. snapcore's
+# action-build is not used because it still runs on the deprecated Node 20.
+
+on:
+  workflow_call:
+  pull_request:
+    paths:
+      - "rust/snap/**"
+      - ".github/workflows/snap.yml"
+
+permissions: read-all
+
+jobs:
+  build:
+    name: Build Snap (${{ matrix.arch }})
+    runs-on: ${{ matrix.runner }}
+    timeout-minutes: 45
+    permissions:
+      contents: read
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - runner: ubuntu-24.04
+            arch: amd64
+          - runner: ubuntu-24.04-arm
+            arch: arm64
+    defaults:
+      run:
+        working-directory: rust
+
+    steps:
+      - uses: step-security/harden-runner@05e31511f85b41b11d1cf0ef85d0992719546e2c # v2.21.0
+        with:
+          egress-policy: audit
+
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v6
+        with:
+          persist-credentials: false
+
+      - name: Install snapcraft
+        run: sudo snap install snapcraft --classic
+
+      - name: Build Snap
+        run: |
+          set -euo pipefail
+          sudo snapcraft pack --destructive-mode --output "revenant_${{ matrix.arch }}.snap"
+          sudo chown "$USER" "revenant_${{ matrix.arch }}.snap"
+
+      - name: Upload Snap
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: snap-${{ matrix.arch }}
+          path: rust/revenant_${{ matrix.arch }}.snap
+          if-no-files-found: error
