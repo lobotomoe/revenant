@@ -7,6 +7,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [4.1.1] - 2026-10-15
+
+Ships the desktop app to the Snap Store. Nothing changes in the app, the CLIs
+or the libraries.
+
 ### Fixed
 
 - **The Snap is the current app again.** The Snap Store had been serving the
@@ -754,7 +759,8 @@ entry point -- but their verification behaviour changes, as described below.
 - Pyright strict mode type checking with 0 errors
 - 96%+ test coverage (600+ tests)
 
-[Unreleased]: https://github.com/lobotomoe/revenant/compare/v4.1.0...HEAD
+[Unreleased]: https://github.com/lobotomoe/revenant/compare/v4.1.1...HEAD
+[4.1.1]: https://github.com/lobotomoe/revenant/compare/v4.1.0...v4.1.1
 [4.1.0]: https://github.com/lobotomoe/revenant/compare/v4.0.0...v4.1.0
 [4.0.0]: https://github.com/lobotomoe/revenant/compare/v3.0.5...v4.0.0
 [3.0.5]: https://github.com/lobotomoe/revenant/compare/v3.0.4...v3.0.5
