@@ -189,6 +189,60 @@ jobs:
           path: rust/dist/revenant-cli-linux-${{ matrix.arch }}
           if-no-files-found: error
 
+  # -- Store screenshots -----------------------------------------------------
+  # Renders the Mac App Store, Microsoft Store and Snap Store screenshots from
+  # this release's UI (headless, fictional account; see the GUI crate's
+  # `store_screenshots` module) and attaches them as one zip. None of the three
+  # stores is uploaded to from here: the zip is what goes into each listing.
+  store-screenshots:
+    name: Store Screenshots
+    needs: [ci, version-guard]
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    permissions:
+      contents: read
+    defaults:
+      run:
+        working-directory: rust
+
+    steps:
+      - uses: step-security/harden-runner@05e31511f85b41b11d1cf0ef85d0992719546e2c # v2.21.0
+        with:
+          egress-policy: audit
+
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v6
+        with:
+          persist-credentials: false
+
+      # libdbus for the keyring backend the GUI links; Mesa's lavapipe gives
+      # wgpu a software Vulkan device, since the runner has no GPU.
+      - name: Install libdbus and software Vulkan
+        run: sudo apt-get update && sudo apt-get install -y libdbus-1-dev pkg-config mesa-vulkan-drivers libvulkan1
+
+      - name: Set up Rust
+        uses: dtolnay/rust-toolchain@6c977a6ca4077a0ceb28ffbe03f59d46e9ac8772 # master
+        with:
+          toolchain: stable
+
+      - uses: Swatinem/rust-cache@6323deb102c322ba6fcbdcafc7e3dddab59af2b6 # v2.9.2
+        with:
+          workspaces: rust
+
+      - name: Render screenshots
+        run: cargo run --release --locked -p revenant-sign-gui --features store-screenshots --bin store-screenshots -- "$RUNNER_TEMP/store-screenshots"
+
+      - name: Pack screenshots
+        run: |
+          mkdir -p dist
+          (cd "$RUNNER_TEMP/store-screenshots" && zip -r -X "$GITHUB_WORKSPACE/rust/dist/revenant-store-screenshots.zip" .)
+
+      - name: Upload screenshots
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: release-store-screenshots
+          path: rust/dist/revenant-store-screenshots.zip
+          if-no-files-found: error
+
   # -- Windows: build + Authenticode sign + MSIX -----------------------------
   build-windows:
     name: Build Windows (x64)
@@ -547,7 +601,7 @@ jobs:
   # -- Collect artifacts, checksum, attest, SBOM, GitHub Release --------------
   release:
     name: Create Release
-    needs: [build-linux, build-windows, macos-devid, macos-mas]
+    needs: [build-linux, build-windows, macos-devid, macos-mas, store-screenshots]
     runs-on: ubuntu-latest
     timeout-minutes: 15
     permissions:

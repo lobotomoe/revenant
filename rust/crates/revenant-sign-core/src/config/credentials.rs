@@ -6,8 +6,10 @@
 //! storage falls back to a plaintext password in the config file, and a one-time
 //! migration removes the plaintext once the keychain holds it.
 
+use std::collections::HashMap;
 use std::error::Error;
 use std::fmt;
+use std::sync::{Mutex, MutexGuard, PoisonError};
 
 use serde_json::Value;
 
@@ -127,6 +129,64 @@ impl SecretStore for KeyringStore {
         } else {
             "system keychain".to_owned()
         }
+    }
+
+    fn is_secure(&self) -> bool {
+        true
+    }
+}
+
+/// An in-memory backend standing in for a secure keychain.
+///
+/// Backs [`ConfigStore::isolated`]: nothing outlives the process and the OS
+/// keychain is never touched, yet the store behaves as if secure storage is
+/// present, so the UI shows the same states it would on a configured machine.
+pub(super) struct MemorySecretStore {
+    entries: Mutex<HashMap<String, String>>,
+    backend_name: String,
+}
+
+impl MemorySecretStore {
+    /// An empty store that reports itself as `backend_name`.
+    pub(super) fn new(backend_name: String) -> Self {
+        MemorySecretStore {
+            entries: Mutex::new(HashMap::new()),
+            backend_name,
+        }
+    }
+
+    fn lock(&self) -> MutexGuard<'_, HashMap<String, String>> {
+        self.entries.lock().unwrap_or_else(PoisonError::into_inner)
+    }
+}
+
+impl fmt::Debug for MemorySecretStore {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        // Never render stored secrets.
+        f.debug_struct("MemorySecretStore")
+            .field("backend_name", &self.backend_name)
+            .field("entries", &self.lock().len())
+            .finish()
+    }
+}
+
+impl SecretStore for MemorySecretStore {
+    fn get(&self, account: &str) -> Result<Option<String>, SecretStoreError> {
+        Ok(self.lock().get(account).cloned())
+    }
+
+    fn set(&self, account: &str, secret: &str) -> Result<(), SecretStoreError> {
+        self.lock().insert(account.to_owned(), secret.to_owned());
+        Ok(())
+    }
+
+    fn delete(&self, account: &str) -> Result<(), SecretStoreError> {
+        self.lock().remove(account);
+        Ok(())
+    }
+
+    fn backend_name(&self) -> String {
+        self.backend_name.clone()
     }
 
     fn is_secure(&self) -> bool {
