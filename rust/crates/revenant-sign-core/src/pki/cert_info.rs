@@ -272,7 +272,7 @@ mod tests {
         assert!(first.subject.contains("Test Signer Direct"), "{first:?}");
         assert!(first.issuer.contains("Test Root CA"), "{first:?}");
         // Serial renders as a non-empty run of decimal digits.
-        assert!(!first.serial.is_empty());
+        assert_ne!(first.serial, "");
         assert!(first.serial.bytes().all(|b| b.is_ascii_digit()));
         assert!(first.not_before.is_some());
         assert!(first.not_after.is_some());

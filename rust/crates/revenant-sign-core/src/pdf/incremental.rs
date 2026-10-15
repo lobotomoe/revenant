@@ -434,7 +434,7 @@ mod tests {
             group_consecutive(&[1, 2, 3, 7, 8, 10]),
             vec![vec![1, 2, 3], vec![7, 8], vec![10]]
         );
-        assert!(group_consecutive(&[]).is_empty());
+        assert_eq!(group_consecutive(&[]), Vec::<Vec<u32>>::new());
     }
 
     #[test]
