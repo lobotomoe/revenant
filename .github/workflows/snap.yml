@@ -55,6 +55,13 @@ jobs:
       - name: Install snapcraft
         run: sudo snap install snapcraft --classic
 
+      - name: Diagnose PATH (temporary)
+        run: |
+          sudo snap install rustup --classic
+          echo "user PATH: $PATH"
+          sudo sh -c 'echo "root PATH: $PATH"; command -v rustup cargo rustc snapcraft; ls -l /snap/bin | head'
+          sudo grep -rh secure_path /etc/sudoers /etc/sudoers.d || true
+
       - name: Build Snap
         run: |
           set -euo pipefail
