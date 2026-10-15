@@ -7,6 +7,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Security
+
+- **rustls 0.23.46** in the Rust desktop app, CLI and crates, clearing
+  RUSTSEC-2026-0285, -0346, -0348 and -0349 (medium and low). rustls carries
+  every standard HTTPS connection; the EKENG profile's legacy TLS 1.0 path is
+  a separate stack and does not go through it.
+
 ## [4.0.0] - 2026-09-03
 
 Two fixes -- logging in to a non-EKENG server, and the app icon on macOS -- plus
