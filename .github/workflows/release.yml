@@ -926,17 +926,26 @@ jobs:
           merge-multiple: true
 
       - name: Install snapcraft
-        run: sudo snap install snapcraft --classic
+        run: sudo snap install snapcraft --classic --channel=9.x/stable
 
+      # A revision held for manual review is uploaded but not released, and
+      # snapcraft exits non-zero for it; the release then has to be done by hand
+      # once the store approves it. Each architecture is its own revision, so
+      # one can go out while the other waits.
       - name: Upload and release
         env:
           SNAPCRAFT_STORE_CREDENTIALS: ${{ secrets.SNAPCRAFT_STORE_CREDENTIALS }}
           CHANNEL: ${{ contains(github.ref_name, '-') && 'candidate' || 'stable' }}
         run: |
           set -euo pipefail
+          failed=0
           for snap in snaps/*.snap; do
-            snapcraft upload --release="$CHANNEL" "$snap"
+            if ! snapcraft upload --release="$CHANNEL" "$snap"; then
+              echo "::error::${snap} was not released to ${CHANNEL}. If the output above says it needs manual review, wait for approval, then run: snapcraft list-revisions revenant && snapcraft release revenant <revision> ${CHANNEL}"
+              failed=1
+            fi
           done
+          exit "$failed"
 
   # -- crates.io: publish the Rust library + CLI crates via OIDC --------------
   # Tokenless trusted publishing, same model as npm/PyPI: crates-io-auth-action

@@ -83,7 +83,8 @@ parts:
     # The gnome extension points LD_LIBRARY_PATH at the GNOME SDK's glibc for
     # every part. rustup cannot run against it (symbol lookup error, exit 127),
     # which the rust plugin reports as "'rustup' not found". The Rust build links
-    # nothing from the SDK, so clear it here.
+    # nothing from the SDK, so clear it here. Drop this once the regression
+    # behind https://github.com/canonical/snapcraft/issues/6330 is fixed.
     build-environment:
       - LD_LIBRARY_PATH: ""
     build-packages:

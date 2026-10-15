@@ -53,22 +53,24 @@ jobs:
         with:
           persist-credentials: false
 
+      # snapcraft is pinned to a major track: an unpinned refresh is how the
+      # rust plugin regression in rust/snap/snapcraft.yaml arrived.
       - name: Install snapcraft and LXD
         run: |
           set -euo pipefail
-          sudo snap install snapcraft --classic
+          sudo snap install snapcraft --classic --channel=9.x/stable
           sudo snap install lxd || sudo snap refresh lxd
           sudo lxd waitready
           sudo lxd init --auto
+          sudo usermod --append --groups lxd "$USER"
           # Docker on the runner sets the FORWARD policy to DROP, which cuts the
           # LXD container off from the network.
           sudo iptables -P FORWARD ACCEPT
 
+      # As the runner user, not root: the lxd group membership above is not in
+      # this shell's credentials yet, so sg picks it up for the one command.
       - name: Build Snap
-        run: |
-          set -euo pipefail
-          sudo snapcraft pack --use-lxd --output "revenant_${{ matrix.arch }}.snap"
-          sudo chown "$USER" "revenant_${{ matrix.arch }}.snap"
+        run: sg lxd -c 'snapcraft pack --use-lxd --output "revenant_${{ matrix.arch }}.snap"'
 
       # A snap without meta/gui/<app>.desktop installs and runs, but the GUI is
       # missing from the application menu; snapcraft does not treat that as an
@@ -81,6 +83,20 @@ jobs:
             echo "::error::the Snap has no $entry, so the GUI would not appear in the application menu"
             exit 1
           fi
+
+      # The checks the store runs on upload, so a rejection shows up here rather
+      # than after a release tag.
+      - name: Store review
+        run: |
+          set -euo pipefail
+          sudo snap install review-tools
+          review-tools.snap-review "revenant_${{ matrix.arch }}.snap"
+
+      - name: Install and run
+        run: |
+          set -euo pipefail
+          sudo snap install --dangerous "./revenant_${{ matrix.arch }}.snap"
+          revenant --version
 
       - name: Upload Snap
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
