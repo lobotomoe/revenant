@@ -70,6 +70,18 @@ jobs:
           sudo snapcraft pack --use-lxd --output "revenant_${{ matrix.arch }}.snap"
           sudo chown "$USER" "revenant_${{ matrix.arch }}.snap"
 
+      # A snap without meta/gui/<app>.desktop installs and runs, but the GUI is
+      # missing from the application menu; snapcraft does not treat that as an
+      # error, so check for it here.
+      - name: Check the menu entry
+        run: |
+          set -euo pipefail
+          entry="squashfs-root/meta/gui/revenant-gui.desktop"
+          if ! unsquashfs -l "revenant_${{ matrix.arch }}.snap" | grep -qx "$entry"; then
+            echo "::error::the Snap has no $entry, so the GUI would not appear in the application menu"
+            exit 1
+          fi
+
       - name: Upload Snap
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
