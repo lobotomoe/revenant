@@ -266,6 +266,9 @@ mod tests {
             value: SigFieldValue::Cert("missing".to_owned()),
             label: None,
         }];
-        assert!(extract_display_fields(&sig_fields, &cert_values).is_empty());
+        assert_eq!(
+            extract_display_fields(&sig_fields, &cert_values),
+            Vec::<String>::new()
+        );
     }
 }
