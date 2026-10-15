@@ -28,6 +28,26 @@ pub(crate) enum Chrome {
     Gnome,
 }
 
+/// Where a store's listing carries each shot's copy.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub(crate) enum CopyPlacement {
+    /// Drawn above the window. App Store guideline 2.3.3 allows text overlays
+    /// on screenshots that show the real app.
+    OnImage,
+    /// Kept off the image and written to `captions.txt` for the listing's
+    /// per-screenshot caption field. Partner Center's screenshot guidance says
+    /// not to add marketing messages to screenshots and offers a caption of up
+    /// to 200 characters instead.
+    Caption,
+    /// Not shown at all. The Snap Store has no caption field, and its stated
+    /// direction (and the Linux store norm, e.g. Flathub's rules) is to keep
+    /// text out of screenshots.
+    Omitted,
+}
+
+/// The longest caption Partner Center accepts per screenshot.
+pub(crate) const CAPTION_LIMIT: usize = 200;
+
 /// The app window size, in points, every shot is rendered at: the default
 /// window's width, a little taller so the batch list and the Sign button fit on
 /// screen together. A size the user can resize the window to, not a new layout.
@@ -68,6 +88,14 @@ impl Store {
             Store::MacApp => "macOS Keychain",
             Store::Microsoft => "Windows Credential Manager",
             Store::Snap => "Linux Secret Service",
+        }
+    }
+
+    pub(crate) fn copy(self) -> CopyPlacement {
+        match self {
+            Store::MacApp => CopyPlacement::OnImage,
+            Store::Microsoft => CopyPlacement::Caption,
+            Store::Snap => CopyPlacement::Omitted,
         }
     }
 
@@ -152,6 +180,11 @@ pub(crate) const SHOTS: [Shot; 5] = [
 ];
 
 impl Shot {
+    /// The headline and subline as one caption.
+    pub(crate) fn caption(&self) -> String {
+        format!("{}. {}", self.headline, self.subline)
+    }
+
     pub(crate) fn stage(&self) -> Stage {
         (self.stage)()
     }

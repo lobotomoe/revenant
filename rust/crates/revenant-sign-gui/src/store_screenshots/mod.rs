@@ -18,7 +18,7 @@ use std::path::{Path, PathBuf};
 
 use revenant_sign_core::error::RevenantError;
 
-use listing::{Store, SHOTS};
+use listing::{CopyPlacement, Store, CAPTION_LIMIT, SHOTS};
 
 /// Why rendering the screenshots failed.
 #[derive(Debug)]
@@ -97,8 +97,37 @@ pub fn render_all(out_dir: &Path) -> Result<Vec<PathBuf>, ScreenshotError> {
                 })?;
             written.push(path);
         }
+        if store.copy() == CopyPlacement::Caption {
+            written.push(write_captions(&store_dir)?);
+        }
     }
     Ok(written)
+}
+
+/// Write `captions.txt` beside the shots: one `file<TAB>caption` line per shot,
+/// in upload order, for pasting into the listing's caption fields.
+fn write_captions(store_dir: &Path) -> Result<PathBuf, ScreenshotError> {
+    let path = store_dir.join("captions.txt");
+    let mut lines = String::new();
+    for shot in &SHOTS {
+        let caption = shot.caption();
+        let length = caption.chars().count();
+        if length > CAPTION_LIMIT {
+            return Err(ScreenshotError::Render(format!(
+                "{}: caption is {length} characters, over the {CAPTION_LIMIT} the listing takes",
+                shot.slug
+            )));
+        }
+        lines.push_str(shot.slug);
+        lines.push_str(".png\t");
+        lines.push_str(&caption);
+        lines.push('\n');
+    }
+    std::fs::write(&path, lines).map_err(|source| ScreenshotError::Io {
+        path: path.clone(),
+        source,
+    })?;
+    Ok(path)
 }
 
 /// Drop the alpha channel: App Store Connect rejects a screenshot whose PNG has

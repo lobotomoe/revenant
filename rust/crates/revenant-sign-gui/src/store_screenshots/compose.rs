@@ -12,7 +12,7 @@ use eframe::egui::{
 use egui_kittest::Harness;
 use image::RgbaImage;
 
-use super::listing::{Chrome, Shot, Store, WINDOW_SIZE};
+use super::listing::{Chrome, CopyPlacement, Shot, Store, WINDOW_SIZE};
 use super::{backdrop, chrome, ScreenshotError};
 
 /// Font family name for the bold face used by headlines and some titles.
@@ -30,6 +30,8 @@ pub(crate) struct Layout {
     scale: f32,
     /// The whole window, title bar included.
     window: Rect,
+    /// Whether the headline and subline are drawn above the window.
+    copy_on_image: bool,
     headline_top: f32,
     headline_size: f32,
     subline_size: f32,
@@ -41,10 +43,15 @@ impl Layout {
         let chrome = store.chrome();
         let canvas = Rect::from_min_size(pos2(0.0, 0.0), vec2(width, height));
 
-        // The headline block takes the top quarter; the window fills the rest
-        // down to a small bottom margin.
-        let window_top = height * 0.255;
-        let window_bottom = height * 0.965;
+        // With copy on the image, the headline block takes the top quarter and
+        // the window fills the rest down to a small bottom margin. Without it,
+        // the window is centered with an even margin.
+        let copy_on_image = store.copy() == CopyPlacement::OnImage;
+        let (window_top, window_bottom) = if copy_on_image {
+            (height * 0.255, height * 0.965)
+        } else {
+            (height * 0.06, height * 0.94)
+        };
         let [app_width, app_height] = WINDOW_SIZE;
         let window_points = vec2(app_width, app_height + chrome.title_bar_height());
         let scale = (window_bottom - window_top) / window_points.y;
@@ -58,6 +65,7 @@ impl Layout {
             chrome,
             scale,
             window,
+            copy_on_image,
             headline_top: height * 0.075,
             headline_size: height * 0.052,
             subline_size: height * 0.025,
@@ -84,6 +92,12 @@ pub(crate) fn frame(
     let headline = shot.headline;
     let subline = shot.subline;
 
+    // egui assumes a 2048 px texture limit unless told otherwise, and a 4K
+    // canvas places a window wider than that. The device already renders the
+    // whole canvas as one target, so a texture no larger than the canvas is
+    // within its limits.
+    let texture_limit = texture_side(layout.canvas.width().max(layout.canvas.height()));
+    let mut fonts_installed = false;
     let mut textures: Option<(TextureHandle, TextureHandle)> = None;
     let mut harness = Harness::builder()
         .with_size(layout.canvas.size())
@@ -91,20 +105,30 @@ pub(crate) fn frame(
         .wgpu()
         .build_ui(move |ui| {
             let ctx = ui.ctx().clone();
-            let Some((window_texture, icon_texture)) = &textures else {
-                // Fonts set now only take effect next frame, so the first frame
-                // loads everything and paints nothing.
+            if !fonts_installed {
+                // Fonts set now only take effect next frame.
                 install_fonts(&ctx);
-                textures = Some((
-                    ctx.load_texture("window", window_pixels.clone(), TextureOptions::LINEAR),
-                    ctx.load_texture("icon", icon_pixels.clone(), TextureOptions::LINEAR),
-                ));
+                fonts_installed = true;
                 ctx.request_repaint();
                 return;
-            };
+            }
+            // The harness runs frames while it is still being built, before the
+            // raised texture limit below reaches the context; wait for it.
+            if ctx.input(|input| input.max_texture_side) < texture_limit {
+                ctx.request_repaint();
+                return;
+            }
+            let (window_texture, icon_texture) = textures.get_or_insert_with(|| {
+                (
+                    ctx.load_texture("window", window_pixels.clone(), TextureOptions::LINEAR),
+                    ctx.load_texture("icon", icon_pixels.clone(), TextureOptions::LINEAR),
+                )
+            });
             let painter = ctx.layer_painter(egui::LayerId::background());
             backdrop::paint(&painter, layout.canvas, layout.window);
-            paint_copy(&painter, &layout, headline, subline);
+            if layout.copy_on_image {
+                paint_copy(&painter, &layout, headline, subline);
+            }
             paint_window(
                 &painter,
                 &layout,
@@ -113,6 +137,7 @@ pub(crate) fn frame(
                 icon_texture.id(),
             );
         });
+    harness.input_mut().max_texture_side = Some(texture_limit);
     harness
         .try_run()
         .map_err(|err| ScreenshotError::Render(format!("{}: {err}", store.dir_name())))?;
@@ -185,6 +210,16 @@ fn paint_window(
     );
 }
 
+/// A canvas side in pixels as a texture-size limit. Canvases are `u16`-sized.
+#[expect(
+    clippy::cast_possible_truncation,
+    clippy::cast_sign_loss,
+    reason = "a canvas side is a whole, positive u16 converted to f32 and back"
+)]
+fn texture_side(pixels: f32) -> usize {
+    pixels as usize
+}
+
 /// A vertical shadow offset in whole pixels, as egui stores it.
 #[expect(
     clippy::cast_possible_truncation,
@@ -244,7 +279,20 @@ fn app_icon() -> Result<ColorImage, ScreenshotError> {
 #[cfg(test)]
 mod tests {
     use super::Layout;
-    use crate::store_screenshots::listing::Store;
+    use crate::store_screenshots::listing::{Store, CAPTION_LIMIT, SHOTS};
+
+    #[test]
+    fn captions_fit_the_partner_center_limit() {
+        for shot in &SHOTS {
+            let caption = shot.caption();
+            assert!(
+                caption.chars().count() <= CAPTION_LIMIT,
+                "{}: caption is {} characters",
+                shot.slug,
+                caption.chars().count()
+            );
+        }
+    }
 
     #[test]
     fn window_fits_each_canvas_below_the_copy() {
@@ -256,6 +304,9 @@ mod tests {
                 layout.window,
                 layout.canvas
             );
+            if !layout.copy_on_image {
+                continue;
+            }
             let copy_bottom =
                 layout.headline_top + layout.headline_size * 1.45 + layout.subline_size * 1.5;
             assert!(
