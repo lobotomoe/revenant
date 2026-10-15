@@ -205,7 +205,7 @@ fn paint_window(
     painter.rect_stroke(
         outline,
         CornerRadius::same(corner),
-        Stroke::new(1.0, Color32::from_white_alpha(40)),
+        Stroke::new(1.0_f32, Color32::from_white_alpha(40)),
         StrokeKind::Outside,
     );
 }
