@@ -1,0 +1,106 @@
+name: Snap
+
+# Builds the Snap from rust/snap/snapcraft.yaml for both architectures. Called by
+# release.yml, which publishes what this produces, and run on pull requests that
+# touch the manifest so a broken Snap shows up before a tag does.
+#
+# The Snap Store sat on the Python client's 1.2.1 for every Rust release up to
+# 4.1.0: its own build service tracked the old root snap/snapcraft.yaml, which
+# moved to python/snap/ when the Rust app took over, and nothing built the Rust
+# manifest at all. Building it here keeps the Snap on the same tag as every
+# other channel.
+#
+# snapcraft builds inside an LXD container, as the Snap Store's own build service
+# does. Destructive mode on the runner itself does not work: the runner already
+# has a Rust toolchain, so the rust plugin skips installing rustup and then fails
+# its own check for it. snapcore's action-build is not used because it still
+# runs on the deprecated Node 20.
+
+on:
+  workflow_call:
+  pull_request:
+    paths:
+      - "rust/snap/**"
+      - ".github/workflows/snap.yml"
+
+permissions: read-all
+
+jobs:
+  build:
+    name: Build Snap (${{ matrix.arch }})
+    runs-on: ${{ matrix.runner }}
+    timeout-minutes: 45
+    permissions:
+      contents: read
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - runner: ubuntu-latest
+            arch: amd64
+          - runner: ubuntu-24.04-arm
+            arch: arm64
+    defaults:
+      run:
+        working-directory: rust
+
+    steps:
+      - uses: step-security/harden-runner@05e31511f85b41b11d1cf0ef85d0992719546e2c # v2.21.0
+        with:
+          egress-policy: audit
+
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v6
+        with:
+          persist-credentials: false
+
+      # snapcraft is pinned to a major track: an unpinned refresh is how the
+      # rust plugin regression in rust/snap/snapcraft.yaml arrived.
+      - name: Install snapcraft and LXD
+        run: |
+          set -euo pipefail
+          sudo snap install snapcraft --classic --channel=9.x/stable
+          sudo snap install lxd || sudo snap refresh lxd
+          sudo lxd waitready
+          sudo lxd init --auto
+          sudo usermod --append --groups lxd "$USER"
+          # Docker on the runner sets the FORWARD policy to DROP, which cuts the
+          # LXD container off from the network.
+          sudo iptables -P FORWARD ACCEPT
+
+      # As the runner user, not root: the lxd group membership above is not in
+      # this shell's credentials yet, so sg picks it up for the one command.
+      - name: Build Snap
+        run: sg lxd -c 'snapcraft pack --use-lxd --output "revenant_${{ matrix.arch }}.snap"'
+
+      # A snap without meta/gui/<app>.desktop installs and runs, but the GUI is
+      # missing from the application menu; snapcraft does not treat that as an
+      # error, so check for it here.
+      - name: Check the menu entry
+        run: |
+          set -euo pipefail
+          entry="squashfs-root/meta/gui/revenant-gui.desktop"
+          if ! unsquashfs -l "revenant_${{ matrix.arch }}.snap" | grep -qx "$entry"; then
+            echo "::error::the Snap has no $entry, so the GUI would not appear in the application menu"
+            exit 1
+          fi
+
+      # The checks the store runs on upload, so a rejection shows up here rather
+      # than after a release tag.
+      - name: Store review
+        run: |
+          set -euo pipefail
+          sudo snap install review-tools
+          review-tools.snap-review "revenant_${{ matrix.arch }}.snap"
+
+      - name: Install and run
+        run: |
+          set -euo pipefail
+          sudo snap install --dangerous "./revenant_${{ matrix.arch }}.snap"
+          revenant --version
+
+      - name: Upload Snap
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: snap-${{ matrix.arch }}
+          path: rust/revenant_${{ matrix.arch }}.snap
+          if-no-files-found: error

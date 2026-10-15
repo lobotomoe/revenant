@@ -8,7 +8,8 @@
 # Publish:                 snapcraft upload revenant_*.snap --release=stable
 # Prereq:                  sudo snap install snapcraft --classic
 #
-# Not buildable on macOS (snapcraft is Linux-only) -- validated in Linux CI.
+# Not buildable on macOS (snapcraft is Linux-only). Built in CI by
+# .github/workflows/snap.yml and published by release.yml.
 #
 # vs the Python manifest: the `revenant` part switches from the python plugin
 # (which bundled CPython + tkinter) to the rust plugin building the self-contained
@@ -34,7 +35,7 @@ confinement: strict
 base: core24
 license: Apache-2.0
 icon: packaging/linux/io.github.lobotomoe.revenant.png
-adopt-info: revenant
+adopt-info: desktop-integration
 website: https://github.com/lobotomoe/revenant
 source-code: https://github.com/lobotomoe/revenant
 contact: https://github.com/lobotomoe/revenant/issues
@@ -79,8 +80,13 @@ parts:
     rust-path:
       - crates/revenant-sign
       - crates/revenant-sign-gui
-    parse-info:
-      - packaging/linux/io.github.lobotomoe.revenant.metainfo.xml
+    # The gnome extension points LD_LIBRARY_PATH at the GNOME SDK's glibc for
+    # every part. rustup cannot run against it (symbol lookup error, exit 127),
+    # which the rust plugin reports as "'rustup' not found". The Rust build links
+    # nothing from the SDK, so clear it here. Drop this once the regression
+    # behind https://github.com/canonical/snapcraft/issues/6330 is fixed.
+    build-environment:
+      - LD_LIBRARY_PATH: ""
     build-packages:
       - libdbus-1-dev
       - pkg-config
@@ -89,14 +95,21 @@ parts:
     stage-packages:
       - libdbus-1-3
 
+  # Carries the version (adopt-info) as well as the desktop entry. snapcraft
+  # turns the metainfo's <launchable> into the menu entry (meta/gui) only when
+  # parse-info belongs to the part that installs the .desktop, and only when it
+  # sits under usr/share/applications. Without both, the snap installs fine but
+  # the GUI never appears in the application menu.
   desktop-integration:
     plugin: dump
     source: packaging/linux
+    parse-info:
+      - usr/share/metainfo/io.github.lobotomoe.revenant.metainfo.xml
     organize:
-      io.github.lobotomoe.revenant.desktop: share/applications/io.github.lobotomoe.revenant.desktop
-      io.github.lobotomoe.revenant.png: share/icons/hicolor/256x256/apps/io.github.lobotomoe.revenant.png
-      io.github.lobotomoe.revenant.metainfo.xml: share/metainfo/io.github.lobotomoe.revenant.metainfo.xml
+      io.github.lobotomoe.revenant.desktop: usr/share/applications/io.github.lobotomoe.revenant.desktop
+      io.github.lobotomoe.revenant.png: usr/share/icons/hicolor/256x256/apps/io.github.lobotomoe.revenant.png
+      io.github.lobotomoe.revenant.metainfo.xml: usr/share/metainfo/io.github.lobotomoe.revenant.metainfo.xml
     stage:
-      - share/applications/io.github.lobotomoe.revenant.desktop
-      - share/icons/hicolor/256x256/apps/io.github.lobotomoe.revenant.png
-      - share/metainfo/io.github.lobotomoe.revenant.metainfo.xml
+      - usr/share/applications/io.github.lobotomoe.revenant.desktop
+      - usr/share/icons/hicolor/256x256/apps/io.github.lobotomoe.revenant.png
+      - usr/share/metainfo/io.github.lobotomoe.revenant.metainfo.xml

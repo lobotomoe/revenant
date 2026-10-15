@@ -7,6 +7,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+
+- **The Snap is the current app again.** The Snap Store had been serving the
+  Python client's 1.2.1 since the Rust app replaced it in 2.1.0: the store's
+  build service still followed the old manifest, and the release pipeline never
+  built the new one. Releases now build the Snap for amd64 and arm64 and publish
+  it alongside every other channel.
+
 ## [4.1.0] - 2026-10-15
 
 A security update for the Rust app and crates, store screenshots generated with
