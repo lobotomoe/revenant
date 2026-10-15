@@ -70,6 +70,14 @@
   </branding>
 
   <releases>
+    <release version="4.1.1" date="2026-10-15">
+      <description>
+        <p>
+          The Snap now ships the current app. Earlier Snap releases were
+          stuck on an old version of the client.
+        </p>
+      </description>
+    </release>
     <release version="4.1.0" date="2026-10-15">
       <description>
         <p>
