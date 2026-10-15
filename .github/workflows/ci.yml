@@ -407,6 +407,11 @@ jobs:
       - name: Clippy (warnings as errors)
         run: cargo clippy --workspace --all-targets -- -D warnings
 
+      # The screenshot renderer only compiles with its feature on; lint it too so
+      # a UI change that breaks it fails here, not on release day.
+      - name: Clippy, store-screenshots feature (warnings as errors)
+        run: cargo clippy -p revenant-sign-gui --all-targets --features store-screenshots -- -D warnings
+
   rs-test:
     name: Rust Test (${{ matrix.os }})
     runs-on: ${{ matrix.os }}

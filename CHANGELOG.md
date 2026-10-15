@@ -7,6 +7,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- **Store screenshots ship with every release.** The Mac App Store, Microsoft
+  Store and Snap Store screenshots are now rendered from the release's own UI
+  and attached to the GitHub Release as `revenant-store-screenshots.zip`. They
+  are drawn headlessly with a fictional account, so no real name, ID number or
+  path can reach a listing.
+- `ConfigStore::isolated` in `revenant-sign-core`: a store whose config lives
+  in a given directory, whose secrets stay in memory, and which ignores
+  environment overrides -- for driving the real UI or API without touching the
+  user's setup.
+
 ### Security
 
 - **rustls 0.23.46** in the Rust desktop app, CLI and crates, clearing
