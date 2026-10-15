@@ -61,6 +61,8 @@ jobs:
           echo "user PATH: $PATH"
           sudo sh -c 'echo "root PATH: $PATH"; command -v rustup cargo rustc snapcraft; ls -l /snap/bin | head'
           sudo grep -rh secure_path /etc/sudoers /etc/sudoers.d || true
+          sudo snap run --shell snapcraft -c 'echo "snapcraft PATH: $PATH"'
+          sudo snapcraft pack --destructive-mode --verbosity=debug 2>&1 | grep -E 'validation (environment|command)|PATH' | head -20 || true
 
       - name: Build Snap
         run: |
