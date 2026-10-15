@@ -18,7 +18,9 @@ members = [
 # major here like any other release.
 version = "4.0.0"
 edition = "2021"
-rust-version = "1.85"
+# The floor is lopdf 0.44 (required, see its entry below). The rs-msrv CI job
+# checks the published crates on exactly this toolchain.
+rust-version = "1.88"
 license = "Apache-2.0"
 authors = ["Aleksandr Kraiz"]
 repository = "https://github.com/lobotomoe/revenant"
