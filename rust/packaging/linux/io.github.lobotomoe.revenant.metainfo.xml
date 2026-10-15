@@ -70,6 +70,14 @@
   </branding>
 
   <releases>
+    <release version="4.1.0" date="2026-10-15">
+      <description>
+        <p>
+          A security update. The library that secures connections to the
+          signing server was updated, clearing four advisories.
+        </p>
+      </description>
+    </release>
     <release version="4.0.0" date="2026-09-03">
       <description>
         <p>
