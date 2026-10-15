@@ -610,7 +610,7 @@ mod tests {
         let info = r.page_info(0).unwrap();
         assert!((info.width - 612.0).abs() < 1e-6, "width {}", info.width);
         assert!((info.height - 792.0).abs() < 1e-6, "height {}", info.height);
-        assert!(info.annots.is_empty());
+        assert_eq!(info.annots, []);
         assert!(info.obj_num > 0);
     }
 

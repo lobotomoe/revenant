@@ -265,6 +265,6 @@ mod tests {
         std::fs::write(&path, b"this is definitely not an image file").unwrap();
         let err = load_signature_image(path.to_str().unwrap()).unwrap_err();
         // Either format detection or decode fails; both are surfaced.
-        assert!(!err.to_string().is_empty());
+        assert_ne!(err.to_string(), "");
     }
 }

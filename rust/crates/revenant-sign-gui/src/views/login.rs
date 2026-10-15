@@ -588,7 +588,7 @@ mod tests {
         let (mut login, _requests, request) = state();
         login.step = Step::Identity;
         login.prefill_password(request, "user", "secret".to_owned());
-        assert!(login.password.is_empty());
+        assert_eq!(login.password, "");
     }
 
     /// GHSA-53v5: login A is cancelled and login B opened; A's delayed read must
@@ -616,7 +616,7 @@ mod tests {
         let (mut login, _requests, request) = state();
         login.username = "someone-else".to_owned();
         login.prefill_password(request, "user", "secret".to_owned());
-        assert!(login.password.is_empty());
+        assert_eq!(login.password, "");
     }
 
     /// GHSA-53v5: emptiness alone cannot distinguish "never typed" from "typed,
@@ -627,7 +627,7 @@ mod tests {
         login.password_edited = true;
         login.password.clear();
         login.prefill_password(request, "user", "secret".to_owned());
-        assert!(login.password.is_empty());
+        assert_eq!(login.password, "");
     }
 
     /// A read answers exactly one wizard, once -- a replayed message cannot
@@ -638,7 +638,7 @@ mod tests {
         login.prefill_password(request, "user", "secret".to_owned());
         login.password.clear();
         login.prefill_password(request, "user", "secret".to_owned());
-        assert!(login.password.is_empty());
+        assert_eq!(login.password, "");
     }
 
     /// A discovery result may only be folded into the wizard that started it,

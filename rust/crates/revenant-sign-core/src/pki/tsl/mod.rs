@@ -246,7 +246,7 @@ mod tests {
         assert_eq!(anchor.service_type, "CA/QC");
         assert_eq!(anchor.status, "granted");
         assert_eq!(anchor.subject_name, "CN=Test CA 1");
-        assert!(!anchor.cert_der.is_empty());
+        assert_ne!(anchor.cert_der, b"");
     }
 
     #[test]
