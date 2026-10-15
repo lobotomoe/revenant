@@ -20,6 +20,8 @@ use crate::views::LoginState;
 pub(crate) enum Stage {
     /// The sign tab with a document loaded and ready to sign.
     Sign { pdf: PathBuf },
+    /// The sign tab with several documents queued for one batch.
+    SignMany { pdfs: Vec<PathBuf> },
     /// The verify tab showing a finished report for `pdf`.
     Verify {
         pdf: PathBuf,
@@ -43,6 +45,7 @@ impl RevenantApp {
         let mut app = Self::with_store(cc, store);
         match stage {
             Stage::Sign { pdf } => app.sign_form.set_pdf(&pdf),
+            Stage::SignMany { pdfs } => app.sign_form.set_files(pdfs),
             Stage::Verify {
                 pdf,
                 results,

@@ -88,7 +88,7 @@ pub fn render_all(out_dir: &Path) -> Result<Vec<PathBuf>, ScreenshotError> {
         })?;
         for shot in &SHOTS {
             let path = store_dir.join(format!("{}.png", shot.slug));
-            let image = render_shot(store, shot)?;
+            let image = opaque(render_shot(store, shot)?, &path)?;
             image
                 .save(&path)
                 .map_err(|source| ScreenshotError::Encode {
@@ -99,6 +99,20 @@ pub fn render_all(out_dir: &Path) -> Result<Vec<PathBuf>, ScreenshotError> {
         }
     }
     Ok(written)
+}
+
+/// Drop the alpha channel: App Store Connect rejects a screenshot whose PNG has
+/// one at all, even when every pixel is opaque. The backdrop covers the whole
+/// canvas, so a pixel that is not fully opaque means the frame pass is broken --
+/// fail rather than flatten it onto an arbitrary color.
+fn opaque(image: image::RgbaImage, path: &Path) -> Result<image::RgbImage, ScreenshotError> {
+    if let Some(pixel) = image.pixels().find(|pixel| pixel[3] != u8::MAX) {
+        return Err(ScreenshotError::Render(format!(
+            "{} has a translucent pixel {pixel:?}",
+            path.display()
+        )));
+    }
+    Ok(image::DynamicImage::ImageRgba8(image).to_rgb8())
 }
 
 /// Render one framed screenshot.

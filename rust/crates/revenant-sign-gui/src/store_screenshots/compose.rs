@@ -12,9 +12,8 @@ use eframe::egui::{
 use egui_kittest::Harness;
 use image::RgbaImage;
 
-use super::listing::{Chrome, Shot, Store};
+use super::listing::{Chrome, Shot, Store, WINDOW_SIZE};
 use super::{backdrop, chrome, ScreenshotError};
-use crate::INITIAL_SIZE;
 
 /// Font family name for the bold face used by headlines and some titles.
 pub(crate) const BOLD_FAMILY: &str = "bold";
@@ -46,7 +45,7 @@ impl Layout {
         // down to a small bottom margin.
         let window_top = height * 0.255;
         let window_bottom = height * 0.965;
-        let [app_width, app_height] = INITIAL_SIZE;
+        let [app_width, app_height] = WINDOW_SIZE;
         let window_points = vec2(app_width, app_height + chrome.title_bar_height());
         let scale = (window_bottom - window_top) / window_points.y;
         let window_size = window_points * scale;

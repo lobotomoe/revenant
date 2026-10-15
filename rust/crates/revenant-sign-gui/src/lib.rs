@@ -22,7 +22,7 @@ pub mod store_screenshots;
 
 use app::RevenantApp;
 
-pub(crate) const INITIAL_SIZE: [f32; 2] = [940.0, 700.0];
+const INITIAL_SIZE: [f32; 2] = [940.0, 700.0];
 const MIN_SIZE: [f32; 2] = [640.0, 480.0];
 
 /// The window/taskbar icon, embedded in the binary. Rendered from the same

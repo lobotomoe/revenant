@@ -28,6 +28,11 @@ pub(crate) enum Chrome {
     Gnome,
 }
 
+/// The app window size, in points, every shot is rendered at: the default
+/// window's width, a little taller so the batch list and the Sign button fit on
+/// screen together. A size the user can resize the window to, not a new layout.
+pub(crate) const WINDOW_SIZE: [f32; 2] = [940.0, 800.0];
+
 impl Store {
     pub(crate) const ALL: [Store; 3] = [Store::MacApp, Store::Microsoft, Store::Snap];
 
@@ -98,7 +103,11 @@ pub(crate) struct Shot {
     stage: fn() -> Stage,
 }
 
-pub(crate) const SHOTS: [Shot; 4] = [
+/// Five shots: at most what the Snap Store takes, within the Microsoft Store's
+/// recommended five to eight, and three of them the app at work -- App Store
+/// guideline 2.3.3 approves a set only when more than half show the app in use
+/// rather than a sign-in or setup screen.
+pub(crate) const SHOTS: [Shot; 5] = [
     Shot {
         slug: "01-sign",
         headline: "Sign PDFs with your CoSign account",
@@ -109,23 +118,32 @@ pub(crate) const SHOTS: [Shot; 4] = [
         },
     },
     Shot {
-        slug: "02-verify",
-        headline: "Verify any signed PDF",
+        slug: "02-batch",
+        headline: "Sign a whole stack at once",
+        subline: "Drop several PDFs and sign them all in one pass.",
+        setup: Setup::SignedIn,
+        stage: || Stage::SignMany {
+            pdfs: BATCH.iter().map(PathBuf::from).collect(),
+        },
+    },
+    Shot {
+        slug: "03-verify",
+        headline: "Verify signed PDFs",
         subline: "Integrity, signer, and certificate trust, checked in one step.",
         setup: Setup::SignedIn,
         stage: verify_stage,
     },
     Shot {
-        slug: "03-server",
+        slug: "04-server",
         headline: "EKENG profile built in",
         subline: "Or connect to any CoSign / DocuSign Signature Appliance server.",
         setup: Setup::Fresh,
         stage: || Stage::ChooseServer,
     },
     Shot {
-        slug: "04-login",
-        headline: "Your password stays in the system keychain",
-        subline: "Saved credentials are kept by the operating system, not in a plain-text file.",
+        slug: "05-login",
+        headline: "Your password, kept by the system keychain",
+        subline: "Opt in once, and the operating system stores it for you.",
         setup: Setup::CredentialsSaved,
         stage: || Stage::LogIn {
             identity: certificate(),
@@ -174,6 +192,11 @@ const CERT_ISSUED: &str = "2025-03-01T00:00:00Z";
 const CERT_EXPIRES: &str = "2028-03-01T00:00:00Z";
 const DOCUMENT: &str = "Lease agreement.pdf";
 const SIGNED_DOCUMENT: &str = "Lease agreement_signed.pdf";
+const BATCH: [&str; 3] = [
+    "Lease agreement.pdf",
+    "Annex 1 - Inventory.pdf",
+    "Annex 2 - Payment schedule.pdf",
+];
 const SIGNED_AT: &str = "2026-10-15T11:42:07Z";
 const SIGNED_DOCUMENT_BYTES: usize = 184_320;
 const TRUST_ANCHOR: &str = "Staff of Government of RA Root CA";
