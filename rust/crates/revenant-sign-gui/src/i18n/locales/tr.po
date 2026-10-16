@@ -656,3 +656,11 @@ msgstr "Bağlantıyı Kes…"
 #. EN: Language
 msgid "gui.language"
 msgstr "Dil"
+
+#. EN: Signature:
+msgid "gui.signature_label"
+msgstr "İmza:"
+
+#. EN: Number
+msgid "gui.page_number"
+msgstr "Numara"

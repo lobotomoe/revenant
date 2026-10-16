@@ -8,7 +8,6 @@
 use std::path::{Path, PathBuf};
 
 use eframe::egui;
-use revenant_sign_core::appearance::AVAILABLE_FONTS;
 use revenant_sign_core::config::{ConfigLayer, ConfigStore};
 use revenant_sign_core::pdf::{PageSpec, Position};
 use revenant_sign_core::signing::EmbeddedSignatureOptions;
@@ -17,33 +16,23 @@ use super::account::{self, AccountAction};
 use crate::i18n::Localizer;
 use crate::theme;
 
-/// Minimum size of the centered "Sign" button.
-const SIGN_BUTTON_MIN: [f32; 2] = [220.0, 34.0];
+mod input;
+mod options;
+mod progress;
+
+/// Minimum size of the Sign button.
+const SIGN_BUTTON_MIN: [f32; 2] = [160.0, 32.0];
 
 /// Below this available width, the settings/card section stacks instead of
 /// splitting into two columns (egui has no automatic column reflow).
 const TWO_COLUMN_MIN_WIDTH: f32 = 720.0;
+/// Space between the sections of the form.
+const SECTION_GAP: f32 = 20.0;
 
-/// Position presets offered in the appearance combo, in display order.
-const POSITIONS: [Position; 5] = [
-    Position::BottomRight,
-    Position::BottomLeft,
-    Position::BottomCenter,
-    Position::TopLeft,
-    Position::TopRight,
-];
-
-/// Bounds for the explicit page-number spinner (1-based in the UI, 0-based in
+/// Bounds for the explicit page number (1-based in the UI, 0-based in
 /// [`PageSpec::Index`]). The upper bound is a sanity cap, not a real PDF limit.
 const MIN_PAGE: usize = 1;
 const MAX_PAGE: usize = 9999;
-/// Max digits and width of the explicit page-number field.
-const PAGE_DIGITS: usize = 4;
-const PAGE_FIELD_WIDTH: f32 = 52.0;
-/// Busy-overlay modal geometry.
-const OVERLAY_WIDTH: f32 = 300.0;
-const OVERLAY_INNER_PAD: f32 = 24.0;
-const OVERLAY_SPINNER_SIZE: f32 = 32.0;
 
 /// What the app should do after rendering the tab.
 pub(crate) enum SignAction {
@@ -236,8 +225,8 @@ impl SignForm {
     }
 
     /// The fully-configured signing screen: input + image on top, then two
-    /// columns (settings left, signer card right), then a large centered Sign
-    /// button and status line.
+    /// columns (the signature options left, the signer right), then the Sign
+    /// button at the bottom right with the result line beside it.
     fn ui(&mut self, ui: &mut egui::Ui, l10n: &Localizer, store: &ConfigStore) -> SignScreen {
         let mut action = SignAction::None;
         let mut account_action = AccountAction::None;
@@ -247,45 +236,36 @@ impl SignForm {
         let top = self.input_section(ui, l10n);
         merge(&mut action, top);
 
-        ui.add_space(6.0);
-        ui.separator();
-        ui.add_space(6.0);
+        ui.add_space(SECTION_GAP);
 
-        // Signature settings and the signer card sit side by side when there is
-        // room, and stack when the window is too narrow -- egui does not reflow
+        // The options and the signer card sit side by side when there is room,
+        // and stack when the window is too narrow -- egui does not reflow
         // columns on its own, so we pick the layout from the available width.
-        let position = self.position;
-        let appearance_enabled = self.appearance_enabled();
         // Captured before the columns: `ui.columns` can overflow and shift the
-        // layout's content bounds, which would throw off centering the button.
+        // layout's content bounds, which would throw off the button row.
         let full_width = ui.available_width();
         if full_width >= TWO_COLUMN_MIN_WIDTH {
             ui.columns(2, |cols| {
                 if let [left, right] = cols {
-                    self.settings_column(left, l10n);
-                    // Signer card, then the placement preview fills the space
-                    // beneath it -- balancing the columns without overflow.
+                    self.options(left, l10n);
                     account_action = account::show(right, l10n, store);
-                    right.add_space(10.0);
-                    super::preview::signature_preview(right, l10n, position, appearance_enabled);
                 }
             });
         } else {
-            self.settings_column(ui, l10n);
-            ui.add_space(10.0);
+            self.options(ui, l10n);
+            ui.add_space(SECTION_GAP);
             account_action = account::show(ui, l10n, store);
-            ui.add_space(10.0);
-            super::preview::signature_preview(ui, l10n, position, appearance_enabled);
         }
 
-        // Bottom: the primary action and result line, centered within the full
-        // width (allocated explicitly so a prior overflowing columns row cannot
-        // shift it). The in-progress state is a full-window overlay instead, so
-        // it can't be clipped off the bottom of the form.
-        ui.add_space(12.0);
+        // Bottom: the primary action at the trailing edge, where both macOS and
+        // Windows put it, with the result of the last run beside it. Allocated
+        // at the full width so a prior overflowing columns row cannot shift it.
+        // The in-progress state is a full-window overlay instead, so it can't
+        // be clipped off the bottom of the form.
+        ui.add_space(SECTION_GAP);
         ui.allocate_ui_with_layout(
             egui::vec2(full_width, 0.0),
-            egui::Layout::top_down(egui::Align::Center),
+            egui::Layout::right_to_left(egui::Align::Center),
             |ui| {
                 merge(&mut action, self.sign_button(ui, l10n));
                 self.result_line(ui);
@@ -299,97 +279,7 @@ impl SignForm {
         }
     }
 
-    /// The top section: two drop zones -- the required PDF (or batch) on the
-    /// left, the optional stamp image on the right. Each is click-to-browse and
-    /// a drop target; the app routes drops using the stored zone rect.
-    fn input_section(&mut self, ui: &mut egui::Ui, l10n: &Localizer) -> SignAction {
-        let mut action = SignAction::None;
-
-        let pdf_title = crate::style::zone_title(l10n.t("gui.pdf_file_label"));
-        let image_title = crate::style::zone_title(l10n.t("gui.image_opt_label"));
-        let pdf_name = self.pdf_zone_name();
-        let image_name = crate::style::zone_basename(&self.image_path);
-        let appearance_enabled = self.appearance_enabled();
-
-        ui.columns(2, |cols| {
-            if let [left, right] = cols {
-                let pdf = crate::style::drop_zone(
-                    left,
-                    crate::icons::PDF,
-                    &pdf_title,
-                    pdf_name.as_deref(),
-                    l10n.t("gui.drop_pdf_hint"),
-                    crate::style::PDF_EXTS,
-                );
-                if pdf.clicked {
-                    action = SignAction::BrowsePdf;
-                }
-                right.add_enabled_ui(appearance_enabled, |ui| {
-                    let image = crate::style::drop_zone(
-                        ui,
-                        crate::icons::IMAGE,
-                        &image_title,
-                        image_name.as_deref(),
-                        l10n.t("gui.drop_image_hint"),
-                        crate::style::IMAGE_EXTS,
-                    );
-                    if image.clicked {
-                        action = SignAction::BrowseImage;
-                    }
-                });
-            }
-        });
-
-        // Batch: list the queued files below the zones.
-        if self.is_batch() {
-            ui.add_space(4.0);
-            self.batch_list(ui, l10n);
-        }
-        action
-    }
-
-    /// The PDF zone's body text: the file name, a batch count, or nothing (which
-    /// falls back to the drop hint).
-    fn pdf_zone_name(&self) -> Option<String> {
-        if self.is_batch() {
-            return Some(format!("{} PDF", self.batch.len()));
-        }
-        crate::style::zone_basename(&self.pdf_path)
-    }
-
-    /// The left column: mode and appearance controls with a live preview. The
-    /// output location is chosen through the save dialog at sign time, so there
-    /// is no path field here.
-    fn settings_column(&mut self, ui: &mut egui::Ui, l10n: &Localizer) {
-        ui.horizontal(|ui| {
-            ui.selectable_value(&mut self.mode, Mode::Embedded, l10n.t("gui.embedded"));
-            ui.selectable_value(&mut self.mode, Mode::Detached, l10n.t("gui.detached_p7s"));
-        });
-
-        let detached = self.is_detached();
-        let appearance_enabled = self.appearance_enabled();
-
-        // Appearance controls. The live preview lives under the signer card
-        // (see `ui`), not here, so this column stays short and the fixed-size
-        // preview can never overflow onto the card.
-        ui.add_enabled_ui(appearance_enabled, |ui| {
-            self.position_combo(ui, l10n);
-            self.page_selector(ui, l10n);
-            self.font_combo(ui, l10n);
-        });
-
-        ui.add_enabled_ui(!detached, |ui| {
-            ui.checkbox(&mut self.invisible, l10n.t("gui.invisible_signature"));
-        });
-        ui.add_enabled_ui(!detached, |ui| {
-            ui.horizontal(|ui| {
-                ui.label(l10n.t("gui.reason_label"));
-                ui.add(crate::style::text_edit(&mut self.reason).desired_width(f32::INFINITY));
-            });
-        });
-    }
-
-    /// The large centered Sign button. Its label and gating follow the mode
+    /// The Sign button. Its label and gating follow the mode
     /// (single vs. batch, embedded vs. detached) and busy state.
     fn sign_button(&self, ui: &mut egui::Ui, l10n: &Localizer) -> SignAction {
         let busy = matches!(self.status, SignStatus::Signing) || self.batch_progress.is_some();
@@ -416,167 +306,18 @@ impl SignForm {
         !self.is_detached() && !self.invisible
     }
 
-    /// Render the batch file list with per-item remove buttons.
-    fn batch_list(&mut self, ui: &mut egui::Ui, l10n: &Localizer) {
-        let mut remove = None;
-        egui::ScrollArea::vertical()
-            .max_height(90.0)
-            .show(ui, |ui| {
-                for (index, path) in self.batch.iter().enumerate() {
-                    ui.horizontal(|ui| {
-                        if ui.small_button(l10n.t("gui.remove")).clicked() {
-                            remove = Some(index);
-                        }
-                        let name = path
-                            .file_name()
-                            .map_or_else(String::new, |n| n.to_string_lossy().into_owned());
-                        ui.label(name);
-                    });
-                }
-            });
-        if let Some(index) = remove {
-            self.batch.remove(index);
-        }
-    }
-
-    fn position_combo(&mut self, ui: &mut egui::Ui, l10n: &Localizer) {
-        ui.horizontal(|ui| {
-            ui.label(l10n.t("gui.position_label"));
-            egui::ComboBox::from_id_salt("sign_position")
-                .selected_text(position_label(l10n, self.position))
-                .show_ui(ui, |ui| {
-                    for pos in POSITIONS {
-                        ui.selectable_value(&mut self.position, pos, position_label(l10n, pos));
-                    }
-                });
-        });
-    }
-
-    /// Page selection: `Last`/`First` presets plus a numeric spinner for any
-    /// explicit page. Editing the spinner switches to explicit mode, so a signer
-    /// can target a page well beyond the old fixed list.
-    fn page_selector(&mut self, ui: &mut egui::Ui, l10n: &Localizer) {
-        ui.horizontal(|ui| {
-            ui.label(l10n.t("gui.page_label"));
-            if ui
-                .selectable_label(self.page == PageSpec::Last, l10n.t("gui.page_last"))
-                .clicked()
-            {
-                self.page = PageSpec::Last;
-            }
-            if ui
-                .selectable_label(self.page == PageSpec::First, l10n.t("gui.page_first"))
-                .clicked()
-            {
-                self.page = PageSpec::First;
-            }
-            let is_index = matches!(self.page, PageSpec::Index(_));
-            // A fixed-width, digit-only field (1-based). Unlike `DragValue`, it
-            // cannot grow with its content and blow up the layout.
-            let field = ui.add(
-                crate::style::text_edit(&mut self.page_input)
-                    .char_limit(PAGE_DIGITS)
-                    .desired_width(PAGE_FIELD_WIDTH)
-                    .horizontal_align(egui::Align::Center),
-            );
-            if field.changed() {
-                self.page_input.retain(|c| c.is_ascii_digit());
-                if let Ok(number) = self.page_input.parse::<usize>() {
-                    let clamped = number.clamp(MIN_PAGE, MAX_PAGE);
-                    self.page = PageSpec::Index(clamped - 1);
-                }
-            } else if field.gained_focus() && !is_index {
-                // Focusing the field switches to explicit-page mode.
-                let number = self
-                    .page_input
-                    .parse::<usize>()
-                    .unwrap_or(MIN_PAGE)
-                    .clamp(MIN_PAGE, MAX_PAGE);
-                self.page = PageSpec::Index(number - 1);
-            }
-        });
-    }
-
-    fn font_combo(&mut self, ui: &mut egui::Ui, l10n: &Localizer) {
-        ui.horizontal(|ui| {
-            ui.label(l10n.t("gui.font_label"));
-            egui::ComboBox::from_id_salt("sign_font")
-                .selected_text(&self.font)
-                .show_ui(ui, |ui| {
-                    for font in AVAILABLE_FONTS {
-                        ui.selectable_value(&mut self.font, font.to_owned(), font);
-                    }
-                });
-        });
-    }
-
-    /// Render the completed-result line (success or failure) below the button.
+    /// Render the completed-result line (success or failure) beside the button.
     /// In-progress state lives in [`Self::progress_overlay`] instead.
     fn result_line(&self, ui: &mut egui::Ui) {
         match &self.status {
             SignStatus::Done(message) => {
-                ui.add_space(4.0);
                 ui.colored_label(theme::OK, message);
             }
             SignStatus::Failed(message) => {
-                ui.add_space(4.0);
                 ui.colored_label(theme::ERROR, message);
             }
             SignStatus::Idle | SignStatus::Signing => {}
         }
-    }
-
-    /// A full-window modal shown while a signing job runs, so the busy state is
-    /// unmistakable and never clipped by the form layout. A batch run also gets a
-    /// progress bar, the current file, and a Cancel button; single signing just
-    /// shows a spinner. Returns [`SignAction::CancelBatch`] if the user cancels.
-    fn progress_overlay(&self, ctx: &egui::Context, l10n: &Localizer) -> SignAction {
-        let signing = matches!(self.status, SignStatus::Signing);
-        if !signing && self.batch_progress.is_none() {
-            return SignAction::None;
-        }
-        let mut action = SignAction::None;
-        egui::Modal::new(egui::Id::new("signing_overlay")).show(ctx, |ui| {
-            ui.set_width(OVERLAY_WIDTH);
-            ui.vertical_centered(|ui| {
-                ui.add_space(10.0);
-                ui.add(egui::Spinner::new().size(OVERLAY_SPINNER_SIZE));
-                ui.add_space(12.0);
-                if let Some(progress) = &self.batch_progress {
-                    // `u16::from` is lossless, sidestepping the float-cast lint.
-                    let done =
-                        u16::try_from(progress.current.saturating_sub(1)).unwrap_or(u16::MAX);
-                    let total = u16::try_from(progress.total).unwrap_or(u16::MAX);
-                    let fraction = if total == 0 {
-                        0.0
-                    } else {
-                        f32::from(done) / f32::from(total)
-                    };
-                    ui.add(
-                        egui::ProgressBar::new(fraction)
-                            .show_percentage()
-                            .desired_width(OVERLAY_WIDTH - OVERLAY_INNER_PAD),
-                    );
-                    ui.add_space(6.0);
-                    ui.label(l10n.tf(
-                        "gui.signing_n_of_total_filename",
-                        &[
-                            ("n", &progress.current.to_string()),
-                            ("total", &progress.total.to_string()),
-                            ("filename", &progress.filename),
-                        ],
-                    ));
-                    ui.add_space(12.0);
-                    if ui.button(l10n.t("gui.cancel")).clicked() {
-                        action = SignAction::CancelBatch;
-                    }
-                } else {
-                    ui.label(l10n.t("gui.signing_ellipsis"));
-                }
-                ui.add_space(10.0);
-            });
-        });
-        action
     }
 }
 
@@ -588,16 +329,6 @@ pub(crate) fn default_output(pdf: &Path, detached: bool) -> PathBuf {
     } else {
         let stem = pdf.file_stem().unwrap_or_default().to_string_lossy();
         pdf.with_file_name(format!("{stem}_signed.pdf"))
-    }
-}
-
-fn position_label(l10n: &Localizer, position: Position) -> &str {
-    match position {
-        Position::BottomRight => l10n.t("gui.pos_bottom_right"),
-        Position::BottomLeft => l10n.t("gui.pos_bottom_left"),
-        Position::BottomCenter => l10n.t("gui.pos_bottom_center"),
-        Position::TopLeft => l10n.t("gui.pos_top_left"),
-        Position::TopRight => l10n.t("gui.pos_top_right"),
     }
 }
 

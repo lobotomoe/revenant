@@ -28,8 +28,6 @@ const PAGE_SIZE: [f32; 2] = [560.0, 480.0];
 const PAGE_MIN_SIZE: [f32; 2] = [420.0, 320.0];
 const PAGE_PADDING: f32 = 24.0;
 const SECTION_GAP: f32 = 24.0;
-const CARD_PADDING: i8 = 16;
-const CARD_RADIUS: u8 = 6;
 
 /// What the app should do after rendering the window.
 pub(crate) enum SettingsAction {
@@ -196,18 +194,11 @@ fn language_combo(ui: &mut Ui, l10n: &Localizer, current: &str) -> Option<String
     chosen
 }
 
-/// A Fluent settings card: a hairline-bordered row on a slightly raised fill.
 fn card(ui: &mut Ui, content: impl FnOnce(&mut Ui)) {
-    let visuals = ui.visuals();
-    egui::Frame::new()
-        .fill(visuals.faint_bg_color)
-        .stroke(visuals.widgets.noninteractive.bg_stroke)
-        .corner_radius(CARD_RADIUS)
-        .inner_margin(CARD_PADDING)
-        .show(ui, |ui| {
-            ui.set_width(ui.available_width());
-            content(ui);
-        });
+    crate::style::card(ui).show(ui, |ui| {
+        ui.set_width(ui.available_width());
+        content(ui);
+    });
 }
 
 fn about(ui: &mut Ui, l10n: &Localizer) {

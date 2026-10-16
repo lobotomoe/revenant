@@ -389,7 +389,7 @@ impl LoginState {
                 }
                 ui.end_row();
             });
-        ui.checkbox(&mut self.show_password, l10n.t("gui.show_password"));
+        crate::style::checkbox(ui, &mut self.show_password, l10n.t("gui.show_password"));
     }
 
     fn identity_ui(&mut self, ui: &mut egui::Ui, l10n: &Localizer) -> LoginAction {
@@ -479,7 +479,8 @@ impl LoginState {
             &[("username", self.username.trim())],
         ));
         ui.add_space(4.0);
-        ui.checkbox(
+        crate::style::checkbox(
+            ui,
             &mut self.save_credentials,
             l10n.t("gui.save_credentials_username_password"),
         );

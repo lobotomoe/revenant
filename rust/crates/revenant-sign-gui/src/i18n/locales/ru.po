@@ -851,3 +851,11 @@ msgstr "Отключиться…"
 #. EN: Language
 msgid "gui.language"
 msgstr "Язык"
+
+#. EN: Signature:
+msgid "gui.signature_label"
+msgstr "Подпись:"
+
+#. EN: Number
+msgid "gui.page_number"
+msgstr "Номер"

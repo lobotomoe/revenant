@@ -15,6 +15,7 @@ use crate::theme;
 
 /// Minimum size of the primary (accent) button, so it reads as the main action.
 const PRIMARY_BUTTON_MIN: [f32; 2] = [0.0, 30.0];
+const CHECKBOX_RADIUS: u8 = 3;
 
 /// Apply the global style to every theme.
 pub(crate) fn install(ctx: &egui::Context) {
@@ -60,6 +61,10 @@ fn tune(style: &mut egui::Style) {
     }
     style.visuals.window_corner_radius = CornerRadius::same(10);
 
+    // A hairline border on controls at rest, so checkboxes, radio buttons and
+    // text fields read as controls rather than faint patches of fill.
+    style.visuals.widgets.inactive.bg_stroke = Stroke::new(1.0_f32, control_border(&style.visuals));
+
     // Accent for selection (tabs, segmented controls) and links. A translucent
     // fill reads well over both light and dark backgrounds.
     let accent = theme::accent();
@@ -67,6 +72,34 @@ fn tune(style: &mut egui::Style) {
         Color32::from_rgba_unmultiplied(accent.r(), accent.g(), accent.b(), 0x55);
     style.visuals.selection.stroke = Stroke::new(1.0_f32, accent);
     style.visuals.hyperlink_color = accent;
+}
+
+/// The border of a control at rest: dark enough to find the control, light
+/// enough not to compete with its label.
+fn control_border(visuals: &egui::Visuals) -> Color32 {
+    if visuals.dark_mode {
+        Color32::from_gray(0x5A)
+    } else {
+        Color32::from_gray(0xC4)
+    }
+}
+
+/// A checkbox with the small square corners checkboxes have on every
+/// platform. The app-wide widget rounding would otherwise make it a circle,
+/// indistinguishable from a radio button.
+pub(crate) fn checkbox(ui: &mut egui::Ui, checked: &mut bool, text: &str) -> egui::Response {
+    ui.scope(|ui| {
+        let widgets = &mut ui.visuals_mut().widgets;
+        for state in [
+            &mut widgets.inactive,
+            &mut widgets.hovered,
+            &mut widgets.active,
+        ] {
+            state.corner_radius = CornerRadius::same(CHECKBOX_RADIUS);
+        }
+        ui.checkbox(checked, text)
+    })
+    .inner
 }
 
 /// An accent-filled button for the single primary action on a screen. Callers
@@ -78,22 +111,21 @@ pub(crate) fn primary_button(text: impl Into<String>) -> egui::Button<'static> {
         .min_size(Vec2::new(PRIMARY_BUTTON_MIN[0], PRIMARY_BUTTON_MIN[1]))
 }
 
-/// A card container: subtle fill, hairline border, rounding, and a soft shadow.
-/// Use for grouped panels (the signer card) instead of the plainer
-/// [`egui::Frame::group`].
+/// A card: a group of related content on a fill a step lighter than the window,
+/// with a hairline border, as Fluent settings cards and macOS grouped forms
+/// draw them. No shadow: a card is part of the page, not floating above it.
 pub(crate) fn card(ui: &egui::Ui) -> egui::Frame {
     let visuals = ui.visuals();
+    let fill = if visuals.dark_mode {
+        Color32::from_white_alpha(10)
+    } else {
+        Color32::WHITE
+    };
     egui::Frame::new()
-        .fill(visuals.faint_bg_color)
+        .fill(fill)
         .stroke(visuals.widgets.noninteractive.bg_stroke)
         .corner_radius(CornerRadius::same(8))
-        .inner_margin(Margin::same(12))
-        .shadow(egui::epaint::Shadow {
-            offset: [0, 1],
-            blur: 6,
-            spread: 0,
-            color: Color32::from_black_alpha(24),
-        })
+        .inner_margin(Margin::same(16))
 }
 
 /// A single-line text field whose vertical padding matches the buttons, so

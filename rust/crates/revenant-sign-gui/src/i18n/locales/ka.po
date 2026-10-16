@@ -656,3 +656,11 @@ msgstr "გათიშვა…"
 #. EN: Language
 msgid "gui.language"
 msgstr "ენა"
+
+#. EN: Signature:
+msgid "gui.signature_label"
+msgstr "ხელმოწერა:"
+
+#. EN: Number
+msgid "gui.page_number"
+msgstr "ნომერი"

@@ -8,6 +8,7 @@
 mod app;
 mod dialog;
 mod fonts;
+mod form;
 mod friendly;
 mod i18n;
 mod icons;

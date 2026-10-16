@@ -654,3 +654,11 @@ msgstr "Disconnect…"
 #. EN: Language
 msgid "gui.language"
 msgstr "Language"
+
+#. EN: Signature:
+msgid "gui.signature_label"
+msgstr "Signature:"
+
+#. EN: Number
+msgid "gui.page_number"
+msgstr "Number"

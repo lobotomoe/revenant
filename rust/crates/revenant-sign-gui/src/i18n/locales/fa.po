@@ -656,3 +656,11 @@ msgstr "قطع اتصال…"
 #. EN: Language
 msgid "gui.language"
 msgstr "زبان"
+
+#. EN: Signature:
+msgid "gui.signature_label"
+msgstr "امضا:"
+
+#. EN: Number
+msgid "gui.page_number"
+msgstr "شماره"

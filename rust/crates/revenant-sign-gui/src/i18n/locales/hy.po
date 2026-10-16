@@ -853,3 +853,11 @@ msgstr "Անջատվել…"
 #. EN: Language
 msgid "gui.language"
 msgstr "Լեզու"
+
+#. EN: Signature:
+msgid "gui.signature_label"
+msgstr "Ստորագրություն:"
+
+#. EN: Number
+msgid "gui.page_number"
+msgstr "Համար"
