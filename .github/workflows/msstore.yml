@@ -146,8 +146,8 @@ jobs:
       # are in.
       - name: Upload the package
         run: |
-          msstore publish "$RUNNER_TEMP/msix" --inputFile "$RUNNER_TEMP/msix/RevenantSign.msix" \
-            --appId "$PRODUCT_ID" --noCommit
+          msstore publish "$RUNNER_TEMP/msix" --inputDirectory "$RUNNER_TEMP/msix" \
+            --appId "$PRODUCT_ID" --noCommit --uploadTimeout 600 --verbose
 
       # Every listing's What's New, so no language keeps the previous release's
       # text. The key's case is matched loosely: the API's JSON casing is not
