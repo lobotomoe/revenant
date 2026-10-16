@@ -132,7 +132,7 @@ jobs:
             "$ACTIONS_ID_TOKEN_REQUEST_URL&audience=api://AzureADTokenExchange" |
             jq -er '.value' > "$MSSTORE_CLIENT_ASSERTION_FILE"
           msstore reconfigure --tenantId "$TENANT_ID" --sellerId "$SELLER_ID" \
-            --clientId "$CLIENT_ID" --clientAssertion
+            --clientId "$CLIENT_ID" --clientAssertion --verbose
 
       # `publish` replaces any pending draft with a new one carrying the package,
       # so the notes are set after it, and the draft is committed only once both
