@@ -19,7 +19,7 @@ name = "revenant"
 path = "src/main.rs"
 
 [dependencies]
-revenant-sign-core = { path = "../revenant-sign-core", version = "4.1.2" }
+revenant-sign-core = { path = "../revenant-sign-core", version = "4.2.0" }
 
 clap = { workspace = true }
 log.workspace = true

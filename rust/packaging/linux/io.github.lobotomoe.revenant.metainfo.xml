@@ -70,6 +70,16 @@
   </branding>
 
   <releases>
+    <release version="4.2.0" date="2026-10-16">
+      <description>
+        <p>
+          The app follows the platform's design guidelines: dialogs order
+          their buttons the way the desktop does, Settings is a window of its
+          own, the signing form lines up its labels, and the verification
+          report opens with a clear verdict. Secondary text is easier to read.
+        </p>
+      </description>
+    </release>
     <release version="4.1.2" date="2026-10-16">
       <description>
         <p>
