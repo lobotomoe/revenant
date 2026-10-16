@@ -55,6 +55,11 @@ jobs:
       CLIENT_ID: aa0979c7-672b-4f5e-af69-34b7bdfae11f
       SELLER_ID: "93627990"
       MSSTORE_TELEMETRY_OPTOUT: "1"
+      # The CLI prints the submission's package upload URL, a write-enabled SAS
+      # link, and wraps it over several console lines. Every line of it carries
+      # one of these, so output from the steps that touch a submission is run
+      # through `grep -vE "$UPLOAD_URL_PARTS"` before it reaches the public log.
+      UPLOAD_URL_PARTS: "FileUploadUrl|blob\\.core\\.windows\\.net|&|%[0-9A-Fa-f]{2}"
 
     steps:
       - uses: step-security/harden-runner@05e31511f85b41b11d1cf0ef85d0992719546e2c # v2.21.0
@@ -139,7 +144,7 @@ jobs:
             "$ACTIONS_ID_TOKEN_REQUEST_URL&audience=api://AzureADTokenExchange" |
             jq -er '.value' > "$MSSTORE_CLIENT_ASSERTION_FILE"
           msstore reconfigure --tenantId "$TENANT_ID" --sellerId "$SELLER_ID" \
-            --clientId "$CLIENT_ID" --clientAssertion --verbose
+            --clientId "$CLIENT_ID" --clientAssertion
 
       # `publish` replaces any pending draft with a new one carrying the package,
       # so the notes are set after it, and the draft is committed only once both
@@ -149,7 +154,7 @@ jobs:
           # The package itself as the path: the CLI recognises a ready MSIX by
           # its extension, and treats a directory as a project to build.
           msstore publish "$RUNNER_TEMP/msix/RevenantSign.msix" --appId "$PRODUCT_ID" \
-            --noCommit --uploadTimeout 600 --verbose
+            --noCommit --uploadTimeout 600 2>&1 | { grep -vE "$UPLOAD_URL_PARTS" || true; }
 
       # Every listing's What's New, so no language keeps the previous release's
       # text. The key's case is matched loosely: the API's JSON casing is not
@@ -168,7 +173,9 @@ jobs:
               with_entries(if (.key | ascii_downcase) == "releasenotes" then .value = ($notes | rtrimstr("\n")) else . end)
             else . end)
           ' "$RUNNER_TEMP/submission.json" > "$RUNNER_TEMP/submission-updated.json"
-          msstore submission update "$PRODUCT_ID" "$(cat "$RUNNER_TEMP/submission-updated.json")"
+          msstore submission update "$PRODUCT_ID" "$(cat "$RUNNER_TEMP/submission-updated.json")" \
+            2>&1 | { grep -vE "$UPLOAD_URL_PARTS" || true; }
 
       - name: Submit for certification
-        run: msstore submission publish "$PRODUCT_ID"
+        run: |
+          msstore submission publish "$PRODUCT_ID" 2>&1 | { grep -vE "$UPLOAD_URL_PARTS" || true; }
