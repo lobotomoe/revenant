@@ -11,7 +11,7 @@ use revenant_sign_core::config::ConfigStore;
 use revenant_sign_core::constants::VERSION;
 
 use crate::i18n::{self, Localizer, SUPPORTED_LOCALES, SYSTEM_LANGUAGE};
-use crate::{icons, links, theme};
+use crate::{icons, links};
 
 const VIEWPORT_KEY: &str = "settings_window";
 
@@ -206,16 +206,13 @@ fn about(ui: &mut Ui, l10n: &Localizer) {
         ui.label(RichText::new(icons::ABOUT).size(20.0));
         ui.vertical(|ui| {
             ui.label(RichText::new("Revenant").strong());
-            ui.colored_label(
-                theme::MUTED,
-                l10n.tf("gui.version_version", &[("version", VERSION)]),
-            );
+            ui.weak(l10n.tf("gui.version_version", &[("version", VERSION)]));
         });
     });
     ui.add_space(8.0);
     ui.label(l10n.t("gui.cross_platform_client_for_arx_cosign_electronic_signatures"));
-    ui.colored_label(theme::MUTED, l10n.t("gui.author_aleksandr_kraiz"));
-    ui.colored_label(theme::MUTED, l10n.t("gui.license_apache_2_0"));
+    ui.weak(l10n.t("gui.author_aleksandr_kraiz"));
+    ui.weak(l10n.t("gui.license_apache_2_0"));
     ui.add_space(8.0);
     ui.horizontal(|ui| {
         ui.hyperlink_to(l10n.t("gui.github"), links::REPO_URL);

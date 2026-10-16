@@ -38,7 +38,7 @@ pub(crate) fn signature_preview(
     let visuals = ui.visuals();
     let page_fill = visuals.extreme_bg_color;
     let page_stroke = visuals.widgets.noninteractive.bg_stroke;
-    let line_color = theme::MUTED.gamma_multiply(0.5);
+    let line_color = visuals.weak_text_color().gamma_multiply(0.5);
     let painter = ui.painter_at(rect);
 
     painter.rect_filled(rect, 3.0, page_fill);
@@ -53,7 +53,7 @@ pub(crate) fn signature_preview(
             egui::Align2::CENTER_CENTER,
             crate::icons::INVISIBLE,
             egui::FontId::proportional(EYE_ICON_SIZE),
-            theme::MUTED,
+            visuals.weak_text_color(),
         );
         response.on_hover_text(l10n.t("gui.invisible_signature"));
         return;

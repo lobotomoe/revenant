@@ -53,12 +53,12 @@ enum Tone {
 }
 
 impl Tone {
-    fn color(self) -> Color32 {
+    fn color(self, visuals: &egui::Visuals) -> Color32 {
         match self {
             Tone::Good => theme::OK,
             Tone::Caution => theme::WARNING,
             Tone::Bad => theme::ERROR,
-            Tone::Neutral => theme::MUTED,
+            Tone::Neutral => visuals.weak_text_color(),
         }
     }
 
@@ -112,7 +112,7 @@ fn banner(ui: &mut Ui, l10n: &Localizer, report: &Report) {
         }
     };
 
-    let color = tone.color();
+    let color = tone.color(ui.visuals());
     egui::Frame::new()
         .fill(color.gamma_multiply(0.12))
         .stroke(egui::Stroke::new(1.0_f32, color.gamma_multiply(0.6)))
@@ -297,7 +297,7 @@ fn server_card(ui: &mut Ui, l10n: &Localizer, server: &ServerVerifyResult) {
                 }
             }
             ServerVerifyResult::Failed(reason) => {
-                ui.colored_label(theme::MUTED, reason);
+                ui.weak(reason);
             }
         }
     });

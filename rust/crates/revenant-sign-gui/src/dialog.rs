@@ -147,7 +147,7 @@ impl<'a> DialogFrame<'a> {
             ui.label(RichText::new(title).heading().strong());
             if let Some(detail) = self.title_detail {
                 ui.with_layout(Layout::right_to_left(Align::Center), |ui| {
-                    ui.colored_label(theme::MUTED, detail);
+                    ui.weak(detail);
                 });
             }
         });

@@ -484,10 +484,7 @@ impl LoginState {
             &mut self.save_credentials,
             l10n.t("gui.save_credentials_username_password"),
         );
-        ui.colored_label(
-            theme::MUTED,
-            l10n.tf("gui.storage_storage", &[("storage", &self.storage_info)]),
-        );
+        ui.weak(l10n.tf("gui.storage_storage", &[("storage", &self.storage_info)]));
     }
 }
 

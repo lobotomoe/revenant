@@ -41,14 +41,14 @@ pub(crate) fn show(ui: &mut egui::Ui, l10n: &Localizer, store: &ConfigStore) -> 
 
         let rows = identity_rows(profile.as_ref(), &signer, l10n);
         if rows.is_empty() {
-            ui.label(egui::RichText::new(l10n.t("gui.no_signer")).color(theme::MUTED));
+            ui.label(egui::RichText::new(l10n.t("gui.no_signer")).weak());
         } else {
             egui::Grid::new("account_identity")
                 .num_columns(2)
                 .spacing([12.0, 4.0])
                 .show(ui, |ui| {
                     for (label, value) in rows {
-                        ui.label(egui::RichText::new(format!("{label}:")).color(theme::MUTED));
+                        ui.label(egui::RichText::new(format!("{label}:")).weak());
                         ui.label(value);
                         ui.end_row();
                     }
@@ -61,10 +61,11 @@ pub(crate) fn show(ui: &mut egui::Ui, l10n: &Localizer, store: &ConfigStore) -> 
                 signer.not_before.as_deref(),
                 signer.not_after.as_deref(),
             );
+            let color = color.unwrap_or_else(|| ui.visuals().weak_text_color());
             ui.label(egui::RichText::new(text).color(color));
         }
 
-        ui.label(egui::RichText::new(store.credential_storage_info()).color(theme::MUTED));
+        ui.label(egui::RichText::new(store.credential_storage_info()).weak());
     });
     action
 }
@@ -106,29 +107,38 @@ fn identity_rows(
 }
 
 /// Format the certificate validity window with a color cue, matching the Python
-/// client's `format_cert_validity`: gray when valid, orange when expiring soon,
-/// red when expired, gray when the window is unknown or unparsable.
+/// client's `format_cert_validity`: orange when expiring soon, red when expired,
+/// and no color of its own (secondary text) when valid or when the window is
+/// unknown or unparsable.
 fn format_cert_validity(
     l10n: &Localizer,
     not_before: Option<&str>,
     not_after: Option<&str>,
-) -> (String, egui::Color32) {
+) -> (String, Option<egui::Color32>) {
     let Some(na) = not_after else {
-        return (l10n.t("gui.cert_validity_unknown").to_owned(), theme::MUTED);
+        return (l10n.t("gui.cert_validity_unknown").to_owned(), None);
     };
     let (Some(remaining), Some(status)) =
         (days_remaining(na), expiry_status(na, EXPIRY_WARNING_DAYS))
     else {
-        return (l10n.t("gui.cert_validity_unknown").to_owned(), theme::MUTED);
+        return (l10n.t("gui.cert_validity_unknown").to_owned(), None);
     };
 
     let start = not_before.map(ymd).unwrap_or_default();
     let end = ymd(na);
     let (key, days, color) = match status {
-        ExpiryStatus::Expired => ("gui.cert_expired_range", remaining.abs(), theme::ERROR),
-        ExpiryStatus::ExpiringSoon => ("gui.cert_expiring_soon_range", remaining, theme::WARNING),
+        ExpiryStatus::Expired => (
+            "gui.cert_expired_range",
+            remaining.abs(),
+            Some(theme::ERROR),
+        ),
+        ExpiryStatus::ExpiringSoon => (
+            "gui.cert_expiring_soon_range",
+            remaining,
+            Some(theme::WARNING),
+        ),
         ExpiryStatus::Valid | ExpiryStatus::NotYetValid => {
-            ("gui.cert_valid_range", remaining, theme::MUTED)
+            ("gui.cert_valid_range", remaining, None)
         }
     };
     let text = l10n.tf(

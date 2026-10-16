@@ -120,10 +120,7 @@ pub(crate) fn show(ui: &mut egui::Ui, l10n: &Localizer, state: &mut VerifyState)
     ui.add_space(12.0);
     match &state.status {
         Status::Idle => {
-            ui.colored_label(
-                theme::MUTED,
-                l10n.t("gui.select_a_pdf_file_and_click_verify_to_check_signat_8fbc47f0"),
-            );
+            ui.weak(l10n.t("gui.select_a_pdf_file_and_click_verify_to_check_signat_8fbc47f0"));
         }
         Status::Running => {
             ui.horizontal(|ui| {

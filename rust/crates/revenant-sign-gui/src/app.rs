@@ -121,7 +121,7 @@ impl RevenantApp {
         window_style: WindowStyle,
     ) -> Self {
         crate::fonts::install(&cc.egui_ctx);
-        crate::style::install(&cc.egui_ctx);
+        crate::style::install(&cc.egui_ctx, window_style.text);
         let store = Arc::new(store);
         let l10n = Localizer::new(&store.language());
         let transport = Arc::new(Transport::new());
