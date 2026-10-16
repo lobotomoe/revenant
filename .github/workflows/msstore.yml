@@ -87,10 +87,13 @@ jobs:
           grep ' \./RevenantSign\.msix$' SHA256SUMS.txt | sha256sum -c -
 
       # A self-contained build; no .NET runtime needed. Pinned by version and
-      # checksum.
+      # checksum. It loads libsecret on Linux for its credential store, even
+      # when it signs in with an OIDC token and stores nothing.
       - name: Install msstore
         run: |
           set -euo pipefail
+          sudo apt-get update -qq
+          sudo apt-get install -y -qq libsecret-1-0
           curl -fsSL --retry 3 -o "$RUNNER_TEMP/msstore.tar.gz" \
             "https://github.com/microsoft/msstore-cli/releases/download/${MSSTORE_CLI_VERSION}/MSStoreCLI-linux-x64.tar.gz"
           echo "${MSSTORE_CLI_SHA256}  $RUNNER_TEMP/msstore.tar.gz" | sha256sum --check
