@@ -56,7 +56,9 @@ brew install lobotomoe/revenant/revenant
 snap install revenant
 ```
 
-[![Get it from the Snap Store](https://snapcraft.io/en/dark/install.svg)](https://snapcraft.io/revenant)
+<a href="https://snapcraft.io/revenant" target="_blank" rel="noopener noreferrer">
+  <img src="https://snapcraft.io/en/dark/install.svg" width="200" alt="Get it from the Snap Store"/>
+</a>
 
 **Windows**
 ```powershell
