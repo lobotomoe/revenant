@@ -7,6 +7,37 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [4.2.0] - 2026-10-16
+
+The desktop app now follows the macOS and Windows design guidelines. Nothing
+changes in the CLIs, the libraries or how documents are signed and verified.
+
+### Changed
+
+- **The macOS app looks and behaves like a Mac app.** It uses the system font,
+  text sizes and accent color, a toolbar merged with the title bar, and the
+  menu bar: Settings opens with Cmd+comma, About is the standard About panel,
+  and the Help menu links to the documentation and the bug tracker.
+- **Dialogs follow the platform.** On Windows the action comes first and
+  Cancel last; on macOS and Linux Cancel comes first. Enter confirms and
+  Escape cancels. A click outside a dialog no longer throws away what was
+  typed in it.
+- **Settings is a window of its own** instead of a dialog that blocks the app.
+  On Windows and Linux it also holds the About section.
+- **The signing form is laid out as a form**, with aligned labels. The page is
+  chosen as Last, First or a page number, and files in a batch can be removed
+  one by one.
+- **The verification report opens with a verdict**: green when every signature
+  is valid and its signer trusted, amber when the signatures are valid but a
+  signer's certificate is not known to be trusted, red when any signature
+  fails. Each signature and the server's result follow as a card.
+
+### Fixed
+
+- **Secondary text is readable.** Hints, step counters and certificate dates
+  were light gray at about 2:1 contrast on the light theme; they now meet the
+  4.5:1 WCAG minimum on both themes.
+
 ## [4.1.2] - 2026-10-16
 
 Gets the desktop app through Mac App Store review. Nothing changes in the app's
@@ -772,7 +803,8 @@ entry point -- but their verification behaviour changes, as described below.
 - Pyright strict mode type checking with 0 errors
 - 96%+ test coverage (600+ tests)
 
-[Unreleased]: https://github.com/lobotomoe/revenant/compare/v4.1.2...HEAD
+[Unreleased]: https://github.com/lobotomoe/revenant/compare/v4.2.0...HEAD
+[4.2.0]: https://github.com/lobotomoe/revenant/compare/v4.1.2...v4.2.0
 [4.1.2]: https://github.com/lobotomoe/revenant/compare/v4.1.1...v4.1.2
 [4.1.1]: https://github.com/lobotomoe/revenant/compare/v4.1.0...v4.1.1
 [4.1.0]: https://github.com/lobotomoe/revenant/compare/v4.0.0...v4.1.0
