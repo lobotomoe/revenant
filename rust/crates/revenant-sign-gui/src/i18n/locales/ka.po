@@ -588,3 +588,67 @@ msgstr "ჩააგდეთ PDF აქ ან დააწკაპუნე�
 #. EN: Drop an image or click (optional)
 msgid "gui.drop_image_hint"
 msgstr "ჩააგდეთ სურათი ან დააწკაპუნეთ (არასავალდებულო)"
+
+#. EN: Settings…
+msgid "gui.menu_settings"
+msgstr "პარამეტრები…"
+
+#. EN: Services
+msgid "gui.menu_services"
+msgstr "სერვისები"
+
+#. EN: Hide Revenant
+msgid "gui.menu_hide_revenant"
+msgstr "Revenant-ის დამალვა"
+
+#. EN: Hide Others
+msgid "gui.menu_hide_others"
+msgstr "სხვების დამალვა"
+
+#. EN: Show All
+msgid "gui.menu_show_all"
+msgstr "ყველას ჩვენება"
+
+#. EN: Quit Revenant
+msgid "gui.menu_quit_revenant"
+msgstr "Revenant-იდან გასვლა"
+
+#. EN: Open…
+msgid "gui.menu_open"
+msgstr "გახსნა…"
+
+#. EN: Close Window
+msgid "gui.menu_close_window"
+msgstr "ფანჯრის დახურვა"
+
+#. EN: Window
+msgid "gui.menu_window"
+msgstr "ფანჯარა"
+
+#. EN: Minimize
+msgid "gui.menu_minimize"
+msgstr "ჩაკეცვა"
+
+#. EN: Zoom
+msgid "gui.menu_zoom"
+msgstr "მასშტაბირება"
+
+#. EN: Bring All to Front
+msgid "gui.menu_bring_all_to_front"
+msgstr "ყველას წინ გამოტანა"
+
+#. EN: Help
+msgid "gui.menu_help"
+msgstr "დახმარება"
+
+#. EN: Revenant Help
+msgid "gui.menu_revenant_help"
+msgstr "Revenant-ის დახმარება"
+
+#. EN: Connect…
+msgid "gui.menu_connect"
+msgstr "დაკავშირება…"
+
+#. EN: Disconnect…
+msgid "gui.menu_disconnect"
+msgstr "გათიშვა…"

@@ -586,3 +586,67 @@ msgstr "Last"
 
 msgid "gui.page_first"
 msgstr "First"
+
+#. EN: Settings…
+msgid "gui.menu_settings"
+msgstr "Settings…"
+
+#. EN: Services
+msgid "gui.menu_services"
+msgstr "Services"
+
+#. EN: Hide Revenant
+msgid "gui.menu_hide_revenant"
+msgstr "Hide Revenant"
+
+#. EN: Hide Others
+msgid "gui.menu_hide_others"
+msgstr "Hide Others"
+
+#. EN: Show All
+msgid "gui.menu_show_all"
+msgstr "Show All"
+
+#. EN: Quit Revenant
+msgid "gui.menu_quit_revenant"
+msgstr "Quit Revenant"
+
+#. EN: Open…
+msgid "gui.menu_open"
+msgstr "Open…"
+
+#. EN: Close Window
+msgid "gui.menu_close_window"
+msgstr "Close Window"
+
+#. EN: Window
+msgid "gui.menu_window"
+msgstr "Window"
+
+#. EN: Minimize
+msgid "gui.menu_minimize"
+msgstr "Minimize"
+
+#. EN: Zoom
+msgid "gui.menu_zoom"
+msgstr "Zoom"
+
+#. EN: Bring All to Front
+msgid "gui.menu_bring_all_to_front"
+msgstr "Bring All to Front"
+
+#. EN: Help
+msgid "gui.menu_help"
+msgstr "Help"
+
+#. EN: Revenant Help
+msgid "gui.menu_revenant_help"
+msgstr "Revenant Help"
+
+#. EN: Connect…
+msgid "gui.menu_connect"
+msgstr "Connect…"
+
+#. EN: Disconnect…
+msgid "gui.menu_disconnect"
+msgstr "Disconnect…"

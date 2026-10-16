@@ -2,8 +2,8 @@
 //!
 //! The window mirrors the Python client's configuration "layers": nothing
 //! configured -> server configured -> fully configured (can sign). The shell
-//! (a server bar, Sign/Verify tabs, and a footer) stays constant; the Sign tab
-//! swaps content by layer. Long-running work runs on the [`Worker`] and its
+//! (a toolbar with the Sign/Verify switch and the server menu, see `chrome`)
+//! stays constant; the Sign tab swaps content by layer. Long-running work runs on the [`Worker`] and its
 //! results are folded back in on the UI thread.
 
 use std::path::{Path, PathBuf};
@@ -28,10 +28,12 @@ use crate::views::{
     self, AccountAction, ConnectAction, ConnectState, LoginAction, LoginState, SettingsAction,
     SignAction, SignForm, VerifyAction, VerifyState,
 };
+use crate::window_style::WindowStyle;
 use crate::worker::{
     IdentityOutcome, RequestId, RequestIds, SignedOutcome, VerifyOutcome, Worker, WorkerMsg,
 };
 
+mod chrome;
 #[cfg(feature = "store-screenshots")]
 pub(crate) mod stage;
 
@@ -84,16 +86,38 @@ pub(crate) struct RevenantApp {
     /// Set to request cancellation of the in-progress batch (checked between
     /// files by the worker).
     batch_cancel: Arc<AtomicBool>,
+    /// How the window frame and the toolbar share the top of the window.
+    window_style: WindowStyle,
+    /// The macOS menu bar, once installed. `None` when it could not be built, in
+    /// which case the toolbar offers Settings and About itself.
+    #[cfg(target_os = "macos")]
+    menu_bar: Option<crate::macos::menu::MenuBar>,
 }
 
 impl RevenantApp {
     pub(crate) fn new(cc: &eframe::CreationContext<'_>) -> Self {
-        Self::with_store(cc, ConfigStore::new())
+        #[cfg_attr(not(target_os = "macos"), allow(unused_mut))]
+        let mut app = Self::with_store(cc, ConfigStore::new(), WindowStyle::native());
+        #[cfg(target_os = "macos")]
+        match crate::macos::menu::MenuBar::install(&cc.egui_ctx, &app.l10n) {
+            Ok(menu_bar) => app.menu_bar = Some(menu_bar),
+            Err(err) => {
+                // Settings and About move into the toolbar instead.
+                log::error!("the menu bar could not be built: {err}");
+                app.window_style.menu_bar = false;
+            }
+        }
+        app
     }
 
     /// Build the app over a given config store (the user's real one in
-    /// production, an isolated one when rendering store screenshots).
-    fn with_store(cc: &eframe::CreationContext<'_>, store: ConfigStore) -> Self {
+    /// production, an isolated one when rendering store screenshots) with the
+    /// window style of the platform it runs on, or is pictured on.
+    fn with_store(
+        cc: &eframe::CreationContext<'_>,
+        store: ConfigStore,
+        window_style: WindowStyle,
+    ) -> Self {
         crate::fonts::install(&cc.egui_ctx);
         crate::style::install(&cc.egui_ctx);
         let store = Arc::new(store);
@@ -121,6 +145,9 @@ impl RevenantApp {
             verify: VerifyState::new(),
             confirm: None,
             batch_cancel: Arc::new(AtomicBool::new(false)),
+            window_style,
+            #[cfg(target_os = "macos")]
+            menu_bar: None,
         }
     }
 
@@ -132,6 +159,38 @@ impl RevenantApp {
         self.l10n = Localizer::new(code);
         // Drop any result line frozen in the previous language.
         self.sign_form.reset_result();
+        #[cfg(target_os = "macos")]
+        if let Some(menu_bar) = &mut self.menu_bar {
+            if let Err(err) = menu_bar.relabel(&self.l10n) {
+                log::error!("the menu bar could not be relabelled: {err}");
+            }
+        }
+    }
+
+    /// Carry out what was chosen in the macOS menu bar since the last frame.
+    #[cfg(target_os = "macos")]
+    fn handle_menu_commands(&mut self, ctx: &egui::Context) {
+        use crate::macos::menu::MenuCommand;
+
+        let Some(menu_bar) = &self.menu_bar else {
+            return;
+        };
+        for command in menu_bar.take_commands() {
+            match command {
+                MenuCommand::About => self.dialog = Some(Dialog::About),
+                MenuCommand::Settings => self.dialog = Some(Dialog::Settings),
+                MenuCommand::Help => ctx.open_url(egui::OpenUrl::new_tab(views::about::HELP_URL)),
+                MenuCommand::Open => match self.tab {
+                    Tab::Sign if self.store.config_layer() == ConfigLayer::FullyConfigured => {
+                        self.browse_pdf();
+                    }
+                    // Nothing to open into until the account is set up; the
+                    // Sign tab shows what to do first.
+                    Tab::Sign => {}
+                    Tab::Verify => self.browse_verify_pdf(),
+                },
+            }
+        }
     }
 
     /// Fold completed background jobs back into the UI state.
@@ -567,48 +626,6 @@ impl RevenantApp {
         }
     }
 
-    fn top_bar(&mut self, ui: &mut egui::Ui) {
-        egui::Panel::top("server_bar").show_inside(ui, |ui| {
-            ui.add_space(4.0);
-            ui.horizontal(|ui| {
-                ui.heading("Revenant");
-                ui.separator();
-                if self.store.config_layer() == ConfigLayer::Unconfigured {
-                    ui.label(self.l10n.t("gui.no_server_configured"));
-                    if ui.button(self.l10n.t("gui.connect")).clicked() {
-                        self.dialog = Some(Dialog::Connect);
-                    }
-                } else {
-                    let name = self
-                        .store
-                        .active_profile()
-                        .map(|p| p.display_name)
-                        .unwrap_or_default();
-                    ui.label(name);
-                    if ui.button(self.l10n.t("gui.disconnect")).clicked() {
-                        self.confirm = Some(Confirm::Disconnect);
-                    }
-                }
-            });
-            ui.add_space(4.0);
-        });
-    }
-
-    fn footer(&mut self, ui: &mut egui::Ui) {
-        egui::Panel::bottom("footer").show_inside(ui, |ui| {
-            ui.add_space(2.0);
-            ui.horizontal(|ui| {
-                if ui.button(self.l10n.t("gui.settings")).clicked() {
-                    self.dialog = Some(Dialog::Settings);
-                }
-                if ui.button(self.l10n.t("gui.about_revenant")).clicked() {
-                    self.dialog = Some(Dialog::About);
-                }
-            });
-            ui.add_space(2.0);
-        });
-    }
-
     fn central(&mut self, ui: &mut egui::Ui) {
         // Right-align content for right-to-left locales (e.g. Persian). Full
         // widget mirroring is a later polish step; this matches the previous
@@ -625,11 +642,6 @@ impl RevenantApp {
         let mut account_action = AccountAction::None;
         egui::CentralPanel::default().show_inside(ui, |ui| {
             ui.with_layout(egui::Layout::top_down(align), |ui| {
-                ui.horizontal(|ui| {
-                    ui.selectable_value(&mut self.tab, Tab::Sign, self.l10n.t("gui.sign"));
-                    ui.selectable_value(&mut self.tab, Tab::Verify, self.l10n.t("gui.verify"));
-                });
-                ui.separator();
                 // Scroll when content (account panel + form, or long verify
                 // results) exceeds the window, so nothing clips on small sizes.
                 egui::ScrollArea::vertical()
@@ -829,8 +841,9 @@ impl eframe::App for RevenantApp {
         let ctx = ui.ctx().clone();
         self.process_worker_results();
         self.handle_dropped_files(&ctx);
-        self.top_bar(ui);
-        self.footer(ui);
+        #[cfg(target_os = "macos")]
+        self.handle_menu_commands(&ctx);
+        self.toolbar(ui);
         self.central(ui);
         self.dialogs(&ctx);
         self.confirm_dialog(&ctx);

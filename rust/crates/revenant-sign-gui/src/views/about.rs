@@ -8,6 +8,8 @@ use crate::theme;
 
 /// Project URLs, mirrored from the Python client's About dialog.
 const REPO_URL: &str = "https://github.com/lobotomoe/revenant";
+/// Where Help > Revenant Help leads: the README, which is the user guide.
+pub(crate) const HELP_URL: &str = "https://github.com/lobotomoe/revenant#readme";
 const ISSUES_URL: &str = "https://github.com/lobotomoe/revenant/issues";
 const TELEGRAM_URL: &str = "https://t.me/m_surf";
 

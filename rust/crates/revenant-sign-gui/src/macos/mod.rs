@@ -1,9 +1,11 @@
 //! What the app takes from macOS itself so it looks at home there: the user's
-//! accent color and the system San Francisco fonts.
+//! accent color, the system San Francisco fonts and the menu bar.
 //!
 //! San Francisco may not be redistributed, so it is never bundled; it is read
 //! from the system font folder at startup, and the bundled Noto faces stay
 //! behind it as fallbacks.
+
+pub(crate) mod menu;
 
 use std::path::Path;
 

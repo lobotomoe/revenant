@@ -588,3 +588,67 @@ msgstr "یک PDF را اینجا رها کنید یا برای انتخاب کل
 #. EN: Drop an image or click (optional)
 msgid "gui.drop_image_hint"
 msgstr "یک تصویر را رها کنید یا کلیک کنید (اختیاری)"
+
+#. EN: Settings…
+msgid "gui.menu_settings"
+msgstr "تنظیمات…"
+
+#. EN: Services
+msgid "gui.menu_services"
+msgstr "سرویس‌ها"
+
+#. EN: Hide Revenant
+msgid "gui.menu_hide_revenant"
+msgstr "پنهان کردن Revenant"
+
+#. EN: Hide Others
+msgid "gui.menu_hide_others"
+msgstr "پنهان کردن بقیه"
+
+#. EN: Show All
+msgid "gui.menu_show_all"
+msgstr "نمایش همه"
+
+#. EN: Quit Revenant
+msgid "gui.menu_quit_revenant"
+msgstr "خروج از Revenant"
+
+#. EN: Open…
+msgid "gui.menu_open"
+msgstr "باز کردن…"
+
+#. EN: Close Window
+msgid "gui.menu_close_window"
+msgstr "بستن پنجره"
+
+#. EN: Window
+msgid "gui.menu_window"
+msgstr "پنجره"
+
+#. EN: Minimize
+msgid "gui.menu_minimize"
+msgstr "کوچک کردن"
+
+#. EN: Zoom
+msgid "gui.menu_zoom"
+msgstr "بزرگ‌نمایی"
+
+#. EN: Bring All to Front
+msgid "gui.menu_bring_all_to_front"
+msgstr "آوردن همه به جلو"
+
+#. EN: Help
+msgid "gui.menu_help"
+msgstr "راهنما"
+
+#. EN: Revenant Help
+msgid "gui.menu_revenant_help"
+msgstr "راهنمای Revenant"
+
+#. EN: Connect…
+msgid "gui.menu_connect"
+msgstr "اتصال…"
+
+#. EN: Disconnect…
+msgid "gui.menu_disconnect"
+msgstr "قطع اتصال…"

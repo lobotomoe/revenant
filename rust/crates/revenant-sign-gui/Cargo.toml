@@ -52,6 +52,8 @@ tempfile = { workspace = true, optional = true }
 # clipboard crate; listed here with only the classes the app reads.
 [target.'cfg(target_os = "macos")'.dependencies]
 objc2-app-kit = { version = "0.3.2", default-features = false, features = ["std", "NSColor", "NSColorSpace", "objc2-core-foundation"] }
+# The native menu bar (About, Settings, Open, Window, Help).
+muda = { version = "=0.20.0", default-features = false }
 
 [lints]
 workspace = true

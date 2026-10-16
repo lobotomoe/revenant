@@ -14,9 +14,11 @@ mod jobs;
 #[cfg(target_os = "macos")]
 mod macos;
 mod reveal;
+mod segmented;
 mod style;
 mod theme;
 mod views;
+mod window_style;
 mod worker;
 
 #[cfg(feature = "store-screenshots")]
@@ -50,6 +52,13 @@ pub fn run() -> eframe::Result<()> {
         .with_min_inner_size(MIN_SIZE)
         .with_title("Revenant")
         .with_app_id("io.github.lobotomoe.revenant");
+
+    // macOS: the content runs under a transparent title bar, so the toolbar
+    // below the traffic lights reads as part of it (see `app::chrome`).
+    #[cfg(target_os = "macos")]
+    let viewport = viewport
+        .with_fullsize_content_view(true)
+        .with_titlebar_shown(false);
 
     // Windows (taskbar) and Linux (window manager) take the embedded PNG.
     #[cfg(not(target_os = "macos"))]
