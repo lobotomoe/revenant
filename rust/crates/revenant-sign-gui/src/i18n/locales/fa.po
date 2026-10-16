@@ -47,9 +47,6 @@ msgstr "خواندن فایل ممکن نیست: {error}"
 msgid "gui.certificate_inspection"
 msgstr "بررسی گواهی"
 
-msgid "gui.certificate_status"
-msgstr "گواهی: {status}"
-
 msgid "gui.choose_server"
 msgstr "انتخاب سرور"
 
@@ -664,3 +661,15 @@ msgstr "امضا:"
 #. EN: Number
 msgid "gui.page_number"
 msgstr "شماره"
+
+#. EN: Integrity:
+msgid "gui.verify_integrity_label"
+msgstr "یکپارچگی:"
+
+#. EN: FAILED
+msgid "gui.verify_integrity_failed_value"
+msgstr "ناموفق"
+
+#. EN: Certificate:
+msgid "gui.verify_certificate_label"
+msgstr "گواهی:"

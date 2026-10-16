@@ -60,10 +60,6 @@ msgstr "Չհաջողվեց կարդալ ֆայլը: {error}"
 msgid "gui.certificate_inspection"
 msgstr "Վկայագրի ստուգում"
 
-#. EN: Certificate: {status}
-msgid "gui.certificate_status"
-msgstr "Վկայագիր: {status}"
-
 #. EN: Choose Server
 msgid "gui.choose_server"
 msgstr "Ընտրել սերվեր"
@@ -861,3 +857,15 @@ msgstr "Ստորագրություն:"
 #. EN: Number
 msgid "gui.page_number"
 msgstr "Համար"
+
+#. EN: Integrity:
+msgid "gui.verify_integrity_label"
+msgstr "Ամբողջականություն:"
+
+#. EN: FAILED
+msgid "gui.verify_integrity_failed_value"
+msgstr "ԱՆՀԱՋՈՂ"
+
+#. EN: Certificate:
+msgid "gui.verify_certificate_label"
+msgstr "Վկայագիր:"

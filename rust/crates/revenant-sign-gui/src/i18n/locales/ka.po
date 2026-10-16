@@ -47,9 +47,6 @@ msgstr "ფაილის წაკითხვა ვერ ხერხდე
 msgid "gui.certificate_inspection"
 msgstr "სერტიფიკატის შემოწმება"
 
-msgid "gui.certificate_status"
-msgstr "სერტიფიკატი: {status}"
-
 msgid "gui.choose_server"
 msgstr "სერვერის არჩევა"
 
@@ -664,3 +661,15 @@ msgstr "ხელმოწერა:"
 #. EN: Number
 msgid "gui.page_number"
 msgstr "ნომერი"
+
+#. EN: Integrity:
+msgid "gui.verify_integrity_label"
+msgstr "მთლიანობა:"
+
+#. EN: FAILED
+msgid "gui.verify_integrity_failed_value"
+msgstr "ვერ გაიარა"
+
+#. EN: Certificate:
+msgid "gui.verify_certificate_label"
+msgstr "სერტიფიკატი:"

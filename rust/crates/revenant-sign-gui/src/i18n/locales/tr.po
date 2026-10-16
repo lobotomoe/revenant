@@ -47,9 +47,6 @@ msgstr "Dosya okunamıyor: {error}"
 msgid "gui.certificate_inspection"
 msgstr "Sertifika incelemesi"
 
-msgid "gui.certificate_status"
-msgstr "Sertifika: {status}"
-
 msgid "gui.choose_server"
 msgstr "Sunucu Seç"
 
@@ -664,3 +661,15 @@ msgstr "İmza:"
 #. EN: Number
 msgid "gui.page_number"
 msgstr "Numara"
+
+#. EN: Integrity:
+msgid "gui.verify_integrity_label"
+msgstr "Bütünlük:"
+
+#. EN: FAILED
+msgid "gui.verify_integrity_failed_value"
+msgstr "BAŞARISIZ"
+
+#. EN: Certificate:
+msgid "gui.verify_certificate_label"
+msgstr "Sertifika:"

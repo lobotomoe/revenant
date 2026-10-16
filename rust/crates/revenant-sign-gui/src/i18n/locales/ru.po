@@ -60,10 +60,6 @@ msgstr "Не удалось прочитать файл: {error}"
 msgid "gui.certificate_inspection"
 msgstr "Проверка сертификата"
 
-#. EN: Certificate: {status}
-msgid "gui.certificate_status"
-msgstr "Сертификат: {status}"
-
 #. EN: Choose Server
 msgid "gui.choose_server"
 msgstr "Выбор сервера"
@@ -859,3 +855,15 @@ msgstr "Подпись:"
 #. EN: Number
 msgid "gui.page_number"
 msgstr "Номер"
+
+#. EN: Integrity:
+msgid "gui.verify_integrity_label"
+msgstr "Целостность:"
+
+#. EN: FAILED
+msgid "gui.verify_integrity_failed_value"
+msgstr "НЕ ПРОЙДЕНА"
+
+#. EN: Certificate:
+msgid "gui.verify_certificate_label"
+msgstr "Сертификат:"

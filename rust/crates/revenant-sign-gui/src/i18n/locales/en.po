@@ -47,9 +47,6 @@ msgstr "Cannot read file: {error}"
 msgid "gui.certificate_inspection"
 msgstr "Certificate inspection"
 
-msgid "gui.certificate_status"
-msgstr "Certificate: {status}"
-
 msgid "gui.choose_server"
 msgstr "Choose Server"
 
@@ -662,3 +659,15 @@ msgstr "Signature:"
 #. EN: Number
 msgid "gui.page_number"
 msgstr "Number"
+
+#. EN: Integrity:
+msgid "gui.verify_integrity_label"
+msgstr "Integrity:"
+
+#. EN: FAILED
+msgid "gui.verify_integrity_failed_value"
+msgstr "FAILED"
+
+#. EN: Certificate:
+msgid "gui.verify_certificate_label"
+msgstr "Certificate:"
