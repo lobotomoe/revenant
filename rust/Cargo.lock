@@ -3828,6 +3828,7 @@ dependencies = [
  "env_logger",
  "image",
  "log",
+ "objc2-app-kit 0.3.2",
  "revenant-sign-core",
  "rfd",
  "sys-locale",

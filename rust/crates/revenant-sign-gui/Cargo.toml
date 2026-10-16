@@ -48,6 +48,11 @@ egui_kittest = { version = "0.34.3", features = ["wgpu", "eframe"], optional = t
 image = { version = "0.25", default-features = false, features = ["png"], optional = true }
 tempfile = { workspace = true, optional = true }
 
+# The system accent color (see `macos`). Already in the tree through eframe's
+# clipboard crate; listed here with only the classes the app reads.
+[target.'cfg(target_os = "macos")'.dependencies]
+objc2-app-kit = { version = "0.3.2", default-features = false, features = ["std", "NSColor", "NSColorSpace", "objc2-core-foundation"] }
+
 [lints]
 workspace = true
 

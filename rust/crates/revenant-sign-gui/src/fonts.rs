@@ -54,6 +54,18 @@ pub(crate) fn install(ctx: &egui::Context) {
         }
     }
 
+    // On macOS the system San Francisco faces go in front of all of the above,
+    // each falling back to the bundled face for anything it lacks.
+    #[cfg(target_os = "macos")]
+    if let Some(prop) = fonts.families.get_mut(&egui::FontFamily::Proportional) {
+        for (index, (name, bytes)) in crate::macos::system_fonts().into_iter().enumerate() {
+            fonts
+                .font_data
+                .insert(name.to_owned(), Arc::new(egui::FontData::from_owned(bytes)));
+            prop.insert(index, name.to_owned());
+        }
+    }
+
     // Monospace: keep egui's monospace face primary so code/technical text stays
     // fixed-width; append the script fallbacks only so non-Latin still renders
     // (proportionally) rather than as tofu.

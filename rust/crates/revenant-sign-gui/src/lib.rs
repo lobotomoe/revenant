@@ -11,6 +11,8 @@ mod friendly;
 mod i18n;
 mod icons;
 mod jobs;
+#[cfg(target_os = "macos")]
+mod macos;
 mod reveal;
 mod style;
 mod theme;

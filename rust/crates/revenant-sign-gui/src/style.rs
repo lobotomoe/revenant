@@ -62,7 +62,7 @@ fn tune(style: &mut egui::Style) {
 
     // Accent for selection (tabs, segmented controls) and links. A translucent
     // fill reads well over both light and dark backgrounds.
-    let accent = theme::ACCENT;
+    let accent = theme::accent();
     style.visuals.selection.bg_fill =
         Color32::from_rgba_unmultiplied(accent.r(), accent.g(), accent.b(), 0x55);
     style.visuals.selection.stroke = Stroke::new(1.0_f32, accent);
@@ -73,8 +73,8 @@ fn tune(style: &mut egui::Style) {
 /// add it with [`egui::Ui::add`] / [`egui::Ui::add_enabled`] and may chain
 /// `.min_size(...)` for a larger hero button.
 pub(crate) fn primary_button(text: impl Into<String>) -> egui::Button<'static> {
-    egui::Button::new(egui::RichText::new(text.into()).color(theme::ON_ACCENT))
-        .fill(theme::ACCENT)
+    egui::Button::new(egui::RichText::new(text.into()).color(theme::on_accent()))
+        .fill(theme::accent())
         .min_size(Vec2::new(PRIMARY_BUTTON_MIN[0], PRIMARY_BUTTON_MIN[1]))
 }
 
@@ -144,7 +144,7 @@ pub(crate) fn drop_zone(
     }
 
     let visuals = ui.visuals();
-    let accent = theme::ACCENT;
+    let accent = theme::accent();
     let (fill, stroke) = if file_matches {
         (
             Color32::from_rgba_unmultiplied(accent.r(), accent.g(), accent.b(), 0x33),
