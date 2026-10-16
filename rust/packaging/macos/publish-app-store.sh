@@ -59,6 +59,18 @@ if [ "$build_state" != "VALID" ]; then
 	exit 1
 fi
 
+# App Store Connect allows one editable version at a time. One left over from an
+# earlier release, prepared but never submitted or rejected in review, becomes
+# this release: it keeps its listing text and What's New, and gets this build.
+stale_version="$("$ASC" versions list --platform "$PLATFORM" --state "${EDITABLE_STATES// /,}" \
+	--output json | jq -c --arg version "$VERSION" '[.data[] | select(.attributes.versionString != $version)][0] // empty')"
+if [ -n "$stale_version" ]; then
+	stale_id="$(jq -r '.id' <<<"$stale_version")"
+	stale_string="$(jq -r '.attributes.versionString' <<<"$stale_version")"
+	echo "Renaming the unreleased App Store version $stale_string to $VERSION"
+	"$ASC" versions update --version-id "$stale_id" --version "$VERSION" --output json >/dev/null
+fi
+
 # A new version starts from the listing text of the one on sale. What's New is
 # left out: it describes the previous release.
 live_version="$("$ASC" versions list --platform "$PLATFORM" --state READY_FOR_DISTRIBUTION \
