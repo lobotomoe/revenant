@@ -1,7 +1,8 @@
 name: Publish to Microsoft Store
 
 # Submits a released version's MSIX to the Microsoft Store: uploads the package
-# from the GitHub Release, sets What's New to the release's AppStream notes, and
+# from the GitHub Release, replaces the listing's screenshots with the ones the
+# release rendered, sets What's New to the release's AppStream notes, and
 # commits the submission for certification. Called by release.yml on a stable
 # tag, and dispatchable for a chosen tag so a failed or skipped submission can be
 # redone without cutting a release.
@@ -83,7 +84,7 @@ jobs:
           ref: ${{ inputs.tag }}
           persist-credentials: false
 
-      - name: Download the MSIX and release checksums
+      - name: Download the MSIX, screenshots and release checksums
         env:
           GITHUB_TOKEN: ${{ github.token }}
           TAG: ${{ inputs.tag }}
@@ -92,13 +93,15 @@ jobs:
           gh release download "$TAG" \
             --repo "$GITHUB_REPOSITORY" \
             --pattern "RevenantSign.msix" \
+            --pattern "revenant-store-screenshots.zip" \
             --pattern "SHA256SUMS.txt" \
             --dir "$RUNNER_TEMP/msix"
 
-      - name: Verify the MSIX against the release checksums
+      - name: Verify the downloads against the release checksums
         working-directory: ${{ runner.temp }}/msix
         run: |
-          grep ' \./RevenantSign\.msix$' SHA256SUMS.txt | sha256sum -c -
+          grep -E ' \./(RevenantSign\.msix|revenant-store-screenshots\.zip)$' SHA256SUMS.txt | sha256sum -c -
+          7z x -y -bd -o"$RUNNER_TEMP/screenshots" revenant-store-screenshots.zip > /dev/null
 
       # A self-contained build; no .NET runtime needed. Pinned by version and
       # checksum.
@@ -159,24 +162,60 @@ jobs:
           msstore publish "$RUNNER_TEMP/msix/RevenantSign.msix" --appId "$PRODUCT_ID" \
             --noCommit --uploadTimeout 600 2>&1 | { grep -vE "$UPLOAD_URL_PARTS" || true; }
 
-      # Every listing's What's New, so no language keeps the previous release's
-      # text. The key's case is matched loosely: the API's JSON casing is not
-      # documented.
-      - name: Set What's New
+      # The draft `publish` left holds the package in the upload zip. That zip
+      # is replaced by one holding the package and the new screenshots, and the
+      # draft is edited to match: every listing's screenshots swapped for the
+      # new ones (at the zip's root, named after the version so they never
+      # collide with the ones being removed), and every listing's What's New set
+      # to this release's notes. The JSON keys are the CLI's: it reads the
+      # submission into its own models and writes them back.
+      - name: Update the listing
+        env:
+          TAG: ${{ inputs.tag }}
         run: |
           set -euo pipefail
-          msstore submission get "$PRODUCT_ID" > "$RUNNER_TEMP/submission.json"
-          if ! jq -e '[.. | objects | keys[] | select(ascii_downcase == "releasenotes")] | length > 0' \
-            "$RUNNER_TEMP/submission.json" > /dev/null; then
-            echo "::error::the submission has no release notes field"
+          # A POSIX path, so globs and redirections behave the same in Git Bash.
+          temp="$(cygpath -u "$RUNNER_TEMP")"
+          msstore submission get "$PRODUCT_ID" > "$temp/submission.json"
+
+          upload_url="$(jq -er '.FileUploadUrl' "$temp/submission.json")"
+          echo "::add-mask::$upload_url"
+          if ! jq -e '.ApplicationPackages[] | select(.FileName == "RevenantSign.msix" and .FileStatus == "PendingUpload")' \
+            "$temp/submission.json" > /dev/null; then
+            echo "::error::the draft does not hold RevenantSign.msix as its new package"
             exit 1
           fi
-          jq -c --rawfile notes "$RUNNER_TEMP/release-notes.txt" '
-            walk(if type == "object" then
-              with_entries(if (.key | ascii_downcase) == "releasenotes" then .value = ($notes | rtrimstr("\n")) else . end)
-            else . end)
-          ' "$RUNNER_TEMP/submission.json" > "$RUNNER_TEMP/submission-updated.json"
-          msstore submission update "$PRODUCT_ID" "$(cat "$RUNNER_TEMP/submission-updated.json")" \
+
+          bundle="$temp/bundle"
+          mkdir -p "$bundle"
+          cp "$temp/msix/RevenantSign.msix" "$bundle/"
+          shots=()
+          for shot in "$temp"/screenshots/microsoft-store/*.png; do
+            name="screenshot-${TAG#v}-$(basename "$shot")"
+            cp "$shot" "$bundle/$name"
+            shots+=("$name")
+          done
+          # The Store takes at most ten screenshots per listing.
+          if [ "${#shots[@]}" -eq 0 ] || [ "${#shots[@]}" -gt 10 ]; then
+            echo "::error::expected 1 to 10 Microsoft Store screenshots, found ${#shots[@]}"
+            exit 1
+          fi
+          (cd "$bundle" && 7z a -tzip -bd "$temp/upload.zip" RevenantSign.msix "${shots[@]}" > /dev/null)
+          curl -fsS --retry 3 -X PUT -H "x-ms-blob-type: BlockBlob" \
+            -T "$temp/upload.zip" "$upload_url" > /dev/null
+
+          jq -c \
+            --rawfile notes "$temp/release-notes.txt" \
+            --args '
+              ($ARGS.positional | map({FileName: ., FileStatus: "PendingUpload", ImageType: "Screenshot"})) as $new
+              | .Listings |= with_entries(
+                  .value.BaseListing.ReleaseNotes = ($notes | rtrimstr("\n"))
+                  | .value.BaseListing.Images = (
+                      [(.value.BaseListing.Images // [])[]
+                        | if .ImageType == "Screenshot" then .FileStatus = "PendingDelete" else . end]
+                      + $new))
+            ' "${shots[@]}" < "$temp/submission.json" > "$temp/submission-updated.json"
+          msstore submission update "$PRODUCT_ID" "$(cat "$temp/submission-updated.json")" \
             2>&1 | { grep -vE "$UPLOAD_URL_PARTS" || true; }
 
       - name: Submit for certification
