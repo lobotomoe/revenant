@@ -146,8 +146,10 @@ jobs:
       # are in.
       - name: Upload the package
         run: |
-          msstore publish "$RUNNER_TEMP/msix" --inputDirectory "$RUNNER_TEMP/msix" \
-            --appId "$PRODUCT_ID" --noCommit --uploadTimeout 600 --verbose
+          # The package itself as the path: the CLI recognises a ready MSIX by
+          # its extension, and treats a directory as a project to build.
+          msstore publish "$RUNNER_TEMP/msix/RevenantSign.msix" --appId "$PRODUCT_ID" \
+            --noCommit --uploadTimeout 600 --verbose
 
       # Every listing's What's New, so no language keeps the previous release's
       # text. The key's case is matched loosely: the API's JSON casing is not
