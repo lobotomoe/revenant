@@ -25,7 +25,10 @@ on:
         required: true
         type: string
 
-permissions: read-all
+# Nothing at the top level: release.yml calls this with only what the job
+# below asks for, and a called workflow may not request more than its caller
+# grants.
+permissions: {}
 
 concurrency:
   group: msstore-${{ inputs.tag }}
