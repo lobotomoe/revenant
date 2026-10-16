@@ -569,6 +569,18 @@ jobs:
           VERSION="${GITHUB_REF_NAME#v}"
           packaging/macos/bundle-app.sh dist/universal/revenant-gui dist "$VERSION" "${{ github.run_number }}"
 
+      # App Review rejects a binary that imports a private CoreGraphics function
+      # (CGS followed by a capital letter; CGShieldingWindowLevel is public), and
+      # says so only after the upload. 4.1.1 was turned away for winit's blur.
+      - name: Check for private APIs
+        run: |
+          set -euo pipefail
+          private=$(nm -u dist/Revenant.app/Contents/MacOS/revenant-gui | grep -E '^_CGS[A-Z]' || true)
+          if [ -n "$private" ]; then
+            echo "::error::the MAS binary imports private APIs the App Store rejects: $(tr '\n' ' ' <<<"$private")"
+            exit 1
+          fi
+
       - name: Import MAS certificate
         if: env.MAS_SIGN
         uses: apple-actions/import-codesign-certs@5142e029c445c10ffc7149d172e540235a065466 # v7.0.0

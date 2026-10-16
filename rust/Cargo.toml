@@ -165,3 +165,12 @@ missing_panics_doc = "allow"
 # doc_markdown flags every product/proper noun (CoSign, EKENG, SAPIWS, ...) in
 # our prose-heavy doc comments demanding backticks. Not worth backticking names.
 doc_markdown = "allow"
+
+# winit 0.30.x links the private CoreGraphics blur functions unconditionally, and
+# the Mac App Store rejects any binary that references them (4.1.1 was turned
+# away for CGSSetWindowBackgroundBlurRadius). The fork carries one commit on top
+# of 0.30.13 that backports rust-windowing/winit#4541, which puts them behind a
+# `private-apple-apis` feature that nothing here enables. Drop this once eframe
+# moves to winit 0.31.
+[patch.crates-io]
+winit = { git = "https://github.com/lobotomoe/winit", rev = "4ebce49cdd39d8849df59f0ae961efd6a3d8a08b" }
