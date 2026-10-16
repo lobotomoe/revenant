@@ -34,15 +34,21 @@ concurrency:
 jobs:
   publish:
     name: Submit to Microsoft Store
-    runs-on: ubuntu-latest
+    # Windows, where the Store CLI is supported in full: its Linux build needs a
+    # running Secret Service just to start, and does not keep its own settings
+    # between invocations (microsoft/msstore-cli#181).
+    runs-on: windows-latest
     timeout-minutes: 60
+    defaults:
+      run:
+        shell: bash
     environment: microsoft-store
     permissions:
       contents: read
       id-token: write
     env:
       MSSTORE_CLI_VERSION: v0.4.3
-      MSSTORE_CLI_SHA256: 5ec484e2d0eb5105d5fd0274a6c7a5a46177b0f4f8def105f3e90fcd6dfdef14
+      MSSTORE_CLI_SHA256: c5fb008b616f96b1b55f1d52e4e0a5dd8f6c156129b5f52f9b97ec0eed11bd57
       # Store ID of "Revenant Sign" (apps.microsoft.com/detail/9NVH62M20DS3).
       PRODUCT_ID: 9NVH62M20DS3
       TENANT_ID: b91cfdba-8ac2-4da3-a30c-6401e849e14d
@@ -87,18 +93,14 @@ jobs:
           grep ' \./RevenantSign\.msix$' SHA256SUMS.txt | sha256sum -c -
 
       # A self-contained build; no .NET runtime needed. Pinned by version and
-      # checksum. It loads libsecret on Linux for its credential store, even
-      # when it signs in with an OIDC token and stores nothing.
+      # checksum.
       - name: Install msstore
         run: |
           set -euo pipefail
-          sudo apt-get update -qq
-          sudo apt-get install -y -qq libsecret-1-0
-          curl -fsSL --retry 3 -o "$RUNNER_TEMP/msstore.tar.gz" \
-            "https://github.com/microsoft/msstore-cli/releases/download/${MSSTORE_CLI_VERSION}/MSStoreCLI-linux-x64.tar.gz"
-          echo "${MSSTORE_CLI_SHA256}  $RUNNER_TEMP/msstore.tar.gz" | sha256sum --check
-          mkdir -p "$RUNNER_TEMP/msstore"
-          tar -xzf "$RUNNER_TEMP/msstore.tar.gz" -C "$RUNNER_TEMP/msstore"
+          curl -fsSL --retry 3 -o "$RUNNER_TEMP/msstore.zip" \
+            "https://github.com/microsoft/msstore-cli/releases/download/${MSSTORE_CLI_VERSION}/MSStoreCLI-win-x64.zip"
+          echo "${MSSTORE_CLI_SHA256}  $RUNNER_TEMP/msstore.zip" | sha256sum --check
+          7z x -y -bd -o"$RUNNER_TEMP/msstore" "$RUNNER_TEMP/msstore.zip" > /dev/null
           echo "$RUNNER_TEMP/msstore" >> "$GITHUB_PATH"
 
       # What's New for this version, from the same <release> entry the Snap and
@@ -107,7 +109,7 @@ jobs:
         env:
           TAG: ${{ inputs.tag }}
         run: |
-          python3 - "${TAG#v}" > "$RUNNER_TEMP/release-notes.txt" <<'EOF'
+          python - "${TAG#v}" > "$RUNNER_TEMP/release-notes.txt" <<'EOF'
           import sys
           import xml.etree.ElementTree as ET
 
@@ -119,6 +121,8 @@ jobs:
           paragraphs = [" ".join("".join(p.itertext()).split()) for p in release.iter("p")]
           if not paragraphs:
               sys.exit(f"<release version='{version}'> has no description")
+          # Plain newlines, not the CRLF Windows text mode would write.
+          sys.stdout.reconfigure(newline="\n")
           print("\n\n".join(paragraphs))
           EOF
           cat "$RUNNER_TEMP/release-notes.txt"
