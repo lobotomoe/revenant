@@ -47,9 +47,6 @@ msgstr "Dosya okunamıyor: {error}"
 msgid "gui.certificate_inspection"
 msgstr "Sertifika incelemesi"
 
-msgid "gui.certificate_status"
-msgstr "Sertifika: {status}"
-
 msgid "gui.choose_server"
 msgstr "Sunucu Seç"
 
@@ -588,3 +585,91 @@ msgstr "Bir PDF'yi buraya bırakın veya seçmek için tıklayın"
 #. EN: Drop an image or click (optional)
 msgid "gui.drop_image_hint"
 msgstr "Bir görsel bırakın veya tıklayın (isteğe bağlı)"
+
+#. EN: Settings…
+msgid "gui.menu_settings"
+msgstr "Ayarlar…"
+
+#. EN: Services
+msgid "gui.menu_services"
+msgstr "Servisler"
+
+#. EN: Hide Revenant
+msgid "gui.menu_hide_revenant"
+msgstr "Revenant'ı Gizle"
+
+#. EN: Hide Others
+msgid "gui.menu_hide_others"
+msgstr "Diğerlerini Gizle"
+
+#. EN: Show All
+msgid "gui.menu_show_all"
+msgstr "Tümünü Göster"
+
+#. EN: Quit Revenant
+msgid "gui.menu_quit_revenant"
+msgstr "Revenant'tan Çık"
+
+#. EN: Open…
+msgid "gui.menu_open"
+msgstr "Aç…"
+
+#. EN: Close Window
+msgid "gui.menu_close_window"
+msgstr "Pencereyi Kapat"
+
+#. EN: Window
+msgid "gui.menu_window"
+msgstr "Pencere"
+
+#. EN: Minimize
+msgid "gui.menu_minimize"
+msgstr "Küçült"
+
+#. EN: Zoom
+msgid "gui.menu_zoom"
+msgstr "Büyüt/Küçült"
+
+#. EN: Bring All to Front
+msgid "gui.menu_bring_all_to_front"
+msgstr "Tümünü Öne Getir"
+
+#. EN: Help
+msgid "gui.menu_help"
+msgstr "Yardım"
+
+#. EN: Revenant Help
+msgid "gui.menu_revenant_help"
+msgstr "Revenant Yardım"
+
+#. EN: Connect…
+msgid "gui.menu_connect"
+msgstr "Bağlan…"
+
+#. EN: Disconnect…
+msgid "gui.menu_disconnect"
+msgstr "Bağlantıyı Kes…"
+
+#. EN: Language
+msgid "gui.language"
+msgstr "Dil"
+
+#. EN: Signature:
+msgid "gui.signature_label"
+msgstr "İmza:"
+
+#. EN: Number
+msgid "gui.page_number"
+msgstr "Numara"
+
+#. EN: Integrity:
+msgid "gui.verify_integrity_label"
+msgstr "Bütünlük:"
+
+#. EN: FAILED
+msgid "gui.verify_integrity_failed_value"
+msgstr "BAŞARISIZ"
+
+#. EN: Certificate:
+msgid "gui.verify_certificate_label"
+msgstr "Sertifika:"

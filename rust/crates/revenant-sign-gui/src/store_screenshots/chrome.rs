@@ -10,6 +10,7 @@ use eframe::egui::{
 };
 
 use super::listing::Chrome;
+use crate::window_style::WindowStyle;
 
 const WINDOW_TITLE: &str = "Revenant";
 
@@ -17,6 +18,21 @@ const WINDOW_TITLE: &str = "Revenant";
 const TRAFFIC_LIGHT_OFFSETS: [f32; 3] = [14.0, 34.0, 54.0];
 
 impl Chrome {
+    /// How the app arranges its toolbar under this platform's frame.
+    pub(crate) fn window_style(self) -> WindowStyle {
+        match self {
+            Chrome::MacOs => WindowStyle::MACOS,
+            Chrome::Windows => WindowStyle::WINDOWS,
+            Chrome::Gnome => WindowStyle::LINUX,
+        }
+    }
+
+    /// Whether the title bar is drawn over the top of the app's content, as
+    /// macOS draws the app's transparent title bar, rather than above it.
+    pub(crate) fn title_bar_overlays_content(self) -> bool {
+        self.window_style().title_bar_inset > 0.0
+    }
+
     /// Title bar height in points.
     pub(crate) fn title_bar_height(self) -> f32 {
         match self {
@@ -62,11 +78,15 @@ pub(crate) fn paint_title_bar(
         sw: 0,
         se: 0,
     };
-    painter.rect_filled(bar, top_corners, chrome.title_bar_fill());
-    painter.line_segment(
-        [bar.left_bottom(), bar.right_bottom()],
-        Stroke::new(scale, Color32::from_gray(0xD2)),
-    );
+    // A title bar over the content is transparent: the app draws what is behind
+    // it.
+    if !chrome.title_bar_overlays_content() {
+        painter.rect_filled(bar, top_corners, chrome.title_bar_fill());
+        painter.line_segment(
+            [bar.left_bottom(), bar.right_bottom()],
+            Stroke::new(scale, Color32::from_gray(0xD2)),
+        );
+    }
 
     match chrome {
         Chrome::MacOs => paint_macos(painter, bar, scale),

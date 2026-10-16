@@ -9,6 +9,7 @@ use super::listing::WINDOW_SIZE;
 use super::ScreenshotError;
 use crate::app::stage::Stage;
 use crate::app::RevenantApp;
+use crate::window_style::WindowStyle;
 
 /// Render the app, staged at `stage` over `store`, at the shots' window size.
 ///
@@ -18,6 +19,7 @@ use crate::app::RevenantApp;
 pub(crate) fn render(
     store: ConfigStore,
     stage: Stage,
+    window_style: WindowStyle,
     pixels_per_point: f32,
 ) -> Result<RgbaImage, ScreenshotError> {
     let [width, height] = WINDOW_SIZE;
@@ -26,7 +28,7 @@ pub(crate) fn render(
         .with_pixels_per_point(pixels_per_point)
         .with_theme(egui::Theme::Light)
         .wgpu()
-        .build_eframe(|cc| RevenantApp::staged(cc, store, stage));
+        .build_eframe(|cc| RevenantApp::staged(cc, store, stage, window_style));
     harness
         .try_run()
         .map_err(|err| ScreenshotError::Render(err.to_string()))?;

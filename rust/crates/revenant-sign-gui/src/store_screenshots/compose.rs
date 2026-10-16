@@ -53,7 +53,12 @@ impl Layout {
             (height * 0.06, height * 0.94)
         };
         let [app_width, app_height] = WINDOW_SIZE;
-        let window_points = vec2(app_width, app_height + chrome.title_bar_height());
+        let bar_above_content = if chrome.title_bar_overlays_content() {
+            0.0
+        } else {
+            chrome.title_bar_height()
+        };
+        let window_points = vec2(app_width, app_height + bar_above_content);
         let scale = (window_bottom - window_top) / window_points.y;
         let window_size = window_points * scale;
         // Whole-pixel origin so the window image maps onto pixels exactly.
@@ -179,7 +184,13 @@ fn paint_window(
     // where the renderer rounded the window to whole pixels.
     let bar_height = (layout.chrome.title_bar_height() * scale).round();
     let bar = Rect::from_min_size(layout.window.min, vec2(window_size.x, bar_height));
-    let body = Rect::from_min_size(bar.left_bottom(), window_size);
+    let overlaid = layout.chrome.title_bar_overlays_content();
+    let body_top = if overlaid {
+        bar.left_top()
+    } else {
+        bar.left_bottom()
+    };
+    let body = Rect::from_min_size(body_top, window_size);
     let outline = bar.union(body);
 
     let shadow = Shadow {
@@ -190,9 +201,10 @@ fn paint_window(
     };
     painter.add(shadow.as_shape(outline, CornerRadius::same(corner)));
 
+    let top = if overlaid { corner } else { 0 };
     let bottom_corners = CornerRadius {
-        nw: 0,
-        ne: 0,
+        nw: top,
+        ne: top,
         sw: corner,
         se: corner,
     };

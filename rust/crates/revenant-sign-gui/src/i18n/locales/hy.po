@@ -60,10 +60,6 @@ msgstr "Չհաջողվեց կարդալ ֆայլը: {error}"
 msgid "gui.certificate_inspection"
 msgstr "Վկայագրի ստուգում"
 
-#. EN: Certificate: {status}
-msgid "gui.certificate_status"
-msgstr "Վկայագիր: {status}"
-
 #. EN: Choose Server
 msgid "gui.choose_server"
 msgstr "Ընտրել սերվեր"
@@ -785,3 +781,91 @@ msgstr "Քաշեք PDF-ն այստեղ կամ սեղմեք ընտրելու հա
 #. EN: Drop an image or click (optional)
 msgid "gui.drop_image_hint"
 msgstr "Քաշեք պատկերը կամ սեղմեք (ըստ ցանկության)"
+
+#. EN: Settings…
+msgid "gui.menu_settings"
+msgstr "Կարգավորումներ…"
+
+#. EN: Services
+msgid "gui.menu_services"
+msgstr "Ծառայություններ"
+
+#. EN: Hide Revenant
+msgid "gui.menu_hide_revenant"
+msgstr "Թաքցնել Revenant-ը"
+
+#. EN: Hide Others
+msgid "gui.menu_hide_others"
+msgstr "Թաքցնել մյուսները"
+
+#. EN: Show All
+msgid "gui.menu_show_all"
+msgstr "Ցույց տալ բոլորը"
+
+#. EN: Quit Revenant
+msgid "gui.menu_quit_revenant"
+msgstr "Դուրս գալ Revenant-ից"
+
+#. EN: Open…
+msgid "gui.menu_open"
+msgstr "Բացել…"
+
+#. EN: Close Window
+msgid "gui.menu_close_window"
+msgstr "Փակել պատուհանը"
+
+#. EN: Window
+msgid "gui.menu_window"
+msgstr "Պատուհան"
+
+#. EN: Minimize
+msgid "gui.menu_minimize"
+msgstr "Ծալել"
+
+#. EN: Zoom
+msgid "gui.menu_zoom"
+msgstr "Մեծացնել"
+
+#. EN: Bring All to Front
+msgid "gui.menu_bring_all_to_front"
+msgstr "Բոլորը բերել առաջ"
+
+#. EN: Help
+msgid "gui.menu_help"
+msgstr "Օգնություն"
+
+#. EN: Revenant Help
+msgid "gui.menu_revenant_help"
+msgstr "Revenant-ի օգնություն"
+
+#. EN: Connect…
+msgid "gui.menu_connect"
+msgstr "Միանալ…"
+
+#. EN: Disconnect…
+msgid "gui.menu_disconnect"
+msgstr "Անջատվել…"
+
+#. EN: Language
+msgid "gui.language"
+msgstr "Լեզու"
+
+#. EN: Signature:
+msgid "gui.signature_label"
+msgstr "Ստորագրություն:"
+
+#. EN: Number
+msgid "gui.page_number"
+msgstr "Համար"
+
+#. EN: Integrity:
+msgid "gui.verify_integrity_label"
+msgstr "Ամբողջականություն:"
+
+#. EN: FAILED
+msgid "gui.verify_integrity_failed_value"
+msgstr "ԱՆՀԱՋՈՂ"
+
+#. EN: Certificate:
+msgid "gui.verify_certificate_label"
+msgstr "Վկայագիր:"

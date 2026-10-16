@@ -2,7 +2,6 @@
 //! for the app to act on, keeping side effects (config writes, worker spawns)
 //! out of the render code.
 
-pub(crate) mod about;
 pub(crate) mod account;
 pub(crate) mod connect;
 pub(crate) mod login;
@@ -14,6 +13,6 @@ pub(crate) mod verify;
 pub(crate) use account::AccountAction;
 pub(crate) use connect::{ConnectAction, ConnectState};
 pub(crate) use login::{LoginAction, LoginState};
-pub(crate) use settings::SettingsAction;
+pub(crate) use settings::{SettingsAction, SettingsLayout};
 pub(crate) use sign::{SignAction, SignForm};
 pub(crate) use verify::{VerifyAction, VerifyState};

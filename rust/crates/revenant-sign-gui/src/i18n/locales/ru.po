@@ -60,10 +60,6 @@ msgstr "Не удалось прочитать файл: {error}"
 msgid "gui.certificate_inspection"
 msgstr "Проверка сертификата"
 
-#. EN: Certificate: {status}
-msgid "gui.certificate_status"
-msgstr "Сертификат: {status}"
-
 #. EN: Choose Server
 msgid "gui.choose_server"
 msgstr "Выбор сервера"
@@ -783,3 +779,91 @@ msgstr "Последняя"
 #. EN: First
 msgid "gui.page_first"
 msgstr "Первая"
+
+#. EN: Settings…
+msgid "gui.menu_settings"
+msgstr "Настройки…"
+
+#. EN: Services
+msgid "gui.menu_services"
+msgstr "Службы"
+
+#. EN: Hide Revenant
+msgid "gui.menu_hide_revenant"
+msgstr "Скрыть Revenant"
+
+#. EN: Hide Others
+msgid "gui.menu_hide_others"
+msgstr "Скрыть остальные"
+
+#. EN: Show All
+msgid "gui.menu_show_all"
+msgstr "Показать все"
+
+#. EN: Quit Revenant
+msgid "gui.menu_quit_revenant"
+msgstr "Завершить Revenant"
+
+#. EN: Open…
+msgid "gui.menu_open"
+msgstr "Открыть…"
+
+#. EN: Close Window
+msgid "gui.menu_close_window"
+msgstr "Закрыть окно"
+
+#. EN: Window
+msgid "gui.menu_window"
+msgstr "Окно"
+
+#. EN: Minimize
+msgid "gui.menu_minimize"
+msgstr "Свернуть"
+
+#. EN: Zoom
+msgid "gui.menu_zoom"
+msgstr "Изменить масштаб"
+
+#. EN: Bring All to Front
+msgid "gui.menu_bring_all_to_front"
+msgstr "Все окна — на передний план"
+
+#. EN: Help
+msgid "gui.menu_help"
+msgstr "Справка"
+
+#. EN: Revenant Help
+msgid "gui.menu_revenant_help"
+msgstr "Справка Revenant"
+
+#. EN: Connect…
+msgid "gui.menu_connect"
+msgstr "Подключиться…"
+
+#. EN: Disconnect…
+msgid "gui.menu_disconnect"
+msgstr "Отключиться…"
+
+#. EN: Language
+msgid "gui.language"
+msgstr "Язык"
+
+#. EN: Signature:
+msgid "gui.signature_label"
+msgstr "Подпись:"
+
+#. EN: Number
+msgid "gui.page_number"
+msgstr "Номер"
+
+#. EN: Integrity:
+msgid "gui.verify_integrity_label"
+msgstr "Целостность:"
+
+#. EN: FAILED
+msgid "gui.verify_integrity_failed_value"
+msgstr "НЕ ПРОЙДЕНА"
+
+#. EN: Certificate:
+msgid "gui.verify_certificate_label"
+msgstr "Сертификат:"

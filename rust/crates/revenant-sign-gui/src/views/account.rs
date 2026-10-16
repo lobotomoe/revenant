@@ -27,16 +27,28 @@ pub(crate) fn show(ui: &mut egui::Ui, l10n: &Localizer, store: &ConfigStore) -> 
     let profile = store.active_profile();
 
     crate::style::card(ui).show(ui, |ui| {
+        ui.set_width(ui.available_width());
+        ui.horizontal(|ui| {
+            ui.label(egui::RichText::new(l10n.t("gui.signer_identity")).strong());
+            ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
+                let log_out = format!("{}  {}", crate::icons::LOG_OUT, l10n.t("gui.log_out"));
+                if ui.button(log_out).clicked() {
+                    action = AccountAction::LogOut;
+                }
+            });
+        });
+        ui.add_space(4.0);
+
         let rows = identity_rows(profile.as_ref(), &signer, l10n);
         if rows.is_empty() {
-            ui.label(egui::RichText::new(l10n.t("gui.no_signer")).color(theme::MUTED));
+            ui.label(egui::RichText::new(l10n.t("gui.no_signer")).weak());
         } else {
             egui::Grid::new("account_identity")
                 .num_columns(2)
-                .spacing([8.0, 2.0])
+                .spacing([12.0, 4.0])
                 .show(ui, |ui| {
                     for (label, value) in rows {
-                        ui.label(egui::RichText::new(format!("{label}:")).color(theme::MUTED));
+                        ui.label(egui::RichText::new(format!("{label}:")).weak());
                         ui.label(value);
                         ui.end_row();
                     }
@@ -49,15 +61,11 @@ pub(crate) fn show(ui: &mut egui::Ui, l10n: &Localizer, store: &ConfigStore) -> 
                 signer.not_before.as_deref(),
                 signer.not_after.as_deref(),
             );
+            let color = color.unwrap_or_else(|| ui.visuals().weak_text_color());
             ui.label(egui::RichText::new(text).color(color));
         }
 
-        ui.label(egui::RichText::new(store.credential_storage_info()).color(theme::MUTED));
-
-        let log_out = format!("{}  {}", crate::icons::LOG_OUT, l10n.t("gui.log_out"));
-        if ui.button(log_out).clicked() {
-            action = AccountAction::LogOut;
-        }
+        ui.label(egui::RichText::new(store.credential_storage_info()).weak());
     });
     action
 }
@@ -99,29 +107,38 @@ fn identity_rows(
 }
 
 /// Format the certificate validity window with a color cue, matching the Python
-/// client's `format_cert_validity`: gray when valid, orange when expiring soon,
-/// red when expired, gray when the window is unknown or unparsable.
+/// client's `format_cert_validity`: orange when expiring soon, red when expired,
+/// and no color of its own (secondary text) when valid or when the window is
+/// unknown or unparsable.
 fn format_cert_validity(
     l10n: &Localizer,
     not_before: Option<&str>,
     not_after: Option<&str>,
-) -> (String, egui::Color32) {
+) -> (String, Option<egui::Color32>) {
     let Some(na) = not_after else {
-        return (l10n.t("gui.cert_validity_unknown").to_owned(), theme::MUTED);
+        return (l10n.t("gui.cert_validity_unknown").to_owned(), None);
     };
     let (Some(remaining), Some(status)) =
         (days_remaining(na), expiry_status(na, EXPIRY_WARNING_DAYS))
     else {
-        return (l10n.t("gui.cert_validity_unknown").to_owned(), theme::MUTED);
+        return (l10n.t("gui.cert_validity_unknown").to_owned(), None);
     };
 
     let start = not_before.map(ymd).unwrap_or_default();
     let end = ymd(na);
     let (key, days, color) = match status {
-        ExpiryStatus::Expired => ("gui.cert_expired_range", remaining.abs(), theme::ERROR),
-        ExpiryStatus::ExpiringSoon => ("gui.cert_expiring_soon_range", remaining, theme::WARNING),
+        ExpiryStatus::Expired => (
+            "gui.cert_expired_range",
+            remaining.abs(),
+            Some(theme::ERROR),
+        ),
+        ExpiryStatus::ExpiringSoon => (
+            "gui.cert_expiring_soon_range",
+            remaining,
+            Some(theme::WARNING),
+        ),
         ExpiryStatus::Valid | ExpiryStatus::NotYetValid => {
-            ("gui.cert_valid_range", remaining, theme::MUTED)
+            ("gui.cert_valid_range", remaining, None)
         }
     };
     let text = l10n.tf(

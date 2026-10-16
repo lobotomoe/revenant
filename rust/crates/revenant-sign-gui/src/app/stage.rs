@@ -15,6 +15,7 @@ use revenant_sign_core::pki::CertInfo;
 
 use super::{Dialog, RevenantApp, Tab};
 use crate::views::LoginState;
+use crate::window_style::WindowStyle;
 
 /// One screen of the app as a store screenshot shows it.
 pub(crate) enum Stage {
@@ -36,13 +37,15 @@ pub(crate) enum Stage {
 }
 
 impl RevenantApp {
-    /// Build the app over `store` and bring it to `stage`.
+    /// Build the app over `store`, framed as `window_style`, and bring it to
+    /// `stage`.
     pub(crate) fn staged(
         cc: &eframe::CreationContext<'_>,
         store: ConfigStore,
         stage: Stage,
+        window_style: WindowStyle,
     ) -> Self {
-        let mut app = Self::with_store(cc, store);
+        let mut app = Self::with_store(cc, store, window_style);
         match stage {
             Stage::Sign { pdf } => app.sign_form.set_pdf(&pdf),
             Stage::SignMany { pdfs } => app.sign_form.set_files(pdfs),

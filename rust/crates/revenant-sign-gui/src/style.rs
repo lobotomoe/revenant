@@ -2,51 +2,42 @@
 //!
 //! `install` is applied to both the light and dark themes (via
 //! [`egui::Context::all_styles_mut`]) so the look survives an OS theme switch.
-//! It sets a comfortable spacing rhythm, larger text, rounded widgets, and the
-//! accent color used for selection and primary actions -- the difference
+//! It sets a comfortable spacing rhythm, the platform's type scale, a readable
+//! secondary text color, rounded widgets, and the accent color used for
+//! selection and primary actions -- the difference
 //! between "default egui" and a finished app. Fonts are installed separately in
 //! [`crate::fonts`].
 
-use eframe::egui::{
-    self, Color32, CornerRadius, FontFamily, FontId, Margin, Stroke, TextStyle, Vec2,
-};
+use eframe::egui::{self, Color32, CornerRadius, FontId, Margin, Stroke, TextStyle, Vec2};
 
 use crate::theme;
+use crate::window_style::TextSizes;
 
 /// Minimum size of the primary (accent) button, so it reads as the main action.
 const PRIMARY_BUTTON_MIN: [f32; 2] = [0.0, 30.0];
+const CHECKBOX_RADIUS: u8 = 3;
 
 /// Apply the global style to every theme.
-pub(crate) fn install(ctx: &egui::Context) {
-    ctx.all_styles_mut(tune);
+pub(crate) fn install(ctx: &egui::Context, text: TextSizes) {
+    ctx.all_styles_mut(|style| tune(style, text));
 }
 
-fn tune(style: &mut egui::Style) {
+fn tune(style: &mut egui::Style, text: TextSizes) {
     style.spacing.item_spacing = Vec2::new(8.0, 8.0);
     style.spacing.button_padding = Vec2::new(12.0, 6.0);
     style.spacing.interact_size.y = 26.0;
     style.spacing.window_margin = Margin::same(12);
 
     style.text_styles = [
-        (
-            TextStyle::Heading,
-            FontId::new(21.0, FontFamily::Proportional),
-        ),
-        (TextStyle::Body, FontId::new(15.0, FontFamily::Proportional)),
-        (
-            TextStyle::Button,
-            FontId::new(15.0, FontFamily::Proportional),
-        ),
-        (
-            TextStyle::Small,
-            FontId::new(12.0, FontFamily::Proportional),
-        ),
-        (
-            TextStyle::Monospace,
-            FontId::new(14.0, FontFamily::Monospace),
-        ),
+        (TextStyle::Heading, FontId::proportional(text.heading)),
+        (TextStyle::Body, FontId::proportional(text.body)),
+        (TextStyle::Button, FontId::proportional(text.body)),
+        (TextStyle::Small, FontId::proportional(text.small)),
+        (TextStyle::Monospace, FontId::monospace(text.monospace)),
     ]
     .into();
+
+    style.visuals.weak_text_color = Some(secondary_text(&style.visuals));
 
     // Round every widget state consistently.
     for widget in [
@@ -60,40 +51,86 @@ fn tune(style: &mut egui::Style) {
     }
     style.visuals.window_corner_radius = CornerRadius::same(10);
 
+    // A hairline border on controls at rest, so checkboxes, radio buttons and
+    // text fields read as controls rather than faint patches of fill.
+    style.visuals.widgets.inactive.bg_stroke = Stroke::new(1.0_f32, control_border(&style.visuals));
+
     // Accent for selection (tabs, segmented controls) and links. A translucent
     // fill reads well over both light and dark backgrounds.
-    let accent = theme::ACCENT;
+    let accent = theme::accent();
     style.visuals.selection.bg_fill =
         Color32::from_rgba_unmultiplied(accent.r(), accent.g(), accent.b(), 0x55);
     style.visuals.selection.stroke = Stroke::new(1.0_f32, accent);
     style.visuals.hyperlink_color = accent;
 }
 
+/// Secondary text (hints, captions, a wizard's step counter): a step back from
+/// the body text, but still at least 4.5:1 against every surface it sits on,
+/// the WCAG AA minimum for text. egui's own weak color is well under that on
+/// the light theme.
+fn secondary_text(visuals: &egui::Visuals) -> Color32 {
+    if visuals.dark_mode {
+        Color32::from_gray(0xA0)
+    } else {
+        Color32::from_gray(0x66)
+    }
+}
+
+/// The border of a control at rest: dark enough to find the control, light
+/// enough not to compete with its label.
+fn control_border(visuals: &egui::Visuals) -> Color32 {
+    if visuals.dark_mode {
+        Color32::from_gray(0x5A)
+    } else {
+        Color32::from_gray(0xC4)
+    }
+}
+
+/// A checkbox with the small square corners checkboxes have on every
+/// platform. The app-wide widget rounding would otherwise make it a circle,
+/// indistinguishable from a radio button.
+pub(crate) fn checkbox(ui: &mut egui::Ui, checked: &mut bool, text: &str) -> egui::Response {
+    ui.scope(|ui| {
+        let widgets = &mut ui.visuals_mut().widgets;
+        for state in [
+            &mut widgets.inactive,
+            &mut widgets.hovered,
+            &mut widgets.active,
+        ] {
+            state.corner_radius = CornerRadius::same(CHECKBOX_RADIUS);
+        }
+        ui.checkbox(checked, text)
+    })
+    .inner
+}
+
 /// An accent-filled button for the single primary action on a screen. Callers
 /// add it with [`egui::Ui::add`] / [`egui::Ui::add_enabled`] and may chain
 /// `.min_size(...)` for a larger hero button.
 pub(crate) fn primary_button(text: impl Into<String>) -> egui::Button<'static> {
-    egui::Button::new(egui::RichText::new(text.into()).color(theme::ON_ACCENT))
-        .fill(theme::ACCENT)
+    egui::Button::new(egui::RichText::new(text.into()).color(theme::on_accent()))
+        .fill(theme::accent())
         .min_size(Vec2::new(PRIMARY_BUTTON_MIN[0], PRIMARY_BUTTON_MIN[1]))
 }
 
-/// A card container: subtle fill, hairline border, rounding, and a soft shadow.
-/// Use for grouped panels (the signer card) instead of the plainer
-/// [`egui::Frame::group`].
+/// A card: a group of related content on a fill a step lighter than the window,
+/// with a hairline border, as Fluent settings cards and macOS grouped forms
+/// draw them. No shadow: a card is part of the page, not floating above it.
 pub(crate) fn card(ui: &egui::Ui) -> egui::Frame {
     let visuals = ui.visuals();
     egui::Frame::new()
-        .fill(visuals.faint_bg_color)
+        .fill(card_fill(visuals))
         .stroke(visuals.widgets.noninteractive.bg_stroke)
         .corner_radius(CornerRadius::same(8))
-        .inner_margin(Margin::same(12))
-        .shadow(egui::epaint::Shadow {
-            offset: [0, 1],
-            blur: 6,
-            spread: 0,
-            color: Color32::from_black_alpha(24),
-        })
+        .inner_margin(Margin::same(16))
+}
+
+fn card_fill(visuals: &egui::Visuals) -> Color32 {
+    if visuals.dark_mode {
+        Color32::from_white_alpha(10)
+    } else {
+        Color32::WHITE
+    }
 }
 
 /// A single-line text field whose vertical padding matches the buttons, so
@@ -144,7 +181,7 @@ pub(crate) fn drop_zone(
     }
 
     let visuals = ui.visuals();
-    let accent = theme::ACCENT;
+    let accent = theme::accent();
     let (fill, stroke) = if file_matches {
         (
             Color32::from_rgba_unmultiplied(accent.r(), accent.g(), accent.b(), 0x33),
@@ -174,18 +211,18 @@ pub(crate) fn drop_zone(
         rect.center_top() + Vec2::new(0.0, 12.0),
         egui::Align2::CENTER_CENTER,
         format!("{icon}  {title}"),
-        FontId::new(12.0, FontFamily::Proportional),
-        theme::MUTED,
+        TextStyle::Small.resolve(ui.style()),
+        visuals.weak_text_color(),
     );
     let (body, color) = match filename {
         Some(name) => (elide(name, 36), visuals.text_color()),
-        None => (placeholder.to_owned(), theme::MUTED),
+        None => (placeholder.to_owned(), visuals.weak_text_color()),
     };
     painter.text(
         rect.center() + Vec2::new(0.0, 6.0),
         egui::Align2::CENTER_CENTER,
         body,
-        FontId::new(14.0, FontFamily::Proportional),
+        TextStyle::Body.resolve(ui.style()),
         color,
     );
 
@@ -239,7 +276,64 @@ fn elide(text: &str, max: usize) -> String {
 
 #[cfg(test)]
 mod tests {
-    use super::elide;
+    use eframe::egui::{Color32, Visuals};
+
+    use super::{card_fill, elide, secondary_text};
+
+    /// WCAG relative luminance of an opaque sRGB color.
+    fn luminance(color: Color32) -> f32 {
+        let channel = |value: u8| {
+            let value = f32::from(value) / 255.0;
+            if value <= 0.040_45 {
+                value / 12.92
+            } else {
+                ((value + 0.055) / 1.055).powf(2.4)
+            }
+        };
+        0.2126 * channel(color.r()) + 0.7152 * channel(color.g()) + 0.0722 * channel(color.b())
+    }
+
+    fn contrast(a: Color32, b: Color32) -> f32 {
+        let (light, dark) = (
+            luminance(a).max(luminance(b)),
+            luminance(a).min(luminance(b)),
+        );
+        (light + 0.05) / (dark + 0.05)
+    }
+
+    /// `over` (premultiplied, possibly translucent) composited onto `under`.
+    fn composite(over: Color32, under: Color32) -> Color32 {
+        let behind = 1.0 - f32::from(over.a()) / 255.0;
+        #[allow(clippy::cast_possible_truncation, clippy::cast_sign_loss)] // 0..=255
+        let mix = |top: u8, bottom: u8| (f32::from(top) + f32::from(bottom) * behind).round() as u8;
+        Color32::from_rgb(
+            mix(over.r(), under.r()),
+            mix(over.g(), under.g()),
+            mix(over.b(), under.b()),
+        )
+    }
+
+    #[test]
+    fn secondary_text_is_readable_on_every_surface() {
+        for visuals in [Visuals::light(), Visuals::dark()] {
+            let text = secondary_text(&visuals);
+            let card = composite(card_fill(&visuals), visuals.panel_fill);
+            for surface in [
+                visuals.panel_fill,
+                visuals.window_fill,
+                visuals.faint_bg_color,
+                card,
+            ] {
+                let surface = composite(surface, visuals.panel_fill);
+                let ratio = contrast(text, surface);
+                assert!(
+                    ratio >= 4.5,
+                    "{text:?} on {surface:?} is {ratio:.2}:1 (dark: {})",
+                    visuals.dark_mode
+                );
+            }
+        }
+    }
 
     #[test]
     fn elide_keeps_short_strings() {

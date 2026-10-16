@@ -154,6 +154,7 @@ fn render_shot(store: Store, shot: &listing::Shot) -> Result<image::RgbaImage, S
     })?;
     let config = shot.config_store(config_dir.path(), store)?;
     let layout = compose::Layout::for_store(store);
-    let window = window::render(config, shot.stage(), layout.window_scale())?;
+    let window_style = store.chrome().window_style();
+    let window = window::render(config, shot.stage(), window_style, layout.window_scale())?;
     compose::frame(store, shot, &layout, &window)
 }
