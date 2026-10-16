@@ -849,3 +849,7 @@ msgstr "Միանալ…"
 #. EN: Disconnect…
 msgid "gui.menu_disconnect"
 msgstr "Անջատվել…"
+
+#. EN: Language
+msgid "gui.language"
+msgstr "Լեզու"

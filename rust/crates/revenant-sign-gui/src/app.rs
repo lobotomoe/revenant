@@ -20,13 +20,13 @@ use revenant_sign_core::config::{
 use revenant_sign_core::net::{ping_server, PingOutcome, SoapSigningTransport, Transport};
 use revenant_sign_core::pki::discover_identity_from_server;
 
+use crate::dialog::{DialogButton, DialogFrame, Role};
 use crate::i18n::Localizer;
 use crate::jobs;
 use crate::reveal;
-use crate::theme;
 use crate::views::{
     self, AccountAction, ConnectAction, ConnectState, LoginAction, LoginState, SettingsAction,
-    SignAction, SignForm, VerifyAction, VerifyState,
+    SettingsLayout, SignAction, SignForm, VerifyAction, VerifyState,
 };
 use crate::window_style::WindowStyle;
 use crate::worker::{
@@ -39,6 +39,7 @@ pub(crate) mod stage;
 
 /// PDF extension accepted by the file picker and drag-and-drop.
 const PDF_EXTENSION: &str = "pdf";
+const CONFIRM_DIALOG_WIDTH: f32 = 380.0;
 
 #[derive(Clone, Copy, PartialEq, Eq)]
 enum Tab {
@@ -50,8 +51,6 @@ enum Tab {
 enum Dialog {
     Connect,
     Login,
-    Settings,
-    About,
 }
 
 /// A destructive action awaiting confirmation.
@@ -76,6 +75,9 @@ pub(crate) struct RevenantApp {
     requests: RequestIds,
     tab: Tab,
     dialog: Option<Dialog>,
+    /// The Settings window is open. A window of its own, so it can stay open
+    /// next to a dialog.
+    settings_open: bool,
     connect: ConnectState,
     /// Present only while the login wizard is open (needs the active profile).
     login: Option<LoginState>,
@@ -139,6 +141,7 @@ impl RevenantApp {
             requests: RequestIds::default(),
             tab: Tab::Sign,
             dialog: None,
+            settings_open: false,
             connect: ConnectState::new(),
             login: None,
             sign_form: SignForm::new(default_font),
@@ -177,9 +180,8 @@ impl RevenantApp {
         };
         for command in menu_bar.take_commands() {
             match command {
-                MenuCommand::About => self.dialog = Some(Dialog::About),
-                MenuCommand::Settings => self.dialog = Some(Dialog::Settings),
-                MenuCommand::Help => ctx.open_url(egui::OpenUrl::new_tab(views::about::HELP_URL)),
+                MenuCommand::Settings => self.open_settings(ctx),
+                MenuCommand::Link(url) => ctx.open_url(egui::OpenUrl::new_tab(url)),
                 MenuCommand::Open => match self.tab {
                     Tab::Sign if self.store.config_layer() == ConfigLayer::FullyConfigured => {
                         self.browse_pdf();
@@ -190,6 +192,15 @@ impl RevenantApp {
                     Tab::Verify => self.browse_verify_pdf(),
                 },
             }
+        }
+    }
+
+    /// Open the Settings window, or bring it to the front if it is open.
+    fn open_settings(&mut self, ctx: &egui::Context) {
+        if self.settings_open {
+            views::settings::focus(ctx);
+        } else {
+            self.settings_open = true;
         }
     }
 
@@ -710,7 +721,12 @@ impl RevenantApp {
             return;
         };
         match dialog {
-            Dialog::Connect => match views::connect::show(ctx, &self.l10n, &mut self.connect) {
+            Dialog::Connect => match views::connect::show(
+                ctx,
+                &self.l10n,
+                &mut self.connect,
+                self.window_style.dialog_buttons,
+            ) {
                 ConnectAction::Cancel => {
                     // Abandon any ping still running: dismissing the dialog is a
                     // decision not to use that server, and a late success must
@@ -726,7 +742,7 @@ impl RevenantApp {
                     self.dialog = None;
                     return;
                 };
-                match views::login::show(ctx, &self.l10n, login) {
+                match views::login::show(ctx, &self.l10n, login, self.window_style.dialog_buttons) {
                     LoginAction::Cancel => {
                         self.dialog = None;
                         self.login = None;
@@ -736,16 +752,24 @@ impl RevenantApp {
                     LoginAction::None => {}
                 }
             }
-            Dialog::Settings => match views::settings::show(ctx, &self.l10n, &self.store) {
-                SettingsAction::Close => self.dialog = None,
-                SettingsAction::SetLanguage(code) => self.set_language(&code),
-                SettingsAction::None => {}
-            },
-            Dialog::About => {
-                if views::about::show(ctx, &self.l10n) {
-                    self.dialog = None;
-                }
-            }
+        }
+    }
+
+    fn settings_window(&mut self, ctx: &egui::Context) {
+        if !self.settings_open {
+            return;
+        }
+        // With a menu bar, About is in the app menu and the form needs only the
+        // settings themselves.
+        let layout = if self.window_style.menu_bar {
+            SettingsLayout::Form
+        } else {
+            SettingsLayout::Page
+        };
+        match views::settings::show(ctx, &self.l10n, &self.store, layout) {
+            SettingsAction::Close => self.settings_open = false,
+            SettingsAction::SetLanguage(code) => self.set_language(&code),
+            SettingsAction::None => {}
         }
     }
 
@@ -762,29 +786,18 @@ impl RevenantApp {
         };
         let cancel_label = self.l10n.t("gui.cancel").to_owned();
 
-        // `Some(true)` proceeds, `Some(false)` cancels.
-        let mut decision = None;
-        let response = egui::Modal::new(egui::Id::new("confirm_dialog")).show(ctx, |ui| {
-            ui.set_width(360.0);
+        let buttons = [
+            DialogButton::new(confirm_label, Role::Destructive, true),
+            DialogButton::new(cancel_label, Role::Cancel, false),
+        ];
+        let ((), decision) = DialogFrame::new(
+            "confirm_dialog",
+            CONFIRM_DIALOG_WIDTH,
+            self.window_style.dialog_buttons,
+        )
+        .show(ctx, &buttons, |ui| {
             ui.label(message);
-            ui.add_space(12.0);
-            ui.separator();
-            ui.horizontal(|ui| {
-                ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
-                    let confirm =
-                        egui::Button::new(egui::RichText::new(&confirm_label).color(theme::ERROR));
-                    if ui.add(confirm).clicked() {
-                        decision = Some(true);
-                    }
-                    if ui.button(&cancel_label).clicked() {
-                        decision = Some(false);
-                    }
-                });
-            });
         });
-        if response.should_close() {
-            decision = Some(false);
-        }
         if let Some(proceed) = decision {
             self.confirm = None;
             if proceed {
@@ -846,6 +859,7 @@ impl eframe::App for RevenantApp {
         self.toolbar(ui);
         self.central(ui);
         self.dialogs(&ctx);
+        self.settings_window(&ctx);
         self.confirm_dialog(&ctx);
     }
 }

@@ -5,9 +5,12 @@
 use eframe::egui;
 use revenant_sign_core::config::{ServerProfile, BUILTIN_PROFILES};
 
+use crate::dialog::{ButtonLayout, DialogButton, DialogFrame, Role};
 use crate::i18n::Localizer;
 use crate::theme;
 use crate::worker::RequestId;
+
+const DIALOG_WIDTH: f32 = 380.0;
 
 /// What the app should do after rendering the dialog.
 pub(crate) enum ConnectAction {
@@ -111,70 +114,67 @@ impl ConnectState {
     }
 }
 
+/// What the dialog's buttons ask for.
+#[derive(Clone, Copy)]
+enum Choice {
+    Connect,
+    Cancel,
+}
+
 pub(crate) fn show(
     ctx: &egui::Context,
     l10n: &Localizer,
     state: &mut ConnectState,
+    layout: ButtonLayout,
 ) -> ConnectAction {
-    let mut action = ConnectAction::None;
+    let busy = matches!(state.status, Status::Pinging { .. });
+    let connect_label = format!("{}  {}", crate::icons::CONNECT, l10n.t("gui.connect"));
+    let buttons = [
+        DialogButton::new(connect_label, Role::Default, Choice::Connect).enabled(!busy),
+        DialogButton::new(l10n.t("gui.cancel"), Role::Cancel, Choice::Cancel),
+    ];
 
-    let response = egui::Modal::new(egui::Id::new("connect_dialog")).show(ctx, |ui| {
-        ui.set_width(360.0);
-        ui.heading(l10n.t("gui.connect_to_server"));
-        ui.separator();
-
-        for (index, profile) in state.builtins.iter().enumerate() {
-            ui.radio_value(&mut state.selected, index, &profile.display_name);
-        }
-        let custom_index = state.custom_index();
-        ui.radio_value(
-            &mut state.selected,
-            custom_index,
-            l10n.t("gui.custom_server"),
-        );
-        if state.selected == custom_index {
-            ui.add(
-                egui::TextEdit::singleline(&mut state.custom_url)
-                    .hint_text("https://host:port/SAPIWS/DSS.asmx")
-                    .desired_width(f32::INFINITY),
+    let ((), choice) = DialogFrame::new("connect_dialog", DIALOG_WIDTH, layout)
+        .title(l10n.t("gui.connect_to_server"))
+        .show(ctx, &buttons, |ui| {
+            for (index, profile) in state.builtins.iter().enumerate() {
+                ui.radio_value(&mut state.selected, index, &profile.display_name);
+            }
+            let custom_index = state.custom_index();
+            ui.radio_value(
+                &mut state.selected,
+                custom_index,
+                l10n.t("gui.custom_server"),
             );
-        }
+            if state.selected == custom_index {
+                ui.add(
+                    egui::TextEdit::singleline(&mut state.custom_url)
+                        .hint_text("https://host:port/SAPIWS/DSS.asmx")
+                        .desired_width(f32::INFINITY),
+                );
+            }
 
-        ui.add_space(4.0);
-        match &state.status {
-            Status::Pinging { profile, .. } => {
-                ui.horizontal(|ui| {
-                    ui.spinner();
-                    ui.label(l10n.tf("gui.connecting_to_url_ellipsis", &[("url", &profile.url)]));
-                });
-            }
-            Status::Failed(detail) => {
-                ui.colored_label(theme::ERROR, detail);
-            }
-            Status::Idle => {}
-        }
-
-        ui.separator();
-        ui.horizontal(|ui| {
-            let busy = matches!(state.status, Status::Pinging { .. });
-            let connect_label = format!("{}  {}", crate::icons::CONNECT, l10n.t("gui.connect"));
-            if ui
-                .add_enabled(!busy, crate::style::primary_button(connect_label))
-                .clicked()
-            {
-                action = state.resolve();
-            }
-            if ui.button(l10n.t("gui.cancel")).clicked() {
-                action = ConnectAction::Cancel;
+            match &state.status {
+                Status::Pinging { profile, .. } => {
+                    ui.horizontal(|ui| {
+                        ui.spinner();
+                        ui.label(
+                            l10n.tf("gui.connecting_to_url_ellipsis", &[("url", &profile.url)]),
+                        );
+                    });
+                }
+                Status::Failed(detail) => {
+                    ui.colored_label(theme::ERROR, detail);
+                }
+                Status::Idle => {}
             }
         });
-    });
 
-    // Backdrop click / Escape dismisses, unless a ping was just requested.
-    if response.should_close() && !matches!(action, ConnectAction::Ping(_)) {
-        action = ConnectAction::Cancel;
+    match choice {
+        Some(Choice::Connect) => state.resolve(),
+        Some(Choice::Cancel) => ConnectAction::Cancel,
+        None => ConnectAction::None,
     }
-    action
 }
 
 #[cfg(test)]

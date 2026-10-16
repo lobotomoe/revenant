@@ -652,3 +652,7 @@ msgstr "Bağlan…"
 #. EN: Disconnect…
 msgid "gui.menu_disconnect"
 msgstr "Bağlantıyı Kes…"
+
+#. EN: Language
+msgid "gui.language"
+msgstr "Dil"

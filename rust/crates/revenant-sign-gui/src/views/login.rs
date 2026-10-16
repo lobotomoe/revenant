@@ -11,11 +11,13 @@ use eframe::egui;
 use revenant_sign_core::config::{IdentityMethod, ServerProfile};
 use revenant_sign_core::pki::CertInfo;
 
+use crate::dialog::{ButtonLayout, DialogButton, DialogFrame, Role};
 use crate::i18n::Localizer;
 use crate::theme;
 use crate::worker::RequestId;
 
 const STEP_COUNT: &str = "3";
+const DIALOG_WIDTH: f32 = 440.0;
 
 /// Which wizard page is showing.
 #[derive(Clone, Copy, PartialEq, Eq, Debug)]
@@ -501,70 +503,55 @@ fn identity_summary(ui: &mut egui::Ui, info: &CertInfo) {
     row(crate::icons::ORG, &info.organization);
 }
 
-pub(crate) fn show(ctx: &egui::Context, l10n: &Localizer, state: &mut LoginState) -> LoginAction {
-    let mut action = LoginAction::None;
+/// What the wizard's buttons ask for.
+#[derive(Clone, Copy)]
+enum Choice {
+    Back,
+    Next,
+    Cancel,
+}
 
-    let response = egui::Modal::new(egui::Id::new("login_dialog")).show(ctx, |ui| {
-        ui.set_width(420.0);
-        ui.horizontal(|ui| {
-            ui.heading(state.step_title(l10n));
-            ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
-                let current = state.step_number().to_string();
-                ui.colored_label(
-                    theme::MUTED,
-                    l10n.tf(
-                        "gui.step_current_of_total",
-                        &[("current", &current), ("total", STEP_COUNT)],
-                    ),
-                );
-            });
-        });
-        ui.separator();
+pub(crate) fn show(
+    ctx: &egui::Context,
+    l10n: &Localizer,
+    state: &mut LoginState,
+    layout: ButtonLayout,
+) -> LoginAction {
+    let title = state.step_title(l10n);
+    let current = state.step_number().to_string();
+    let step = l10n.tf(
+        "gui.step_current_of_total",
+        &[("current", &current), ("total", STEP_COUNT)],
+    );
+    let back_label = format!("{}  {}", crate::icons::ARROW_LEFT, l10n.t("gui.back"));
+    let next_label = format!("{}  {}", state.next_label(l10n), crate::icons::ARROW_RIGHT);
+    let buttons = [
+        DialogButton::new(back_label, Role::Back, Choice::Back)
+            .enabled(state.step != Step::Credentials),
+        DialogButton::new(next_label, Role::Default, Choice::Next).enabled(state.next_enabled()),
+        DialogButton::new(l10n.t("gui.cancel"), Role::Cancel, Choice::Cancel),
+    ];
 
-        let body_action = state.body(ui, l10n);
-        if !matches!(body_action, LoginAction::None) {
-            action = body_action;
-        }
-
-        if let Some(warning) = &state.warning {
-            ui.add_space(4.0);
-            ui.colored_label(theme::WARNING, warning);
-        }
-
-        ui.separator();
-        ui.horizontal(|ui| {
-            let back_enabled = state.step != Step::Credentials;
-            let back_label = format!("{}  {}", crate::icons::ARROW_LEFT, l10n.t("gui.back"));
-            if ui
-                .add_enabled(back_enabled, egui::Button::new(back_label))
-                .clicked()
-            {
-                state.on_back();
+    let (body_action, choice) = DialogFrame::new("login_dialog", DIALOG_WIDTH, layout)
+        .title(title)
+        .title_detail(&step)
+        .show(ctx, &buttons, |ui| {
+            let body_action = state.body(ui, l10n);
+            if let Some(warning) = &state.warning {
+                ui.colored_label(theme::WARNING, warning);
             }
-            ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
-                let next_label =
-                    format!("{}  {}", state.next_label(l10n), crate::icons::ARROW_RIGHT);
-                if ui
-                    .add_enabled(
-                        state.next_enabled(),
-                        crate::style::primary_button(next_label),
-                    )
-                    .clicked()
-                {
-                    action = state.on_next(l10n);
-                }
-                if ui.button(l10n.t("gui.cancel")).clicked() {
-                    action = LoginAction::Cancel;
-                }
-            });
+            body_action
         });
-    });
 
-    // Backdrop click / Escape dismisses, unless a step transition is in flight.
-    if response.should_close() && !matches!(action, LoginAction::Discover | LoginAction::Finish) {
-        action = LoginAction::Cancel;
+    match choice {
+        Some(Choice::Back) => {
+            state.on_back();
+            LoginAction::None
+        }
+        Some(Choice::Next) => state.on_next(l10n),
+        Some(Choice::Cancel) => LoginAction::Cancel,
+        None => body_action,
     }
-    action
 }
 
 #[cfg(test)]

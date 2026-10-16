@@ -2,9 +2,10 @@
 //! switch in the middle and the server menu on the right.
 //!
 //! On macOS the window's title bar is transparent and the toolbar continues it,
-//! and Settings and About live in the menu bar. Elsewhere (and on macOS if the
+//! and Settings and Help live in the menu bar. Elsewhere (and on macOS if the
 //! menu bar could not be built) a settings menu at the toolbar's right end
-//! carries them instead. See [`crate::window_style`].
+//! carries them instead, and About is a section of the Settings window. See
+//! [`crate::window_style`].
 
 use eframe::egui::{self, Align, Layout, Margin, UiBuilder};
 use revenant_sign_core::config::ConfigLayer;
@@ -49,13 +50,14 @@ impl RevenantApp {
                 );
                 let mut dialog = None;
                 let mut confirm = None;
+                let mut open_settings = false;
                 ui.scope_builder(
                     UiBuilder::new()
                         .max_rect(trailing)
                         .layout(Layout::right_to_left(Align::Center)),
                     |ui| {
                         if !self.window_style.menu_bar {
-                            self.settings_menu(ui, &mut dialog);
+                            open_settings = self.settings_menu(ui);
                         }
                         self.server_menu(ui, &mut dialog, &mut confirm);
                     },
@@ -65,6 +67,9 @@ impl RevenantApp {
                 }
                 if confirm.is_some() {
                     self.confirm = confirm;
+                }
+                if open_settings {
+                    self.open_settings(ui.ctx());
                 }
             });
     }
@@ -99,24 +104,22 @@ impl RevenantApp {
         });
     }
 
-    /// Settings, About and Help, for platforms without a menu bar.
-    fn settings_menu(&self, ui: &mut egui::Ui, dialog: &mut Option<Dialog>) {
+    /// Settings and Help, for platforms without a menu bar. Returns whether
+    /// Settings was chosen.
+    fn settings_menu(&self, ui: &mut egui::Ui) -> bool {
+        let mut open_settings = false;
         let button = ui.menu_button(icons::SETTINGS, |ui| {
             if ui.button(self.l10n.t("gui.menu_settings")).clicked() {
-                *dialog = Some(Dialog::Settings);
+                open_settings = true;
                 ui.close();
             }
-            if ui.button(self.l10n.t("gui.about_revenant")).clicked() {
-                *dialog = Some(Dialog::About);
-                ui.close();
-            }
-            ui.separator();
             if ui.button(self.l10n.t("gui.menu_revenant_help")).clicked() {
                 ui.ctx()
-                    .open_url(egui::OpenUrl::new_tab(crate::views::about::HELP_URL));
+                    .open_url(egui::OpenUrl::new_tab(crate::links::HELP_URL));
                 ui.close();
             }
         });
         button.response.on_hover_text(self.l10n.t("gui.settings"));
+        open_settings
     }
 }

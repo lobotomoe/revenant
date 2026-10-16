@@ -1,6 +1,6 @@
 //! The macOS menu bar: the app menu (About, Settings, Hide, Quit), File > Open,
 //! Window and Help, in the order and with the shortcuts a Mac app is expected to
-//! have.
+//! have. About opens the standard About panel AppKit draws for every app.
 //!
 //! There is deliberately no Edit menu. Its Cut/Copy/Paste items would take
 //! Cmd+X/C/V before egui sees them, and egui's text fields handle those keys
@@ -10,31 +10,37 @@ use std::sync::mpsc;
 
 use eframe::egui;
 use muda::accelerator::{Accelerator, Code, Modifiers};
-use muda::{Menu, MenuEvent, MenuItem, PredefinedMenuItem, Submenu};
+use muda::{AboutMetadata, Menu, MenuEvent, MenuItem, PredefinedMenuItem, Submenu};
+use revenant_sign_core::constants::VERSION;
 
 use crate::i18n::Localizer;
+use crate::links;
 
-const ABOUT_ID: &str = "about";
 const SETTINGS_ID: &str = "settings";
 const OPEN_ID: &str = "open";
 const HELP_ID: &str = "help";
+const REPO_ID: &str = "repo";
+const ISSUES_ID: &str = "issues";
+const TELEGRAM_ID: &str = "telegram";
 
 /// What a menu item asks the app to do.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub(crate) enum MenuCommand {
-    About,
     Settings,
     Open,
-    Help,
+    /// Open a web page.
+    Link(&'static str),
 }
 
 impl MenuCommand {
     fn from_id(id: &str) -> Option<Self> {
         match id {
-            ABOUT_ID => Some(Self::About),
             SETTINGS_ID => Some(Self::Settings),
             OPEN_ID => Some(Self::Open),
-            HELP_ID => Some(Self::Help),
+            HELP_ID => Some(Self::Link(links::HELP_URL)),
+            REPO_ID => Some(Self::Link(links::REPO_URL)),
+            ISSUES_ID => Some(Self::Link(links::ISSUES_URL)),
+            TELEGRAM_ID => Some(Self::Link(links::TELEGRAM_URL)),
             _ => None,
         }
     }
@@ -91,7 +97,7 @@ impl MenuBar {
 
 fn build(l10n: &Localizer) -> muda::Result<Menu> {
     let command = Modifiers::META;
-    let about = MenuItem::with_id(ABOUT_ID, l10n.t("gui.about_revenant"), true, None);
+    let about = PredefinedMenuItem::about(Some(l10n.t("gui.about_revenant")), Some(about(l10n)));
     let settings = MenuItem::with_id(
         SETTINGS_ID,
         l10n.t("gui.menu_settings"),
@@ -145,25 +151,71 @@ fn build(l10n: &Localizer) -> muda::Result<Menu> {
     window_menu.set_as_windows_menu_for_nsapp();
 
     let help = MenuItem::with_id(HELP_ID, l10n.t("gui.menu_revenant_help"), true, None);
-    let help_menu = Submenu::with_items(l10n.t("gui.menu_help"), true, &[&help])?;
+    let repo = MenuItem::with_id(REPO_ID, l10n.t("gui.github"), true, None);
+    let issues = MenuItem::with_id(ISSUES_ID, l10n.t("gui.report_a_bug"), true, None);
+    let telegram = MenuItem::with_id(TELEGRAM_ID, l10n.t("gui.telegram"), true, None);
+    let help_menu = Submenu::with_items(
+        l10n.t("gui.menu_help"),
+        true,
+        &[
+            &help,
+            &PredefinedMenuItem::separator(),
+            &repo,
+            &issues,
+            &telegram,
+        ],
+    )?;
     help_menu.set_as_help_menu_for_nsapp();
 
     Menu::with_items(&[&app_menu, &file_menu, &window_menu, &help_menu])
 }
 
+/// What the About panel shows besides the icon, which AppKit takes from the
+/// bundle. Name and version are given explicitly so an unbundled build shows
+/// them too. No credits: AppKit sets them as plain left-aligned body text that
+/// sits oddly under the centred lines above.
+fn about(l10n: &Localizer) -> AboutMetadata {
+    let copyright = format!(
+        "{}\n{}",
+        l10n.t("gui.author_aleksandr_kraiz"),
+        l10n.t("gui.license_apache_2_0"),
+    );
+    AboutMetadata {
+        name: Some("Revenant".to_owned()),
+        short_version: Some(VERSION.to_owned()),
+        copyright: Some(copyright),
+        ..AboutMetadata::default()
+    }
+}
+
 #[cfg(test)]
 mod tests {
-    use super::{MenuCommand, ABOUT_ID, HELP_ID, OPEN_ID, SETTINGS_ID};
+    use super::{MenuCommand, HELP_ID, ISSUES_ID, OPEN_ID, REPO_ID, SETTINGS_ID, TELEGRAM_ID};
+    use crate::links;
 
     #[test]
     fn every_item_id_maps_to_its_command() {
-        assert_eq!(MenuCommand::from_id(ABOUT_ID), Some(MenuCommand::About));
         assert_eq!(
             MenuCommand::from_id(SETTINGS_ID),
             Some(MenuCommand::Settings)
         );
         assert_eq!(MenuCommand::from_id(OPEN_ID), Some(MenuCommand::Open));
-        assert_eq!(MenuCommand::from_id(HELP_ID), Some(MenuCommand::Help));
+        assert_eq!(
+            MenuCommand::from_id(HELP_ID),
+            Some(MenuCommand::Link(links::HELP_URL))
+        );
+        assert_eq!(
+            MenuCommand::from_id(REPO_ID),
+            Some(MenuCommand::Link(links::REPO_URL))
+        );
+        assert_eq!(
+            MenuCommand::from_id(ISSUES_ID),
+            Some(MenuCommand::Link(links::ISSUES_URL))
+        );
+        assert_eq!(
+            MenuCommand::from_id(TELEGRAM_ID),
+            Some(MenuCommand::Link(links::TELEGRAM_URL))
+        );
     }
 
     #[test]

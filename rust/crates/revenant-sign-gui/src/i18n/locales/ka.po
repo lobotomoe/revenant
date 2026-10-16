@@ -652,3 +652,7 @@ msgstr "დაკავშირება…"
 #. EN: Disconnect…
 msgid "gui.menu_disconnect"
 msgstr "გათიშვა…"
+
+#. EN: Language
+msgid "gui.language"
+msgstr "ენა"

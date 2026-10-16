@@ -847,3 +847,7 @@ msgstr "Подключиться…"
 #. EN: Disconnect…
 msgid "gui.menu_disconnect"
 msgstr "Отключиться…"
+
+#. EN: Language
+msgid "gui.language"
+msgstr "Язык"

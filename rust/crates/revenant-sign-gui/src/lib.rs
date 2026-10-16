@@ -6,11 +6,13 @@
 //! and localization. All signing logic lives in the core crate.
 
 mod app;
+mod dialog;
 mod fonts;
 mod friendly;
 mod i18n;
 mod icons;
 mod jobs;
+mod links;
 #[cfg(target_os = "macos")]
 mod macos;
 mod reveal;
@@ -60,23 +62,7 @@ pub fn run() -> eframe::Result<()> {
         .with_fullsize_content_view(true)
         .with_titlebar_shown(false);
 
-    // Windows (taskbar) and Linux (window manager) take the embedded PNG.
-    #[cfg(not(target_os = "macos"))]
-    let viewport = {
-        // Committed, compile-time-embedded PNG, so a decode failure is a build
-        // defect, not a runtime condition -- surface it loudly.
-        let icon = eframe::icon_data::from_png_bytes(APP_ICON_PNG)
-            .expect("embedded app icon must be a valid PNG");
-        viewport.with_icon(icon)
-    };
-
-    // macOS keeps the bundle's `.icns` Dock tile -- but leaving the icon unset
-    // does not mean "leave it alone": eframe substitutes its own egui logo (a
-    // black hexagon) and pushes that through `setApplicationIconImage`, taking
-    // over the Dock tile for as long as the app runs. An empty `IconData` is
-    // egui's documented opt-out ("if you prefer the OS default").
-    #[cfg(target_os = "macos")]
-    let viewport = viewport.with_icon(eframe::egui::IconData::default());
+    let viewport = with_app_icon(viewport);
 
     let native_options = eframe::NativeOptions {
         viewport,
@@ -88,4 +74,31 @@ pub fn run() -> eframe::Result<()> {
         native_options,
         Box::new(|cc| Ok(Box::new(RevenantApp::new(cc)))),
     )
+}
+
+/// Give a window the app's icon: the embedded PNG on Windows (taskbar) and
+/// Linux (window manager).
+#[cfg(not(target_os = "macos"))]
+pub(crate) fn with_app_icon(
+    viewport: eframe::egui::ViewportBuilder,
+) -> eframe::egui::ViewportBuilder {
+    // Committed, compile-time-embedded PNG, so a decode failure is a build
+    // defect, not a runtime condition -- surface it loudly.
+    let icon = eframe::icon_data::from_png_bytes(APP_ICON_PNG)
+        .expect("embedded app icon must be a valid PNG");
+    viewport.with_icon(icon)
+}
+
+/// Leave the Dock tile to the bundle's `.icns`.
+///
+/// Leaving the icon unset does not mean "leave it alone": eframe substitutes
+/// its own egui logo (a black hexagon) and pushes that through
+/// `setApplicationIconImage`, taking over the Dock tile for as long as the app
+/// runs. An empty `IconData` is egui's documented opt-out ("if you prefer the
+/// OS default").
+#[cfg(target_os = "macos")]
+pub(crate) fn with_app_icon(
+    viewport: eframe::egui::ViewportBuilder,
+) -> eframe::egui::ViewportBuilder {
+    viewport.with_icon(eframe::egui::IconData::default())
 }

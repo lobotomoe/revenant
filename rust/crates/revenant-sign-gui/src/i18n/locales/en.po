@@ -650,3 +650,7 @@ msgstr "Connect…"
 #. EN: Disconnect…
 msgid "gui.menu_disconnect"
 msgstr "Disconnect…"
+
+#. EN: Language
+msgid "gui.language"
+msgstr "Language"

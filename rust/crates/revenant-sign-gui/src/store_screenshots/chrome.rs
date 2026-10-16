@@ -22,7 +22,8 @@ impl Chrome {
     pub(crate) fn window_style(self) -> WindowStyle {
         match self {
             Chrome::MacOs => WindowStyle::MACOS,
-            Chrome::Windows | Chrome::Gnome => WindowStyle::OTHER,
+            Chrome::Windows => WindowStyle::WINDOWS,
+            Chrome::Gnome => WindowStyle::LINUX,
         }
     }
 
