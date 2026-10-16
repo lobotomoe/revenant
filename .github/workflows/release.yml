@@ -910,6 +910,21 @@ jobs:
     secrets:
       DIST_TAP_TOKEN: ${{ secrets.DIST_TAP_TOKEN }}
 
+  # -- Microsoft Store ----------------------------------------------------------
+  # Submits the released MSIX for certification. In its own workflow so a
+  # submission can be redone for a chosen tag; it signs in through OIDC, so no
+  # secret is passed.
+  publish-msstore:
+    name: Publish to Microsoft Store
+    needs: release
+    if: ${{ !contains(github.ref_name, '-') }}
+    permissions:
+      contents: read
+      id-token: write
+    uses: ./.github/workflows/msstore.yml
+    with:
+      tag: ${{ github.ref_name }}
+
   # -- Snap Store ---------------------------------------------------------------
   # Uploads the Snaps built by snap.yml: a stable tag releases to `stable`, a
   # prerelease tag to `candidate`, so a rehearsal never reaches stable users.

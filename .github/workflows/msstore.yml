@@ -1,0 +1,165 @@
+name: Publish to Microsoft Store
+
+# Submits a released version's MSIX to the Microsoft Store: uploads the package
+# from the GitHub Release, sets What's New to the release's AppStream notes, and
+# commits the submission for certification. Called by release.yml on a stable
+# tag, and dispatchable for a chosen tag so a failed or skipped submission can be
+# redone without cutting a release.
+#
+# No stored credential: the job signs in to Partner Center as the `revenant-ci`
+# Entra app with a GitHub OIDC token, accepted through a federated credential on
+# that app for this repository's `microsoft-store` environment. The app holds the
+# Manager (Windows) role in Partner Center, which the submission API requires.
+
+on:
+  workflow_call:
+    inputs:
+      tag:
+        description: Release tag to publish (e.g. v4.2.0)
+        required: true
+        type: string
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: Release tag to publish (e.g. v4.2.0)
+        required: true
+        type: string
+
+permissions: read-all
+
+concurrency:
+  group: msstore-${{ inputs.tag }}
+  cancel-in-progress: false
+
+jobs:
+  publish:
+    name: Submit to Microsoft Store
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    environment: microsoft-store
+    permissions:
+      contents: read
+      id-token: write
+    env:
+      MSSTORE_CLI_VERSION: v0.4.3
+      MSSTORE_CLI_SHA256: 5ec484e2d0eb5105d5fd0274a6c7a5a46177b0f4f8def105f3e90fcd6dfdef14
+      # Store ID of "Revenant Sign" (apps.microsoft.com/detail/9NVH62M20DS3).
+      PRODUCT_ID: 9NVH62M20DS3
+      TENANT_ID: b91cfdba-8ac2-4da3-a30c-6401e849e14d
+      CLIENT_ID: aa0979c7-672b-4f5e-af69-34b7bdfae11f
+      SELLER_ID: "93627990"
+      MSSTORE_TELEMETRY_OPTOUT: "1"
+
+    steps:
+      - uses: step-security/harden-runner@05e31511f85b41b11d1cf0ef85d0992719546e2c # v2.21.0
+        with:
+          egress-policy: audit
+
+      - name: Validate tag
+        env:
+          TAG: ${{ inputs.tag }}
+        run: |
+          if ! printf '%s' "$TAG" | grep -Eq '^v[0-9]+\.[0-9]+\.[0-9]+$'; then
+            echo "::error::refusing to submit tag '$TAG'; expected vMAJOR.MINOR.PATCH (the Store has no prerelease channel)"
+            exit 1
+          fi
+
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v6
+        with:
+          ref: ${{ inputs.tag }}
+          persist-credentials: false
+
+      - name: Download the MSIX and release checksums
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+          TAG: ${{ inputs.tag }}
+        run: |
+          mkdir -p "$RUNNER_TEMP/msix"
+          gh release download "$TAG" \
+            --repo "$GITHUB_REPOSITORY" \
+            --pattern "RevenantSign.msix" \
+            --pattern "SHA256SUMS.txt" \
+            --dir "$RUNNER_TEMP/msix"
+
+      - name: Verify the MSIX against the release checksums
+        working-directory: ${{ runner.temp }}/msix
+        run: |
+          grep ' \./RevenantSign\.msix$' SHA256SUMS.txt | sha256sum -c -
+
+      # A self-contained build; no .NET runtime needed. Pinned by version and
+      # checksum.
+      - name: Install msstore
+        run: |
+          set -euo pipefail
+          curl -fsSL --retry 3 -o "$RUNNER_TEMP/msstore.tar.gz" \
+            "https://github.com/microsoft/msstore-cli/releases/download/${MSSTORE_CLI_VERSION}/MSStoreCLI-linux-x64.tar.gz"
+          echo "${MSSTORE_CLI_SHA256}  $RUNNER_TEMP/msstore.tar.gz" | sha256sum --check
+          mkdir -p "$RUNNER_TEMP/msstore"
+          tar -xzf "$RUNNER_TEMP/msstore.tar.gz" -C "$RUNNER_TEMP/msstore"
+          echo "$RUNNER_TEMP/msstore" >> "$GITHUB_PATH"
+
+      # What's New for this version, from the same <release> entry the Snap and
+      # the Linux software centres show.
+      - name: Read the release notes
+        env:
+          TAG: ${{ inputs.tag }}
+        run: |
+          python3 - "${TAG#v}" > "$RUNNER_TEMP/release-notes.txt" <<'EOF'
+          import sys
+          import xml.etree.ElementTree as ET
+
+          version = sys.argv[1]
+          tree = ET.parse("rust/packaging/linux/io.github.lobotomoe.revenant.metainfo.xml")
+          release = tree.find(f"./releases/release[@version='{version}']")
+          if release is None:
+              sys.exit(f"metainfo has no <release version='{version}'>")
+          paragraphs = [" ".join("".join(p.itertext()).split()) for p in release.iter("p")]
+          if not paragraphs:
+              sys.exit(f"<release version='{version}'> has no description")
+          print("\n\n".join(paragraphs))
+          EOF
+          cat "$RUNNER_TEMP/release-notes.txt"
+
+      # The token is short-lived, but one submission fits well inside it.
+      - name: Sign in to Partner Center
+        run: |
+          set -euo pipefail
+          # Read by msstore whenever it needs a Partner Center token.
+          MSSTORE_CLIENT_ASSERTION_FILE="$RUNNER_TEMP/oidc-token"
+          echo "MSSTORE_CLIENT_ASSERTION_FILE=$MSSTORE_CLIENT_ASSERTION_FILE" >> "$GITHUB_ENV"
+          export MSSTORE_CLIENT_ASSERTION_FILE
+          curl -fsS -H "Authorization: Bearer $ACTIONS_ID_TOKEN_REQUEST_TOKEN" \
+            "$ACTIONS_ID_TOKEN_REQUEST_URL&audience=api://AzureADTokenExchange" |
+            jq -er '.value' > "$MSSTORE_CLIENT_ASSERTION_FILE"
+          msstore reconfigure --tenantId "$TENANT_ID" --sellerId "$SELLER_ID" \
+            --clientId "$CLIENT_ID" --clientAssertion
+
+      # `publish` replaces any pending draft with a new one carrying the package,
+      # so the notes are set after it, and the draft is committed only once both
+      # are in.
+      - name: Upload the package
+        run: |
+          msstore publish "$RUNNER_TEMP/msix" --inputFile "$RUNNER_TEMP/msix/RevenantSign.msix" \
+            --appId "$PRODUCT_ID" --noCommit
+
+      # Every listing's What's New, so no language keeps the previous release's
+      # text. The key's case is matched loosely: the API's JSON casing is not
+      # documented.
+      - name: Set What's New
+        run: |
+          set -euo pipefail
+          msstore submission get "$PRODUCT_ID" > "$RUNNER_TEMP/submission.json"
+          if ! jq -e '[.. | objects | keys[] | select(ascii_downcase == "releasenotes")] | length > 0' \
+            "$RUNNER_TEMP/submission.json" > /dev/null; then
+            echo "::error::the submission has no release notes field"
+            exit 1
+          fi
+          jq -c --rawfile notes "$RUNNER_TEMP/release-notes.txt" '
+            walk(if type == "object" then
+              with_entries(if (.key | ascii_downcase) == "releasenotes" then .value = ($notes | rtrimstr("\n")) else . end)
+            else . end)
+          ' "$RUNNER_TEMP/submission.json" > "$RUNNER_TEMP/submission-updated.json"
+          msstore submission update "$PRODUCT_ID" "$(cat "$RUNNER_TEMP/submission-updated.json")"
+
+      - name: Submit for certification
+        run: msstore submission publish "$PRODUCT_ID"
