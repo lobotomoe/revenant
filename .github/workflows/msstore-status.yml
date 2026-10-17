@@ -1,8 +1,8 @@
 name: Microsoft Store status
 
-# Prints where the app's latest Microsoft Store submission stands (in
-# certification, published, failed with what), so it can be read without
-# Partner Center. Read-only: it changes nothing in the Store.
+# Prints where the app's Microsoft Store submission stands (in certification,
+# published, failed and why), so it can be followed without Partner Center.
+# Read-only: it changes nothing in the Store.
 
 on:
   workflow_dispatch:
@@ -12,12 +12,8 @@ permissions: {}
 jobs:
   status:
     name: Submission status
-    # The Store CLI is usable only on Windows; see the msstore-signin action.
-    runs-on: windows-latest
-    timeout-minutes: 15
-    defaults:
-      run:
-        shell: bash
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
     environment: microsoft-store
     permissions:
       contents: read
@@ -32,9 +28,11 @@ jobs:
         with:
           persist-credentials: false
 
-      - name: Sign in to Partner Center
-        uses: ./.github/actions/msstore-signin
-
       - name: Show the submission status
         run: |
-          msstore submission status "$PRODUCT_ID" 2>&1 | { grep -vE "$UPLOAD_URL_PARTS" || true; }
+          set -euo pipefail
+          MSSTORE_CLIENT_ASSERTION="$(curl -fsS -H "Authorization: Bearer $ACTIONS_ID_TOKEN_REQUEST_TOKEN" \
+            "$ACTIONS_ID_TOKEN_REQUEST_URL&audience=api://AzureADTokenExchange" | jq -er '.value')"
+          echo "::add-mask::$MSSTORE_CLIENT_ASSERTION"
+          export MSSTORE_CLIENT_ASSERTION
+          rust/packaging/windows/publish-microsoft-store.sh status

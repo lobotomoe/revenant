@@ -10,6 +10,7 @@
 mod backdrop;
 mod chrome;
 mod compose;
+mod copy;
 mod listing;
 mod window;
 
@@ -18,6 +19,7 @@ use std::path::{Path, PathBuf};
 
 use revenant_sign_core::error::RevenantError;
 
+use copy::Locale;
 use listing::{CopyPlacement, Store, CAPTION_LIMIT, SHOTS};
 
 /// Why rendering the screenshots failed.
@@ -71,7 +73,9 @@ impl From<RevenantError> for ScreenshotError {
     }
 }
 
-/// Render every store's screenshots into `out_dir/<store>/<shot>.png`.
+/// Render every store's screenshots into `out_dir/<store>/<shot>.png`, or
+/// `out_dir/<store>/<language>/<shot>.png` for a store that takes a set per
+/// listing language.
 ///
 /// Returns the written paths in order.
 ///
@@ -81,24 +85,30 @@ impl From<RevenantError> for ScreenshotError {
 pub fn render_all(out_dir: &Path) -> Result<Vec<PathBuf>, ScreenshotError> {
     let mut written = Vec::new();
     for store in Store::ALL {
-        let store_dir = out_dir.join(store.dir_name());
-        std::fs::create_dir_all(&store_dir).map_err(|source| ScreenshotError::Io {
-            path: store_dir.clone(),
-            source,
-        })?;
-        for shot in &SHOTS {
-            let path = store_dir.join(format!("{}.png", shot.slug));
-            let image = opaque(render_shot(store, shot)?, &path)?;
-            image
-                .save(&path)
-                .map_err(|source| ScreenshotError::Encode {
-                    path: path.clone(),
-                    source,
-                })?;
-            written.push(path);
-        }
-        if store.copy() == CopyPlacement::Caption {
-            written.push(write_captions(&store_dir)?);
+        let locales = store.locales();
+        for &locale in locales {
+            let mut set_dir = out_dir.join(store.dir_name());
+            if locales.len() > 1 {
+                set_dir.push(locale.code());
+            }
+            std::fs::create_dir_all(&set_dir).map_err(|source| ScreenshotError::Io {
+                path: set_dir.clone(),
+                source,
+            })?;
+            for shot in &SHOTS {
+                let path = set_dir.join(format!("{}.png", shot.slug));
+                let image = opaque(render_shot(store, shot, locale)?, &path)?;
+                image
+                    .save(&path)
+                    .map_err(|source| ScreenshotError::Encode {
+                        path: path.clone(),
+                        source,
+                    })?;
+                written.push(path);
+            }
+            if store.copy() == CopyPlacement::Caption {
+                written.push(write_captions(&set_dir, locale)?);
+            }
         }
     }
     Ok(written)
@@ -106,11 +116,11 @@ pub fn render_all(out_dir: &Path) -> Result<Vec<PathBuf>, ScreenshotError> {
 
 /// Write `captions.txt` beside the shots: one `file<TAB>caption` line per shot,
 /// in upload order, for pasting into the listing's caption fields.
-fn write_captions(store_dir: &Path) -> Result<PathBuf, ScreenshotError> {
-    let path = store_dir.join("captions.txt");
+fn write_captions(set_dir: &Path, locale: Locale) -> Result<PathBuf, ScreenshotError> {
+    let path = set_dir.join("captions.txt");
     let mut lines = String::new();
     for shot in &SHOTS {
-        let caption = shot.caption();
+        let caption = shot.caption(locale);
         let length = caption.chars().count();
         if length > CAPTION_LIMIT {
             return Err(ScreenshotError::Render(format!(
@@ -145,16 +155,25 @@ fn opaque(image: image::RgbaImage, path: &Path) -> Result<image::RgbImage, Scree
 }
 
 /// Render one framed screenshot.
-fn render_shot(store: Store, shot: &listing::Shot) -> Result<image::RgbaImage, ScreenshotError> {
+fn render_shot(
+    store: Store,
+    shot: &listing::Shot,
+    locale: Locale,
+) -> Result<image::RgbaImage, ScreenshotError> {
     // Each shot gets its own throwaway config directory, so no state carries
     // from one staged account into the next.
     let config_dir = tempfile::tempdir().map_err(|source| ScreenshotError::Io {
         path: std::env::temp_dir(),
         source,
     })?;
-    let config = shot.config_store(config_dir.path(), store)?;
+    let config = shot.config_store(config_dir.path(), store, locale)?;
     let layout = compose::Layout::for_store(store);
     let window_style = store.chrome().window_style();
-    let window = window::render(config, shot.stage(), window_style, layout.window_scale())?;
-    compose::frame(store, shot, &layout, &window)
+    let window = window::render(
+        config,
+        shot.stage(locale),
+        window_style,
+        layout.window_scale(),
+    )?;
+    compose::frame(store, shot, locale, &layout, &window)
 }

@@ -193,8 +193,9 @@ jobs:
   # Renders the Mac App Store, Microsoft Store and Snap Store screenshots from
   # this release's UI (headless, fictional account; see the GUI crate's
   # `store_screenshots` module) and attaches them as one zip. publish-mas uploads
-  # the Mac App Store set; the Microsoft Store and Snap Store have no screenshot
-  # upload API, so those two sets go into their dashboards by hand.
+  # the Mac App Store set and publish-msstore the Microsoft Store sets, one per
+  # listing language; the Snap Store has no screenshot upload API, so its set
+  # goes into the dashboard by hand.
   store-screenshots:
     name: Store Screenshots
     needs: [ci, version-guard]
@@ -911,9 +912,9 @@ jobs:
       DIST_TAP_TOKEN: ${{ secrets.DIST_TAP_TOKEN }}
 
   # -- Microsoft Store ----------------------------------------------------------
-  # Submits the released MSIX for certification. In its own workflow so a
-  # submission can be redone for a chosen tag; it signs in through OIDC, so no
-  # secret is passed.
+  # Submits the released MSIX, screenshots and notes for certification. In its
+  # own workflow so a submission can be redone (or dry-run) for a chosen tag; it
+  # signs in through OIDC, so no secret is passed.
   publish-msstore:
     name: Publish to Microsoft Store
     needs: release

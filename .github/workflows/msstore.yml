@@ -1,16 +1,16 @@
 name: Publish to Microsoft Store
 
-# Submits a released version's MSIX to the Microsoft Store: uploads the package
-# from the GitHub Release, replaces the listing's screenshots with the ones the
-# release rendered, sets What's New to the release's AppStream notes, and
-# commits the submission for certification. Called by release.yml on a stable
-# tag, and dispatchable for a chosen tag so a failed or skipped submission can be
-# redone without cutting a release.
+# Submits a released version to the Microsoft Store and commits it for
+# certification: the release's MSIX, the screenshots it rendered for each
+# listing language with their captions, and each language's What's New from the
+# AppStream notes. The work is rust/packaging/windows/publish-microsoft-store.sh.
+# Called by release.yml on a stable tag, and dispatchable for a chosen tag, with
+# a dry run that does everything but commit.
 #
-# No stored credential: the job signs in to Partner Center as the `revenant-ci`
-# Entra app with a GitHub OIDC token, accepted through a federated credential on
-# that app for this repository's `microsoft-store` environment. The app holds the
-# Manager (Windows) role in Partner Center, which the submission API requires.
+# No stored credential: the script signs in to Partner Center as the
+# `revenant-ci` Entra app with this job's GitHub OIDC token, which a federated
+# credential on that app accepts for this repository's `microsoft-store`
+# environment. The app holds the Manager (Windows) role in Partner Center.
 
 on:
   workflow_call:
@@ -25,6 +25,10 @@ on:
         description: Release tag to publish (e.g. v4.2.0)
         required: true
         type: string
+      dry_run:
+        description: Build and upload the submission, then delete it instead of committing
+        type: boolean
+        default: true
 
 # Nothing at the top level: release.yml calls this with only what the job
 # below asks for, and a called workflow may not request more than its caller
@@ -32,39 +36,44 @@ on:
 permissions: {}
 
 concurrency:
-  group: msstore-${{ inputs.tag }}
+  group: msstore
   cancel-in-progress: false
 
 jobs:
   publish:
     name: Submit to Microsoft Store
-    # The Store CLI is usable only on Windows; see the msstore-signin action.
-    runs-on: windows-latest
-    timeout-minutes: 60
-    defaults:
-      run:
-        shell: bash
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
     environment: microsoft-store
     permissions:
       contents: read
       id-token: write
+
     steps:
       - uses: step-security/harden-runner@05e31511f85b41b11d1cf0ef85d0992719546e2c # v2.21.0
         with:
           egress-policy: audit
 
+      # A prerelease tag is only good for a dry run: the Store has no
+      # prerelease channel. Its notes are those of the version it rehearses.
       - name: Validate tag
         env:
           TAG: ${{ inputs.tag }}
+          DRY_RUN: ${{ github.event_name == 'workflow_dispatch' && inputs.dry_run }}
         run: |
-          if ! printf '%s' "$TAG" | grep -Eq '^v[0-9]+\.[0-9]+\.[0-9]+$'; then
-            echo "::error::refusing to submit tag '$TAG'; expected vMAJOR.MINOR.PATCH (the Store has no prerelease channel)"
-            exit 1
+          if printf '%s' "$TAG" | grep -Eq '^v[0-9]+\.[0-9]+\.[0-9]+$'; then
+            exit 0
           fi
+          if [ "$DRY_RUN" = true ] && printf '%s' "$TAG" | grep -Eq '^v[0-9]+\.[0-9]+\.[0-9]+-rc\.[0-9]+$'; then
+            exit 0
+          fi
+          echo "::error::refusing to submit tag '$TAG'; expected vMAJOR.MINOR.PATCH, or a -rc.N tag for a dry run"
+          exit 1
 
+      # This workflow's own commit, not the tag's: the metainfo keeps every
+      # release's notes, and a re-run for an older tag needs the current script.
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v6
         with:
-          ref: ${{ inputs.tag }}
           persist-credentials: false
 
       - name: Download the MSIX, screenshots and release checksums
@@ -72,113 +81,36 @@ jobs:
           GITHUB_TOKEN: ${{ github.token }}
           TAG: ${{ inputs.tag }}
         run: |
-          mkdir -p "$RUNNER_TEMP/msix"
+          mkdir -p "$RUNNER_TEMP/release"
           gh release download "$TAG" \
             --repo "$GITHUB_REPOSITORY" \
             --pattern "RevenantSign.msix" \
             --pattern "revenant-store-screenshots.zip" \
             --pattern "SHA256SUMS.txt" \
-            --dir "$RUNNER_TEMP/msix"
+            --dir "$RUNNER_TEMP/release"
 
       - name: Verify the downloads against the release checksums
-        working-directory: ${{ runner.temp }}/msix
+        working-directory: ${{ runner.temp }}/release
         run: |
           grep -E ' \./(RevenantSign\.msix|revenant-store-screenshots\.zip)$' SHA256SUMS.txt | sha256sum -c -
-          7z x -y -bd -o"$RUNNER_TEMP/screenshots" revenant-store-screenshots.zip > /dev/null
+          unzip -q revenant-store-screenshots.zip -d screenshots
 
-      # What's New for this version, from the same <release> entry the Snap and
-      # the Linux software centres show.
-      - name: Read the release notes
+      - name: Submit
         env:
           TAG: ${{ inputs.tag }}
-        run: |
-          python - "${TAG#v}" > "$RUNNER_TEMP/release-notes.txt" <<'EOF'
-          import sys
-          import xml.etree.ElementTree as ET
-
-          version = sys.argv[1]
-          tree = ET.parse("rust/packaging/linux/io.github.lobotomoe.revenant.metainfo.xml")
-          release = tree.find(f"./releases/release[@version='{version}']")
-          if release is None:
-              sys.exit(f"metainfo has no <release version='{version}'>")
-          paragraphs = [" ".join("".join(p.itertext()).split()) for p in release.iter("p")]
-          if not paragraphs:
-              sys.exit(f"<release version='{version}'> has no description")
-          # Plain newlines, not the CRLF Windows text mode would write.
-          sys.stdout.reconfigure(newline="\n")
-          print("\n\n".join(paragraphs))
-          EOF
-          cat "$RUNNER_TEMP/release-notes.txt"
-
-      - name: Sign in to Partner Center
-        uses: ./.github/actions/msstore-signin
-
-      # `publish` replaces any pending draft with a new one carrying the package,
-      # so the notes are set after it, and the draft is committed only once both
-      # are in.
-      - name: Upload the package
-        run: |
-          # The package itself as the path: the CLI recognises a ready MSIX by
-          # its extension, and treats a directory as a project to build.
-          msstore publish "$RUNNER_TEMP/msix/RevenantSign.msix" --appId "$PRODUCT_ID" \
-            --noCommit --uploadTimeout 600 2>&1 | { grep -vE "$UPLOAD_URL_PARTS" || true; }
-
-      # The draft `publish` left holds the package in the upload zip. That zip
-      # is replaced by one holding the package and the new screenshots, and the
-      # draft is edited to match: every listing's screenshots swapped for the
-      # new ones (at the zip's root, named after the version so they never
-      # collide with the ones being removed), and every listing's What's New set
-      # to this release's notes. The JSON keys are the CLI's: it reads the
-      # submission into its own models and writes them back.
-      - name: Update the listing
-        env:
-          TAG: ${{ inputs.tag }}
+          # A dispatch defaults to a dry run; a release always commits.
+          DRY_RUN: ${{ github.event_name == 'workflow_dispatch' && inputs.dry_run }}
         run: |
           set -euo pipefail
-          # A POSIX path, so globs and redirections behave the same in Git Bash.
-          temp="$(cygpath -u "$RUNNER_TEMP")"
-          msstore submission get "$PRODUCT_ID" > "$temp/submission.json"
-
-          upload_url="$(jq -er '.FileUploadUrl' "$temp/submission.json")"
-          echo "::add-mask::$upload_url"
-          if ! jq -e '.ApplicationPackages[] | select(.FileName == "RevenantSign.msix" and .FileStatus == "PendingUpload")' \
-            "$temp/submission.json" > /dev/null; then
-            echo "::error::the draft does not hold RevenantSign.msix as its new package"
-            exit 1
+          MSSTORE_CLIENT_ASSERTION="$(curl -fsS -H "Authorization: Bearer $ACTIONS_ID_TOKEN_REQUEST_TOKEN" \
+            "$ACTIONS_ID_TOKEN_REQUEST_URL&audience=api://AzureADTokenExchange" | jq -er '.value')"
+          echo "::add-mask::$MSSTORE_CLIENT_ASSERTION"
+          export MSSTORE_CLIENT_ASSERTION
+          version="${TAG#v}"
+          version="${version%%-*}"
+          args=(publish "$RUNNER_TEMP/release/RevenantSign.msix" \
+            "$RUNNER_TEMP/release/screenshots/microsoft-store" "$version")
+          if [ "$DRY_RUN" = true ]; then
+            args+=(--dry-run)
           fi
-
-          bundle="$temp/bundle"
-          mkdir -p "$bundle"
-          cp "$temp/msix/RevenantSign.msix" "$bundle/"
-          shots=()
-          for shot in "$temp"/screenshots/microsoft-store/*.png; do
-            name="screenshot-${TAG#v}-$(basename "$shot")"
-            cp "$shot" "$bundle/$name"
-            shots+=("$name")
-          done
-          # The Store takes at most ten screenshots per listing.
-          if [ "${#shots[@]}" -eq 0 ] || [ "${#shots[@]}" -gt 10 ]; then
-            echo "::error::expected 1 to 10 Microsoft Store screenshots, found ${#shots[@]}"
-            exit 1
-          fi
-          (cd "$bundle" && 7z a -tzip -bd "$temp/upload.zip" RevenantSign.msix "${shots[@]}" > /dev/null)
-          curl -fsS --retry 3 -X PUT -H "x-ms-blob-type: BlockBlob" \
-            -T "$temp/upload.zip" "$upload_url" > /dev/null
-
-          jq -c \
-            --rawfile notes "$temp/release-notes.txt" \
-            --args '
-              ($ARGS.positional | map({FileName: ., FileStatus: "PendingUpload", ImageType: "Screenshot"})) as $new
-              | .Listings |= with_entries(
-                  .value.BaseListing.ReleaseNotes = ($notes | rtrimstr("\n"))
-                  | .value.BaseListing.Images = (
-                      [(.value.BaseListing.Images // [])[]
-                        | if .ImageType == "Screenshot" then .FileStatus = "PendingDelete" else . end]
-                      + $new))
-            ' "${shots[@]}" < "$temp/submission.json" > "$temp/submission-updated.json"
-          msstore submission update "$PRODUCT_ID" "$(cat "$temp/submission-updated.json")" \
-            2>&1 | { grep -vE "$UPLOAD_URL_PARTS" || true; }
-
-      - name: Submit for certification
-        run: |
-          msstore submission publish "$PRODUCT_ID" 2>&1 | { grep -vE "$UPLOAD_URL_PARTS" || true; }
+          rust/packaging/windows/publish-microsoft-store.sh "${args[@]}"

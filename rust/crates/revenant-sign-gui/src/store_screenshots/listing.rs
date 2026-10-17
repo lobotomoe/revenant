@@ -9,6 +9,7 @@ use revenant_sign_core::net::ServerVerifyResult;
 use revenant_sign_core::pdf::VerificationResult;
 use revenant_sign_core::pki::{CertInfo, TrustStatus};
 
+use super::copy::{self, Locale, Text};
 use super::ScreenshotError;
 use crate::app::stage::Stage;
 
@@ -91,6 +92,16 @@ impl Store {
         }
     }
 
+    /// The languages this store's listing is published in, each getting its
+    /// own set of shots. Only Partner Center takes a set per language here: the
+    /// App Store listings share one set, and the Snap Store has one listing.
+    pub(crate) fn locales(self) -> &'static [Locale] {
+        match self {
+            Store::MacApp | Store::Snap => &[Locale::En],
+            Store::Microsoft => &[Locale::En, Locale::Ru, Locale::Hy],
+        }
+    }
+
     pub(crate) fn copy(self) -> CopyPlacement {
         match self {
             Store::MacApp => CopyPlacement::OnImage,
@@ -125,10 +136,10 @@ pub(crate) struct Shot {
     /// File-name stem, prefixed with the shot's position so stores that keep
     /// upload order get the intended sequence.
     pub(crate) slug: &'static str,
-    pub(crate) headline: &'static str,
-    pub(crate) subline: &'static str,
+    headline: Text,
+    subline: Text,
     setup: Setup,
-    stage: fn() -> Stage,
+    stage: fn(Locale) -> Stage,
 }
 
 /// Five shots: at most what the Snap Store takes, within the Microsoft Store's
@@ -138,65 +149,81 @@ pub(crate) struct Shot {
 pub(crate) const SHOTS: [Shot; 5] = [
     Shot {
         slug: "01-sign",
-        headline: "Sign PDFs with your CoSign account",
-        subline: "Embedded or detached signatures, with a visible stamp on any page.",
+        headline: copy::SIGN_HEADLINE,
+        subline: copy::SIGN_SUBLINE,
         setup: Setup::SignedIn,
-        stage: || Stage::Sign {
-            pdf: PathBuf::from(DOCUMENT),
+        stage: |locale| Stage::Sign {
+            pdf: PathBuf::from(copy::DOCUMENT.get(locale)),
         },
     },
     Shot {
         slug: "02-batch",
-        headline: "Sign a whole stack at once",
-        subline: "Drop several PDFs and sign them all in one pass.",
+        headline: copy::BATCH_HEADLINE,
+        subline: copy::BATCH_SUBLINE,
         setup: Setup::SignedIn,
-        stage: || Stage::SignMany {
-            pdfs: BATCH.iter().map(PathBuf::from).collect(),
+        stage: |locale| Stage::SignMany {
+            pdfs: copy::BATCH
+                .iter()
+                .map(|name| PathBuf::from(name.get(locale)))
+                .collect(),
         },
     },
     Shot {
         slug: "03-verify",
-        headline: "Verify signed PDFs",
-        subline: "Integrity, signer, and certificate trust, checked in one step.",
+        headline: copy::VERIFY_HEADLINE,
+        subline: copy::VERIFY_SUBLINE,
         setup: Setup::SignedIn,
         stage: verify_stage,
     },
     Shot {
         slug: "04-server",
-        headline: "EKENG profile built in",
-        subline: "Or connect to your organization's own signing server.",
+        headline: copy::SERVER_HEADLINE,
+        subline: copy::SERVER_SUBLINE,
         setup: Setup::Fresh,
-        stage: || Stage::ChooseServer,
+        stage: |_| Stage::ChooseServer,
     },
     Shot {
         slug: "05-login",
-        headline: "Your password, kept by the system keychain",
-        subline: "Opt in once, and the operating system stores it for you.",
+        headline: copy::LOGIN_HEADLINE,
+        subline: copy::LOGIN_SUBLINE,
         setup: Setup::CredentialsSaved,
-        stage: || Stage::LogIn {
+        stage: |_| Stage::LogIn {
             identity: certificate(),
         },
     },
 ];
 
 impl Shot {
-    /// The headline and subline as one caption.
-    pub(crate) fn caption(&self) -> String {
-        format!("{}. {}", self.headline, self.subline)
+    pub(crate) fn headline(&self, locale: Locale) -> &'static str {
+        self.headline.get(locale)
     }
 
-    pub(crate) fn stage(&self) -> Stage {
-        (self.stage)()
+    pub(crate) fn subline(&self, locale: Locale) -> &'static str {
+        self.subline.get(locale)
+    }
+
+    /// The headline and subline as one caption.
+    pub(crate) fn caption(&self, locale: Locale) -> String {
+        let headline = self.headline(locale);
+        let subline = self.subline(locale);
+        let full_stop = locale.full_stop();
+        format!("{headline}{full_stop} {subline}")
+    }
+
+    pub(crate) fn stage(&self, locale: Locale) -> Stage {
+        (self.stage)(locale)
     }
 
     /// Build the isolated config store this shot is staged with, rooted in
-    /// `dir` and naming `store`'s keychain.
+    /// `dir`, naming `store`'s keychain and showing the app in `locale`.
     pub(crate) fn config_store(
         &self,
         dir: &Path,
         store: Store,
+        locale: Locale,
     ) -> Result<ConfigStore, ScreenshotError> {
         let config = ConfigStore::isolated(dir.to_path_buf(), store.keychain_name());
+        config.save_language(locale.code())?;
         if self.setup == Setup::Fresh {
             return Ok(config);
         }
@@ -223,13 +250,6 @@ const CERT_NAME: &str = "ANNA PETROSYAN 1234567890";
 const EMAIL: &str = "anna.petrosyan@example.am";
 const CERT_ISSUED: &str = "2025-03-01T00:00:00Z";
 const CERT_EXPIRES: &str = "2028-03-01T00:00:00Z";
-const DOCUMENT: &str = "Lease agreement.pdf";
-const SIGNED_DOCUMENT: &str = "Lease agreement_signed.pdf";
-const BATCH: [&str; 3] = [
-    "Lease agreement.pdf",
-    "Annex 1 - Inventory.pdf",
-    "Annex 2 - Payment schedule.pdf",
-];
 const SIGNED_AT: &str = "2026-10-15T11:42:07Z";
 const SIGNED_DOCUMENT_BYTES: usize = 184_320;
 const TRUST_ANCHOR: &str = "Staff of Government of RA Root CA";
@@ -264,7 +284,7 @@ fn dn() -> String {
 
 /// A finished report for a document the fictional account signed: what the
 /// verify tab shows for a genuine, untouched EKENG signature.
-fn verify_stage() -> Stage {
+fn verify_stage(locale: Locale) -> Stage {
     let result = VerificationResult {
         structure_ok: true,
         hash_ok: true,
@@ -282,7 +302,7 @@ fn verify_stage() -> Stage {
         certificate_status: Some("Valid".to_owned()),
     };
     Stage::Verify {
-        pdf: PathBuf::from(SIGNED_DOCUMENT),
+        pdf: PathBuf::from(copy::SIGNED_DOCUMENT.get(locale)),
         results: vec![result],
         server: Some(server),
     }
