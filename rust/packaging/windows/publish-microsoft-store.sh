@@ -155,7 +155,9 @@ publish() {
 	clear_pending
 
 	local submission id upload_url
-	submission="$(api POST "/submissions")"
+	# An empty body, sent as one: the API refuses a POST without a
+	# Content-Length (HTTP 411).
+	submission="$(api POST "/submissions" --data '')"
 	id="$(jq -er '.id' <<<"$submission")"
 	upload_url="$(jq -er '.fileUploadUrl' <<<"$submission")"
 	if [ -n "${GITHUB_ACTIONS:-}" ]; then
@@ -228,7 +230,7 @@ publish() {
 		return
 	fi
 
-	api POST "/submissions/$id/commit" >/dev/null
+	api POST "/submissions/$id/commit" --data '' >/dev/null
 	echo "Committed submission $id; waiting for Partner Center to take it"
 	local poll response state
 	for ((poll = 0; poll < COMMIT_POLLS; poll++)); do
