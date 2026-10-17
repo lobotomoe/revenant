@@ -1,0 +1,38 @@
+name: Microsoft Store status
+
+# Prints where the app's Microsoft Store submission stands (in certification,
+# published, failed and why), so it can be followed without Partner Center.
+# Read-only: it changes nothing in the Store.
+
+on:
+  workflow_dispatch:
+
+permissions: {}
+
+jobs:
+  status:
+    name: Submission status
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    environment: microsoft-store
+    permissions:
+      contents: read
+      id-token: write
+
+    steps:
+      - uses: step-security/harden-runner@05e31511f85b41b11d1cf0ef85d0992719546e2c # v2.21.0
+        with:
+          egress-policy: audit
+
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v6
+        with:
+          persist-credentials: false
+
+      - name: Show the submission status
+        run: |
+          set -euo pipefail
+          MSSTORE_CLIENT_ASSERTION="$(curl -fsS -H "Authorization: Bearer $ACTIONS_ID_TOKEN_REQUEST_TOKEN" \
+            "$ACTIONS_ID_TOKEN_REQUEST_URL&audience=api://AzureADTokenExchange" | jq -er '.value')"
+          echo "::add-mask::$MSSTORE_CLIENT_ASSERTION"
+          export MSSTORE_CLIENT_ASSERTION
+          rust/packaging/windows/publish-microsoft-store.sh status

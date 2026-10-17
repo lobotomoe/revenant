@@ -12,6 +12,7 @@ use eframe::egui::{
 use egui_kittest::Harness;
 use image::RgbaImage;
 
+use super::copy::Locale;
 use super::listing::{Chrome, CopyPlacement, Shot, Store, WINDOW_SIZE};
 use super::{backdrop, chrome, ScreenshotError};
 
@@ -83,10 +84,12 @@ impl Layout {
     }
 }
 
-/// Frame `window` (the rendered app) for `shot` on `store`'s canvas.
+/// Frame `window` (the rendered app) for `shot` on `store`'s canvas, with the
+/// shot's copy in `locale`.
 pub(crate) fn frame(
     store: Store,
     shot: &Shot,
+    locale: Locale,
     layout: &Layout,
     window: &RgbaImage,
 ) -> Result<RgbaImage, ScreenshotError> {
@@ -94,8 +97,8 @@ pub(crate) fn frame(
     let window_pixels = color_image(window);
     let window_size = pixel_size(window)?;
     let icon_pixels = app_icon()?;
-    let headline = shot.headline;
-    let subline = shot.subline;
+    let headline = shot.headline(locale);
+    let subline = shot.subline(locale);
 
     // egui assumes a 2048 px texture limit unless told otherwise, and a 4K
     // canvas places a window wider than that. The device already renders the
@@ -295,14 +298,16 @@ mod tests {
 
     #[test]
     fn captions_fit_the_partner_center_limit() {
-        for shot in &SHOTS {
-            let caption = shot.caption();
-            assert!(
-                caption.chars().count() <= CAPTION_LIMIT,
-                "{}: caption is {} characters",
-                shot.slug,
-                caption.chars().count()
-            );
+        for &locale in Store::Microsoft.locales() {
+            for shot in &SHOTS {
+                let caption = shot.caption(locale);
+                assert!(
+                    caption.chars().count() <= CAPTION_LIMIT,
+                    "{} ({locale:?}): caption is {} characters",
+                    shot.slug,
+                    caption.chars().count()
+                );
+            }
         }
     }
 
