@@ -8,7 +8,7 @@ cryptography>=42.0,<51
 pytest>=9.0.3,<10
 pytest-cov>=4.0,<8
 pyright>=1.1,<2.0
-pillow>=12.2.0,<13
+pillow>=13.0.0,<14
 keyring>=21.0,<26
 fonttools>=4.0,<5
 # Backports for Python 3.10 (markers stripped since pip-compile runs on 3.12+)
