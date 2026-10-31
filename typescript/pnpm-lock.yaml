@@ -26,7 +26,7 @@ importers:
         version: 0.4.4
       node-forge:
         specifier: ^1.4.0
-        version: 1.4.0
+        version: 1.4.1
       pdf-lib:
         specifier: ^1.17.1
         version: 1.17.1
@@ -921,8 +921,8 @@ packages:
   node-addon-api@4.3.0:
     resolution: {integrity: sha512-73sE9+3UaLYYFmDsFZnqCInzPyh3MqIwZO9cw58yIqAZhONrrabrYyYe3TuIqtIiOuTXVhsGau8hcrhhwSsDIQ==}
 
-  node-forge@1.4.0:
-    resolution: {integrity: sha512-LarFH0+6VfriEhqMMcLX2F7SwSXeWwnEAJEsYm5QKWchiVYVvJyV9v7UDvUv+w5HO23ZpQTXDv/GxdDdMyOuoQ==}
+  node-forge@1.4.1:
+    resolution: {integrity: sha512-w5/MfWaeMrpR/5ba6fZyAUTLSuE6aYz7H/3cYrqwZEmf5eQS3IaaLgJt4MBv7HglGFWmV22K8h4U18RJQmw/ow==}
     engines: {node: '>= 6.13.0'}
 
   object-assign@4.1.1:
@@ -1923,7 +1923,7 @@ snapshots:
   node-addon-api@4.3.0:
     optional: true
 
-  node-forge@1.4.0: {}
+  node-forge@1.4.1: {}
 
   object-assign@4.1.1: {}
 
