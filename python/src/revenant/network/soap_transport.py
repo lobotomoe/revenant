@@ -32,7 +32,7 @@ _logger = logging.getLogger(__name__)
 # A password change is sent once. If the response to a request the appliance
 # already applied were lost, a retry would present the old password, which no
 # longer works: a failed logon counted toward the account lockout.
-_CHANGE_PASSWORD_RETRIES = 0
+_NO_RETRIES = 0
 
 
 class SoapSigningTransport:
@@ -168,5 +168,5 @@ def change_password(
     """
     _logger.info("Changing password: url=%s", url)
     envelope = build_change_password_envelope(username, password, new_password)
-    response = send_soap(url, envelope, timeout=timeout, max_retries=_CHANGE_PASSWORD_RETRIES)
+    response = send_soap(url, envelope, timeout=timeout, max_retries=_NO_RETRIES)
     parse_change_password_response(response)
