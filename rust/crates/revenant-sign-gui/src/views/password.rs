@@ -277,7 +277,7 @@ mod tests {
         let mut state = typed(false, "Secret-123", "Secret-123");
         state.finish("done".to_owned(), Finish::Changed);
 
-        assert!(state.new_password.is_empty());
-        assert!(state.repeat.is_empty());
+        assert_eq!(state.new_password, "");
+        assert_eq!(state.repeat, "");
     }
 }

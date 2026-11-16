@@ -85,8 +85,7 @@ impl RevenantApp {
         let name = if configured {
             self.store
                 .active_profile()
-                .map(|profile| profile.display_name)
-                .unwrap_or_default()
+                .map_or_default(|profile| profile.display_name)
         } else {
             self.l10n.t("gui.no_server_configured").to_owned()
         };

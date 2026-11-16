@@ -528,8 +528,7 @@ impl RevenantApp {
             SignedOutcome::Ok { path, size } => {
                 let filename = path
                     .file_name()
-                    .map(|name| name.to_string_lossy().into_owned())
-                    .unwrap_or_default();
+                    .map_or_default(|name| name.to_string_lossy().into_owned());
                 let human = jobs::format_bytes(size);
                 let message = self.l10n.tf(
                     "gui.signed_filename_size",
@@ -823,8 +822,7 @@ impl RevenantApp {
                 let name = self
                     .store
                     .active_profile()
-                    .map(|profile| profile.display_name)
-                    .unwrap_or_default();
+                    .map_or_default(|profile| profile.display_name);
                 let mut message = self.l10n.tf("gui.disconnect_from_name", &[("name", &name)]);
                 // Disconnecting from a fully-configured profile also wipes the
                 // saved identity, so warn about it.

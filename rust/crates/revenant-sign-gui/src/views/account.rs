@@ -134,7 +134,7 @@ fn format_cert_validity(
         return (l10n.t("gui.cert_validity_unknown").to_owned(), None);
     };
 
-    let start = not_before.map(ymd).unwrap_or_default();
+    let start = not_before.map_or_default(ymd);
     let end = ymd(na);
     let (key, days, color) = match status {
         ExpiryStatus::Expired => (
