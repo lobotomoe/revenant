@@ -15,10 +15,12 @@ from ..errors import PDFError, RevenantError
 from .soap import (
     SIGNATURE_TYPE_CMS,
     ServerVerifyResult,
+    build_change_password_envelope,
     build_enum_certificates_envelope,
     build_sign_envelope,
     build_sign_hash_envelope,
     build_verify_envelope,
+    parse_change_password_response,
     parse_enum_certificates_response,
     parse_sign_response,
     parse_verify_response,
@@ -26,6 +28,11 @@ from .soap import (
 )
 
 _logger = logging.getLogger(__name__)
+
+# A password change is sent once. If the response to a request the appliance
+# already applied were lost, a retry would present the old password, which no
+# longer works: a failed logon counted toward the account lockout.
+_CHANGE_PASSWORD_RETRIES = 0
 
 
 class SoapSigningTransport:
@@ -135,3 +142,31 @@ def enum_certificates(url: str, username: str, password: str, timeout: int) -> l
     envelope = build_enum_certificates_envelope(username, password)
     response = send_soap(url, envelope, timeout=timeout)
     return parse_enum_certificates_response(response)
+
+
+def change_password(
+    url: str, username: str, password: str, new_password: str, timeout: int
+) -> None:
+    """Ask the server to replace ``password`` with ``new_password``.
+
+    One request, never retried. A transport failure leaves the outcome
+    unknown: the appliance may have applied the change before the connection
+    dropped. :func:`revenant.core.password.change_password` settles that case.
+
+    Args:
+        url: CoSign SOAP endpoint URL.
+        username: Revenant username.
+        password: Current password.
+        new_password: Password to change to.
+        timeout: Request timeout in seconds.
+
+    Raises:
+        AuthError: If the current password is wrong.
+        ServerError: If the server refused the new password.
+        RevenantError: If the response cannot be parsed.
+        TLSError: On connection issues.
+    """
+    _logger.info("Changing password: url=%s", url)
+    envelope = build_change_password_envelope(username, password, new_password)
+    response = send_soap(url, envelope, timeout=timeout, max_retries=_CHANGE_PASSWORD_RETRIES)
+    parse_change_password_response(response)

@@ -27,6 +27,8 @@ from .config import (
 
 # Credentials management
 from .credentials import (
+    StoredPasswordUpdate,
+    apply_password_change,
     clear_credentials,
     clear_session_credentials,
     get_credential_storage_info,
@@ -90,6 +92,8 @@ __all__ = [
     "CertField",
     "ServerProfile",
     "SigField",
+    "StoredPasswordUpdate",
+    "apply_password_change",
     "clear_credentials",
     "clear_session_credentials",
     "get_active_profile",

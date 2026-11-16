@@ -9,6 +9,8 @@ when available, falling back to config file storage otherwise.
 from __future__ import annotations
 
 __all__ = [
+    "StoredPasswordUpdate",
+    "apply_password_change",
     "clear_credentials",
     "clear_session_credentials",
     "get_credential_storage_info",
@@ -23,6 +25,7 @@ __all__ = [
 import logging
 import os
 import threading
+from dataclasses import dataclass
 from typing import TYPE_CHECKING
 
 from ..constants import ENV_PASS, ENV_USER
@@ -343,3 +346,46 @@ def clear_credentials() -> None:
     config.pop("password", None)
     save_config(config)
     _logger.info("Config saved without credentials. Keys remaining: %s", list(config.keys()))
+
+
+@dataclass(frozen=True)
+class StoredPasswordUpdate:
+    """What :func:`apply_password_change` did with the new password.
+
+    Attributes:
+        saved: The saved password (keychain or config file) was replaced.
+        env_override: ``REVENANT_PASS`` is set. It outranks every stored
+            password and still holds the old one; only the user can change it.
+    """
+
+    saved: bool
+    env_override: bool
+
+
+def apply_password_change(username: str, new_password: str) -> StoredPasswordUpdate:
+    """Replace every stored copy of ``username``'s password with ``new_password``.
+
+    Call this once the server is known to accept the new password. The
+    in-memory session copy is replaced if it belongs to ``username``. The
+    saved copy is replaced only if a password was saved for ``username``
+    before: a user who chose not to save one keeps that choice.
+
+    Args:
+        username: The account whose password changed.
+        new_password: The password the server now accepts.
+
+    Returns:
+        What was updated, and whether the environment still overrides it.
+    """
+    global _session_password
+    with _session_lock:
+        if _session_username == username:
+            _session_password = new_password
+
+    saved_user, saved_pass = get_credentials()
+    saved_for_user = saved_user == username and bool(saved_pass)
+    if saved_for_user:
+        save_credentials(username, new_password)
+
+    env_override = bool(os.environ.get(ENV_PASS, "").strip())
+    return StoredPasswordUpdate(saved=saved_for_user, env_override=env_override)

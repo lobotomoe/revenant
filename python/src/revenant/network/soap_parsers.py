@@ -20,7 +20,9 @@ _logger = logging.getLogger(__name__)
 # ResultMinor URN suffix indicating authentication failure (language-independent)
 _AUTH_MINOR_SUFFIX = ":AuthenticationError"
 
-# Regex patterns for redacting credentials from XML previews in error messages
+# Regex patterns for redacting credentials from XML previews in error messages.
+# The password pattern also covers NewLogonPassword: its prefix class takes
+# the "arx:New" in front of "LogonPassword".
 _REDACT_PASSWORD_PATTERN = r"<[\w:]*LogonPassword>[^<]*</[\w:]*LogonPassword>"
 _REDACT_PASSWORD_REPLACEMENT = "<LogonPassword>[REDACTED]</LogonPassword>"
 _REDACT_NAME_PATTERN = r"<(\w+:)?Name>[^<]*</(\w+:)?Name>"
@@ -37,6 +39,22 @@ def _is_auth_error(result_minor: str | None, msg: str) -> bool:
     return (
         bool(result_minor and result_minor.endswith(_AUTH_MINOR_SUFFIX))
         or "password" in msg.lower()
+        or "user name" in msg.lower()
+    )
+
+
+def _is_logon_failure_during_password_change(result_minor: str | None, msg: str) -> bool:
+    """Detect a refused current password in a password-change response.
+
+    Every failure of this operation mentions "password", so that keyword says
+    nothing here. The appliance's bad-logon answer, "Failed to verify user name
+    and password", names the user as well; its refusal of a new password,
+    "Error changing password err 90020150", does not (both captured live,
+    2026-11-16). Reading the refusal as bad credentials would show the
+    account-lockout warning for a logon that succeeded.
+    """
+    return (
+        bool(result_minor and result_minor.endswith(_AUTH_MINOR_SUFFIX))
         or "user name" in msg.lower()
     )
 
@@ -175,6 +193,48 @@ def parse_enum_certificates_response(xml_str: str) -> list[bytes]:
 
     _logger.error("enum-certificates failed: %s", msg)
     raise ServerError(f"enum-certificates failed: {msg}")
+
+
+def parse_change_password_response(xml_str: str) -> None:
+    """Parse the response to a password-change request.
+
+    Checked live against the EKENG appliance on 2026-11-16: a success result
+    means the new password is in force; a new password the appliance will not
+    take comes back as ``ResponderError`` with the message
+    ``Error changing password err 90020150`` and the old password still valid.
+
+    Raises:
+        AuthError: If the current password was refused.
+        ServerError: If the server refused the new password.
+        RevenantError: If the response cannot be parsed.
+    """
+    try:
+        root = ET.fromstring(xml_str)
+    except _XMLParseError as e:
+        _logger.exception("Invalid XML in password-change response")
+        safe_preview = _redact_and_truncate_xml(xml_str[:500])
+        raise RevenantError(f"Invalid XML response: {e}\nRaw: {safe_preview}") from e
+
+    result: dict[str, str] = {}
+    for elem in root.iter():
+        tag = _strip_namespace(elem.tag)
+        text = (elem.text or "").strip()
+        if tag in ("ResultMajor", "ResultMinor", "ResultMessage") and text:
+            result[tag] = text
+
+    result_major = result.get("ResultMajor")
+    if result_major and result_major.endswith(":Success"):
+        return
+
+    result_minor = result.get("ResultMinor")
+    msg = result.get("ResultMessage") or result_minor or result_major or "Unknown error"
+
+    if _is_logon_failure_during_password_change(result_minor, msg):
+        _logger.warning("Authentication failed: %s", msg)
+        raise AuthError(f"Authentication failed: {msg}")
+
+    _logger.error("Password change refused: %s", msg)
+    raise ServerError(f"The server refused the new password: {msg}")
 
 
 @dataclass

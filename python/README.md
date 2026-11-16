@@ -231,11 +231,12 @@ revenant info document.pdf.p7s
 ### Manage configuration
 
 ```bash
+revenant password # change the account password on the server
 revenant logout   # clear credentials + identity, keep server config
 revenant reset    # clear everything (server, credentials, identity)
 ```
 
-`logout` preserves the server URL and profile so you can re-authenticate with `revenant setup` without reconfiguring the server. `reset` removes all configuration from `~/.revenant/config.json`.
+`password` asks for the new password twice, changes it on the server, confirms it with a logon and then updates the saved password, if one was saved. `logout` preserves the server URL and profile so you can re-authenticate with `revenant setup` without reconfiguring the server. `reset` removes all configuration from `~/.revenant/config.json`.
 
 ### Output modes
 

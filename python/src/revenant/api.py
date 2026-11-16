@@ -3,7 +3,7 @@
 
 Provides :func:`sign` and :func:`sign_detached` that handle profile
 resolution, transport creation, TLS registration, and appearance defaults
-automatically.
+automatically, and :func:`change_password` for the account password.
 
 For lower-level control, use :func:`~revenant.core.signing.sign_pdf_embedded`
 and :func:`~revenant.core.signing.sign_pdf_detached` directly with a
@@ -12,7 +12,7 @@ and :func:`~revenant.core.signing.sign_pdf_detached` directly with a
 
 from __future__ import annotations
 
-__all__ = ["sign", "sign_detached"]
+__all__ = ["change_password", "sign", "sign_detached"]
 
 import logging
 
@@ -25,9 +25,11 @@ from .config import (
 )
 from .config.profiles import ServerProfile, get_profile, make_custom_profile
 from .constants import DEFAULT_TIMEOUT_SOAP
+from .core import password as password_change
 from .core.appearance import extract_cert_fields, extract_display_fields
+from .core.password import PasswordChange, check_new_password
 from .core.signing import EmbeddedSignatureOptions, sign_pdf_detached, sign_pdf_embedded
-from .errors import ConfigError
+from .errors import ConfigError, RevenantError
 from .network.soap_transport import SoapSigningTransport
 
 _logger = logging.getLogger(__name__)
@@ -282,3 +284,55 @@ def sign_detached(
     transport = _setup_transport(resolved_url, profile_obj)
 
     return sign_pdf_detached(pdf_bytes, transport, username, password, resolved_timeout)
+
+
+def change_password(
+    username: str,
+    password: str,
+    new_password: str,
+    *,
+    profile: str | None = None,
+    url: str | None = None,
+    timeout: int | None = None,
+) -> PasswordChange:
+    """Change the signing account's password on the server.
+
+    Server resolution is identical to :func:`sign`. The new password is
+    checked against the resolved profile before anything is sent, and the
+    result is confirmed by a logon with the new password.
+
+    Stored credentials are left alone: when the result is confirmed, follow
+    up with :func:`revenant.config.apply_password_change`.
+
+    Args:
+        username: Revenant username.
+        password: Current password.
+        new_password: Password to change to.
+        profile: Built-in profile name (e.g. ``"ekeng"``).
+        url: SOAP endpoint URL. Mutually exclusive with *profile*.
+        timeout: Request timeout in seconds.
+
+    Returns:
+        The outcome: confirmed, or sent but unconfirmed.
+
+    Raises:
+        ConfigError: If no server URL can be resolved, or both *profile* and
+            *url* are given.
+        RevenantError: If the new password is refused before being sent, or
+            the request failed with the old password still in force.
+        AuthError: If the current password is wrong.
+        ServerError: If the server refused the new password.
+    """
+    profile_obj = _resolve_profile(profile, url)
+    resolved_url, resolved_timeout = _resolve_url_and_timeout(profile_obj, url, timeout)
+
+    ascii_only = profile_obj is not None and profile_obj.ascii_credentials_only
+    problem = check_new_password(password, new_password, ascii_only)
+    if problem is not None:
+        raise RevenantError(problem.value)
+
+    if profile_obj is not None:
+        register_profile_tls_mode(profile_obj)
+    return password_change.change_password(
+        resolved_url, username, password, new_password, resolved_timeout
+    )

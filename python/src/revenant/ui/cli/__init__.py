@@ -17,6 +17,7 @@ from ...constants import __version__
 from ...core.pdf import verify_all_embedded_signatures
 from ...errors import RevenantError
 from .cert import cmd_cert
+from .password import cmd_password
 from .setup import cmd_setup
 from .sign import cmd_sign
 from .verify import cmd_info, cmd_verify
@@ -228,6 +229,9 @@ def main() -> None:
         help=f"Use a built-in server profile ({', '.join(sorted(BUILTIN_PROFILES))})",
     )
 
+    # password
+    sub.add_parser("password", help="Change the account password on the server")
+
     # logout
     sub.add_parser("logout", help="Log out (clear credentials and identity, keep server)")
 
@@ -249,6 +253,8 @@ def main() -> None:
         cmd_info(args)
     elif args.command == "cert":
         cmd_cert(args)
+    elif args.command == "password":
+        cmd_password()
     elif args.command == "logout":
         _cmd_logout()
     elif args.command == "reset":

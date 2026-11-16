@@ -22,6 +22,7 @@ def _build_soap_envelope(
     sig_type: str,
     input_documents: str,
     extra_namespaces: str = "",
+    new_password: str | None = None,
 ) -> str:
     """
     Build a SOAP envelope for CoSign signing requests.
@@ -32,6 +33,10 @@ def _build_soap_envelope(
     Args:
         username: Revenant username (escaped internally).
         password: Revenant password (escaped internally).
+        new_password: Adds ``NewLogonPassword`` after ``LogonPassword``, the
+            order the WSDL's ``CoSignAuthDataType`` declares. The appliance
+            changes the password on any logon that carries it, so only the
+            password-change request passes it.
         sig_type: Signature type URN (e.g., SIGNATURE_TYPE_CMS).
         input_documents: XML fragment for <InputDocuments> content.
         extra_namespaces: Additional xmlns declarations for the envelope.
@@ -43,6 +48,12 @@ def _build_soap_envelope(
     safe_pass = xml_escape(password)
     safe_type = xml_escape(sig_type)
     ns_part = f"\n               {extra_namespaces}" if extra_namespaces else ""
+    new_password_part = ""
+    if new_password is not None:
+        safe_new_pass = xml_escape(new_password)
+        new_password_part = (
+            f"\n              <arx:NewLogonPassword>{safe_new_pass}</arx:NewLogonPassword>"
+        )
     return f"""\
 <?xml version="1.0" encoding="utf-8"?>
 <soap:Envelope xmlns:soap="http://schemas.xmlsoap.org/soap/envelope/"
@@ -54,7 +65,7 @@ def _build_soap_envelope(
           <ClaimedIdentity>
             <Name>{safe_user}</Name>
             <SupportingInfo>
-              <arx:LogonPassword>{safe_pass}</arx:LogonPassword>
+              <arx:LogonPassword>{safe_pass}</arx:LogonPassword>{new_password_part}
             </SupportingInfo>
           </ClaimedIdentity>
           <SignatureType>{safe_type}</SignatureType>
@@ -101,6 +112,19 @@ def build_enum_certificates_envelope(username: str, password: str) -> str:
     X.509 certificates without signing anything.  Auth is required.
     """
     return _build_soap_envelope(username, password, SIGNATURE_TYPE_ENUM_CERTS, "")
+
+
+def build_change_password_envelope(username: str, password: str, new_password: str) -> str:
+    """
+    Build the envelope that changes the user's password.
+
+    The appliance has no dedicated operation for this: it changes the password
+    on a logon that carries ``NewLogonPassword``. The logon rides on
+    enum-certificates because that operation signs nothing.
+    """
+    return _build_soap_envelope(
+        username, password, SIGNATURE_TYPE_ENUM_CERTS, "", new_password=new_password
+    )
 
 
 def build_verify_envelope(pdf_b64: str, sig_type: str = SIGNATURE_TYPE_FIELD_VERIFY) -> str:
