@@ -11,6 +11,7 @@ use std::time::Duration;
 use base64::Engine as _;
 
 use crate::constants::{DEFAULT_MAX_RETRIES, PDF_MAGIC, SHA1_DIGEST_SIZE};
+use crate::net::password_change::change_password;
 use crate::net::protocol::SigningTransport;
 use crate::net::soap::send_soap;
 use crate::net::soap_envelope::{
@@ -135,6 +136,23 @@ impl SigningTransport for SoapSigningTransport {
             &self.url,
             username,
             password,
+            timeout,
+        )
+    }
+
+    fn change_password(
+        &self,
+        username: &str,
+        password: &str,
+        new_password: &str,
+        timeout: Duration,
+    ) -> Result<()> {
+        change_password(
+            self.transport.as_ref(),
+            &self.url,
+            username,
+            password,
+            new_password,
             timeout,
         )
     }

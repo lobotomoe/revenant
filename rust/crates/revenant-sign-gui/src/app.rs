@@ -25,8 +25,8 @@ use crate::i18n::Localizer;
 use crate::jobs;
 use crate::reveal;
 use crate::views::{
-    self, AccountAction, ConnectAction, ConnectState, LoginAction, LoginState, SettingsAction,
-    SettingsLayout, SignAction, SignForm, VerifyAction, VerifyState,
+    self, AccountAction, ConnectAction, ConnectState, LoginAction, LoginState, PasswordState,
+    SettingsAction, SettingsLayout, SignAction, SignForm, VerifyAction, VerifyState,
 };
 use crate::window_style::WindowStyle;
 use crate::worker::{
@@ -34,6 +34,7 @@ use crate::worker::{
 };
 
 mod chrome;
+mod password;
 #[cfg(feature = "store-screenshots")]
 pub(crate) mod stage;
 
@@ -51,6 +52,7 @@ enum Tab {
 enum Dialog {
     Connect,
     Login,
+    ChangePassword,
 }
 
 /// A destructive action awaiting confirmation.
@@ -81,6 +83,8 @@ pub(crate) struct RevenantApp {
     connect: ConnectState,
     /// Present only while the login wizard is open (needs the active profile).
     login: Option<LoginState>,
+    /// Present only while the change-password dialog is open.
+    password: Option<PasswordState>,
     sign_form: SignForm,
     verify: VerifyState,
     /// A destructive action awaiting the user's confirmation, if any.
@@ -144,6 +148,7 @@ impl RevenantApp {
             settings_open: false,
             connect: ConnectState::new(),
             login: None,
+            password: None,
             sign_form: SignForm::new(default_font),
             verify: VerifyState::new(),
             confirm: None,
@@ -221,6 +226,9 @@ impl RevenantApp {
                     username,
                     password,
                 } => self.on_saved_password(request, &username, password),
+                WorkerMsg::PasswordChanged { request, outcome } => {
+                    self.on_password_changed(request, &outcome);
+                }
                 WorkerMsg::Signed(outcome) => self.on_signed(outcome),
                 WorkerMsg::Verified(outcome) => self.on_verified(outcome),
                 WorkerMsg::BatchProgress {
@@ -705,6 +713,7 @@ impl RevenantApp {
         match action {
             AccountAction::None => {}
             AccountAction::LogOut => self.confirm = Some(Confirm::LogOut),
+            AccountAction::ChangePassword => self.open_change_password(),
         }
     }
 
@@ -752,6 +761,7 @@ impl RevenantApp {
                     LoginAction::None => {}
                 }
             }
+            Dialog::ChangePassword => self.change_password_dialog(ctx),
         }
     }
 

@@ -242,6 +242,7 @@ and every command returns a typed result that maps to the process exit code.
 | `info` | List the certificates in a CMS `.p7s`: subject, issuer, serial, validity, expiry. |
 | `cert` | Show the signer certificate from the server, or `--pdf` from a signed document (offline). |
 | `setup` | Interactive wizard: choose a profile, ping, enter credentials, discover identity, save. |
+| `password` | Change the account password on the server, confirm it with a logon, and update the saved password if one was saved. |
 | `logout` / `reset` | Clear credentials + identity (keeping the server), or clear everything. |
 
 Credentials resolve env (`REVENANT_USER` / `REVENANT_PASS`) > saved keychain >

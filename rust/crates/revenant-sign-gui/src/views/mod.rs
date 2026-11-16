@@ -5,6 +5,7 @@
 pub(crate) mod account;
 pub(crate) mod connect;
 pub(crate) mod login;
+pub(crate) mod password;
 pub(crate) mod preview;
 pub(crate) mod settings;
 pub(crate) mod sign;
@@ -13,6 +14,7 @@ pub(crate) mod verify;
 pub(crate) use account::AccountAction;
 pub(crate) use connect::{ConnectAction, ConnectState};
 pub(crate) use login::{LoginAction, LoginState};
+pub(crate) use password::{PasswordAction, PasswordState};
 pub(crate) use settings::{SettingsAction, SettingsLayout};
 pub(crate) use sign::{SignAction, SignForm};
 pub(crate) use verify::{VerifyAction, VerifyState};

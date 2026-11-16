@@ -169,6 +169,11 @@ pub struct ServerProfile {
     /// deployment is known to work that way -- the SOAP envelope escapes and
     /// encodes credentials as UTF-8, so the transport imposes no such limit.
     pub ascii_credentials_only: bool,
+    /// The shortest password this deployment has been seen to accept, where
+    /// that was measured. The server does not publish its password rules, so
+    /// this only words the message shown after it refuses a password; nothing
+    /// is refused on the strength of it.
+    pub observed_min_password_length: Option<usize>,
     /// Certificate fields to display and extract.
     pub cert_fields: Vec<CertField>,
     /// Signature-appearance layout.
@@ -235,6 +240,9 @@ fn ekeng_profile() -> ServerProfile {
         // entry is the keyboard layout, not the account, and spending one of
         // the five attempts above to prove it risks locking the account.
         ascii_credentials_only: true,
+        // Measured on 2026-11-16, see docs/ekeng/README.md: five characters
+        // were refused, six accepted, whatever they were made of.
+        observed_min_password_length: Some(6),
         cert_fields: vec![
             CertField {
                 id: "name".to_owned(),
@@ -344,6 +352,7 @@ impl ServerProfile {
             ca_cert_markers: Vec::new(),
             max_auth_attempts: 0,
             ascii_credentials_only: false,
+            observed_min_password_length: None,
             cert_fields: Vec::new(),
             sig_fields: Vec::new(),
             font: "noto-sans".to_owned(),

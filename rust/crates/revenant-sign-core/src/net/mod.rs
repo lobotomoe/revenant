@@ -5,6 +5,7 @@
 //! consumers depend on `revenant_sign_core::net::*`, not on the internal file layout.
 
 mod discovery;
+mod password_change;
 mod protocol;
 mod soap;
 mod soap_envelope;
@@ -13,12 +14,13 @@ mod soap_transport;
 mod transport;
 
 pub use discovery::{ping_server, PingOutcome};
+pub use password_change::{change_password, parse_change_password_response};
 pub use protocol::SigningTransport;
 pub use soap::send_soap;
 pub use soap_envelope::{
-    build_enum_certificates_envelope, build_sign_envelope, build_sign_hash_envelope,
-    build_verify_envelope, xml_escape, SIGNATURE_TYPE_CMS, SIGNATURE_TYPE_ENUM_CERTS,
-    SIGNATURE_TYPE_FIELD_VERIFY, SIGNATURE_TYPE_XMLDSIG,
+    build_change_password_envelope, build_enum_certificates_envelope, build_sign_envelope,
+    build_sign_hash_envelope, build_verify_envelope, xml_escape, SIGNATURE_TYPE_CMS,
+    SIGNATURE_TYPE_ENUM_CERTS, SIGNATURE_TYPE_FIELD_VERIFY, SIGNATURE_TYPE_XMLDSIG,
 };
 pub use soap_parsers::{
     parse_enum_certificates_response, parse_sign_response, parse_verify_response,
