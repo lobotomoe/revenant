@@ -62,14 +62,16 @@ def cmd_password() -> None:
     except ServerError as e:
         print(f"Error: {e}", file=sys.stderr)
         observed_minimum = profile.observed_min_password_length if profile else None
-        minimum = shorter_than_observed_minimum(new_password, observed_minimum)
-        if minimum is None:
-            hint = "It may not meet the server's password rules."
-        else:
+        too_short = shorter_than_observed_minimum(new_password, observed_minimum) is not None
+        if too_short:
+            # The number printed is the profile's, not anything read from the
+            # password.
             hint = (
-                f"It is shorter than {minimum} characters, "
+                f"It is shorter than {observed_minimum} characters, "
                 "the shortest this server is known to accept."
             )
+        else:
+            hint = "It may not meet the server's password rules."
         print(f"The password was not changed. {hint}", file=sys.stderr)
         sys.exit(1)
     except TLSError as e:
