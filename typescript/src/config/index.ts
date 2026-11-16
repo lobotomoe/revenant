@@ -14,6 +14,7 @@ export {
   saveSignerInfo,
 } from "./config.js";
 export {
+  applyPasswordChange,
   clearCredentials,
   clearSessionCredentials,
   getCredentialStorageInfo,
@@ -21,6 +22,7 @@ export {
   getSavedUsername,
   isKeyringAvailable,
   resolveCredentials,
+  type StoredPasswordUpdate,
   saveCredentials,
   setSessionCredentials,
 } from "./credentials.js";

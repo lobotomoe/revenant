@@ -19,6 +19,7 @@ vi.mock("../src/network/soap.js", async (importOriginal) => {
 
 import { parseSignResponse, sendSoap } from "../src/network/soap.js";
 import {
+  changePassword,
   enumCertificates,
   SoapSigningTransport,
   verifyPdfServer,
@@ -157,5 +158,25 @@ describe("enumCertificates", () => {
     }
     expect(callArgs[0]).toBe("https://example.com/api");
     expect(callArgs[2]).toBe("DssSign");
+  });
+});
+
+// -- changePassword -----------------------------------------------------------
+
+describe("changePassword", () => {
+  it("sends the request once, with retries disabled", async () => {
+    vi.mocked(sendSoap).mockResolvedValueOnce(
+      "<Result><ResultMajor>urn:oasis:names:tc:dss:1.0:resultmajor:Success</ResultMajor></Result>",
+    );
+
+    await changePassword("https://example.com/DSS.asmx", "user", "old", "new", 30);
+
+    expect(sendSoap).toHaveBeenCalledTimes(1);
+    const [url, envelope, action, timeout, maxRetries] = vi.mocked(sendSoap).mock.calls[0] ?? [];
+    expect(url).toBe("https://example.com/DSS.asmx");
+    expect(envelope).toContain("<arx:NewLogonPassword>new</arx:NewLogonPassword>");
+    expect(action).toBe("DssSign");
+    expect(timeout).toBe(30);
+    expect(maxRetries).toBe(0);
   });
 });

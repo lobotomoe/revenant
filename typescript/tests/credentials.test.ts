@@ -22,6 +22,7 @@ vi.mock("keytar", () => {
 });
 
 import {
+  applyPasswordChange,
   clearCredentials,
   clearSessionCredentials,
   getCredentialStorageInfo,
@@ -212,5 +213,52 @@ describe("clearCredentials", () => {
     // After delete, the store object should not have username/password
     expect("username" in store).toBe(false);
     expect("password" in store).toBe(false);
+  });
+});
+
+// -- applyPasswordChange ------------------------------------------------------
+
+describe("applyPasswordChange", () => {
+  // Earlier suites pin loadConfig to fixed values, and those outlive
+  // restoreAllMocks, so this suite runs on a store of its own.
+  beforeEach(() => {
+    let store: Record<string, unknown> = {};
+    vi.mocked(loadConfig).mockImplementation(() => ({ ...store }));
+    vi.mocked(loadRawConfig).mockImplementation(() => store);
+    vi.mocked(saveConfig).mockImplementation((data: Record<string, unknown>) => {
+      store = { ...data };
+    });
+  });
+
+  it("replaces a saved password", async () => {
+    await saveCredentials("alice", "old");
+    const update = await applyPasswordChange("alice", "new");
+    expect(update).toEqual({ saved: true, envOverride: false });
+    expect(await getCredentials()).toEqual({ username: "alice", password: "new" });
+  });
+
+  it("saves nothing for a user who saved no password", async () => {
+    const update = await applyPasswordChange("alice", "new");
+    expect(update.saved).toBe(false);
+    expect(await getCredentials()).toEqual({ username: null, password: null });
+  });
+
+  it("leaves another account alone", async () => {
+    await saveCredentials("bob", "theirs");
+    const update = await applyPasswordChange("alice", "new");
+    expect(update.saved).toBe(false);
+    expect(await getCredentials()).toEqual({ username: "bob", password: "theirs" });
+  });
+
+  it("updates the session password of the same user", async () => {
+    setSessionCredentials("alice", "old");
+    await applyPasswordChange("alice", "new");
+    expect(resolveCredentials()).toEqual({ username: "alice", password: "new" });
+  });
+
+  it("reports an environment override", async () => {
+    process.env.REVENANT_PASS = "old";
+    const update = await applyPasswordChange("alice", "new");
+    expect(update.envOverride).toBe(true);
   });
 });

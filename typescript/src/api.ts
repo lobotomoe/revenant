@@ -22,6 +22,12 @@ import {
 import { DEFAULT_TIMEOUT_SOAP } from "./constants.js";
 import { extractCertFields, extractDisplayFields } from "./core/appearance/index.js";
 import { type CertInfo, discoverIdentityFromServer } from "./core/cert-info.js";
+import {
+  checkNewPassword,
+  describeNewPasswordProblem,
+  type PasswordChange,
+  changePassword as runPasswordChange,
+} from "./core/password.js";
 import type { PrepareOptions } from "./core/pdf/index.js";
 import {
   signDataWithTransport,
@@ -29,7 +35,7 @@ import {
   signPdfDetachedWithTransport,
   signPdfEmbeddedWithTransport,
 } from "./core/signing.js";
-import { ConfigError } from "./errors.js";
+import { ConfigError, RevenantError } from "./errors.js";
 import { SoapSigningTransport } from "./network/soap-transport.js";
 
 // -- Types --------------------------------------------------------------------
@@ -344,4 +350,43 @@ export async function verifyCredentials(
   options: DetachedSignOptions = {},
 ): Promise<void> {
   await getCertInfo(username, password, options);
+}
+
+/**
+ * Change the signing account's password on the server.
+ *
+ * Server resolution is identical to `signDetached`. The new password is
+ * checked against the resolved profile before anything is sent, and the
+ * result is confirmed by a logon with the new password.
+ *
+ * Stored credentials are left alone: when the result is confirmed, follow up
+ * with `applyPasswordChange` from the config module.
+ *
+ * Throws `AuthError` when the current password is wrong, `ServerError` when
+ * the server refuses the new one, and `RevenantError` when the new password
+ * is refused before being sent.
+ */
+export async function changePassword(
+  username: string,
+  password: string,
+  newPassword: string,
+  options: DetachedSignOptions = {},
+): Promise<PasswordChange> {
+  const profileObj = resolveProfile(options.profile, options.url);
+  const { url: resolvedUrl, timeout: resolvedTimeout } = resolveUrlAndTimeout(
+    profileObj,
+    options.url,
+    options.timeout,
+  );
+
+  const asciiOnly = profileObj?.asciiCredentialsOnly ?? false;
+  const problem = checkNewPassword(password, newPassword, asciiOnly);
+  if (problem !== null) {
+    throw new RevenantError(describeNewPasswordProblem(problem));
+  }
+
+  if (profileObj !== null) {
+    await registerProfileTlsMode(profileObj);
+  }
+  return runPasswordChange(resolvedUrl, username, password, newPassword, resolvedTimeout);
 }

@@ -5,10 +5,12 @@ export { pingServer } from "./discovery.js";
 export { legacyRequest } from "./legacy-tls.js";
 export type { SigningTransport } from "./protocol.js";
 export {
+  buildChangePasswordEnvelope,
   buildEnumCertificatesEnvelope,
   buildSignEnvelope,
   buildSignHashEnvelope,
   buildVerifyEnvelope,
+  parseChangePasswordResponse,
   parseEnumCertificatesResponse,
   parseSignResponse,
   parseVerifyResponse,
@@ -21,6 +23,7 @@ export {
   xmlEscape,
 } from "./soap.js";
 export {
+  changePassword,
   enumCertificates,
   SoapSigningTransport,
   verifyPdfServer,

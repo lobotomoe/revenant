@@ -101,6 +101,47 @@ export function printAuthFailure(error: AuthError, profile?: ServerProfile | nul
 }
 
 /**
+ * Read one line without echoing it. Ctrl-C exits the process.
+ */
+export async function promptHidden(label: string): Promise<string> {
+  const rl = createInterface({
+    input: process.stdin,
+    output: process.stdout,
+  });
+  return new Promise<string>((resolve) => {
+    // Disable echoing by writing to stdout directly
+    process.stdout.write(label);
+    const stdin = process.stdin;
+    const wasRaw = stdin.isRaw;
+    if (stdin.isTTY) stdin.setRawMode(true);
+
+    let buf = "";
+    const onData = (ch: Buffer): void => {
+      const c = ch.toString("utf-8");
+      if (c === "\n" || c === "\r") {
+        if (stdin.isTTY) stdin.setRawMode(wasRaw ?? false);
+        stdin.removeListener("data", onData);
+        process.stdout.write("\n");
+        rl.close();
+        resolve(buf.trim());
+      } else if (c === "\u0003") {
+        // Ctrl-C
+        if (stdin.isTTY) stdin.setRawMode(wasRaw ?? false);
+        stdin.removeListener("data", onData);
+        rl.close();
+        process.stdout.write("\n");
+        process.exit(1);
+      } else if (c === "\u007f" || c === "\b") {
+        buf = buf.slice(0, -1);
+      } else {
+        buf += c;
+      }
+    };
+    stdin.on("data", onData);
+  });
+}
+
+/**
  * Prompt for username and/or password interactively.
  */
 export async function promptCredentials(
@@ -114,42 +155,7 @@ export async function promptCredentials(
   }
 
   if (!password) {
-    // Use readline with silent output for password
-    const rl = createInterface({
-      input: process.stdin,
-      output: process.stdout,
-    });
-    password = await new Promise<string>((resolve) => {
-      // Disable echoing by writing to stdout directly
-      process.stdout.write("Revenant password: ");
-      const stdin = process.stdin;
-      const wasRaw = stdin.isRaw;
-      if (stdin.isTTY) stdin.setRawMode(true);
-
-      let buf = "";
-      const onData = (ch: Buffer): void => {
-        const c = ch.toString("utf-8");
-        if (c === "\n" || c === "\r") {
-          if (stdin.isTTY) stdin.setRawMode(wasRaw ?? false);
-          stdin.removeListener("data", onData);
-          process.stdout.write("\n");
-          rl.close();
-          resolve(buf.trim());
-        } else if (c === "\u0003") {
-          // Ctrl-C
-          if (stdin.isTTY) stdin.setRawMode(wasRaw ?? false);
-          stdin.removeListener("data", onData);
-          rl.close();
-          process.stdout.write("\n");
-          process.exit(1);
-        } else if (c === "\u007f" || c === "\b") {
-          buf = buf.slice(0, -1);
-        } else {
-          buf += c;
-        }
-      };
-      stdin.on("data", onData);
-    });
+    password = await promptHidden("Revenant password: ");
   }
 
   if (!username || !password) {

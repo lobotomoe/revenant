@@ -42,6 +42,9 @@ npx revenant info document.pdf.p7s
 
 # Verify with openssl (detached)
 npx revenant verify document.pdf
+
+# Change the account password on the server
+npx revenant password
 ```
 
 ### CLI options

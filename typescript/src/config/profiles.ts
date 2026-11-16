@@ -42,6 +42,20 @@ export interface ServerProfile {
   readonly tlsPins: readonly string[];
   readonly caCertMarkers: readonly string[];
   readonly maxAuthAttempts: number;
+  /**
+   * Whether this deployment issues Latin-only logins, making a non-ASCII
+   * entry a keyboard-layout slip rather than a credential. The desktop
+   * client's login form refuses non-ASCII credentials for such a profile, so
+   * a password change must not set one.
+   */
+  readonly asciiCredentialsOnly: boolean;
+  /**
+   * The shortest password this deployment has been seen to accept, where that
+   * was measured. The server does not publish its password rules, so this
+   * only words the message shown after it refuses a password; nothing is
+   * refused on the strength of it.
+   */
+  readonly observedMinPasswordLength: number | null;
   readonly certFields: readonly CertField[];
   readonly sigFields: readonly SigField[];
   readonly font: string;
@@ -71,6 +85,10 @@ export const BUILTIN_PROFILES: ReadonlyMap<string, ServerProfile> = new Map([
       identityMethods: ["server", "manual"],
       caCertMarkers: ["ekeng", "\u0567\u056f\u0565\u0576\u0563"],
       maxAuthAttempts: 5,
+      asciiCredentialsOnly: true,
+      // Measured on 2026-11-16, see docs/ekeng/README.md: five characters
+      // were refused, six accepted, whatever they were made of.
+      observedMinPasswordLength: 6,
       certFields: [
         {
           id: "name",
@@ -147,6 +165,8 @@ export function makeCustomProfile(
     tlsPins,
     caCertMarkers: [],
     maxAuthAttempts: 0,
+    asciiCredentialsOnly: false,
+    observedMinPasswordLength: null,
     certFields: [],
     sigFields: [],
     font: "noto-sans",
