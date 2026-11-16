@@ -50,6 +50,8 @@ pub(crate) enum Command {
     Cert(CertArgs),
     /// Configure server, credentials, and signer identity
     Setup(SetupArgs),
+    /// Change the account password on the server
+    Password,
     /// Log out (clear credentials and identity, keep server)
     Logout,
     /// Clear all configuration (server, credentials, identity)

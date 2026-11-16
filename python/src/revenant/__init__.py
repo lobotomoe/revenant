@@ -8,7 +8,7 @@ No Windows required — works on macOS and Linux.
 
 from __future__ import annotations
 
-from .api import sign, sign_detached
+from .api import change_password, sign, sign_detached
 from .config.config import get_signer_name
 from .constants import __version__
 from .core.pdf import (
@@ -47,6 +47,7 @@ __all__ = [
     "SigningResponseError",
     "TLSError",
     "__version__",
+    "change_password",
     "get_signer_name",
     "resolve_position",
     "sign",

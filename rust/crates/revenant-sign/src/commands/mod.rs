@@ -8,6 +8,7 @@
 mod account;
 mod cert;
 mod check;
+mod password;
 mod report;
 mod setup;
 mod sign;
@@ -16,6 +17,7 @@ mod verify;
 pub(crate) use account::{logout, reset};
 pub(crate) use cert::cert;
 pub(crate) use check::check;
+pub(crate) use password::password;
 pub(crate) use setup::setup;
 pub(crate) use sign::sign;
 pub(crate) use verify::{info, verify};

@@ -20,10 +20,13 @@ from revenant.config.config import (
     save_signer_info,
 )
 from revenant.config.credentials import (
+    apply_password_change,
     clear_credentials,
+    clear_session_credentials,
     get_credentials,
     resolve_credentials,
     save_credentials,
+    set_session_credentials,
 )
 from revenant.config.profiles import (
     BUILTIN_PROFILES,
@@ -238,6 +241,51 @@ def test_save_and_get_credentials(config_dir):
     user, pwd = get_credentials()
     assert user == "myuser"
     assert pwd == "mypass"
+
+
+def test_apply_password_change_replaces_a_saved_password(config_dir):
+    save_credentials("myuser", "old")
+
+    update = apply_password_change("myuser", "new")
+
+    assert update.saved
+    assert get_credentials() == ("myuser", "new")
+
+
+def test_apply_password_change_saves_nothing_for_a_user_who_saved_no_password(config_dir):
+    update = apply_password_change("myuser", "new")
+
+    assert not update.saved
+    assert get_credentials() == (None, None)
+
+
+def test_apply_password_change_leaves_another_account_alone(config_dir):
+    save_credentials("someone-else", "theirs")
+
+    update = apply_password_change("myuser", "new")
+
+    assert not update.saved
+    assert get_credentials() == ("someone-else", "theirs")
+
+
+def test_apply_password_change_updates_the_session_password(config_dir, monkeypatch):
+    monkeypatch.delenv("REVENANT_USER", raising=False)
+    monkeypatch.delenv("REVENANT_PASS", raising=False)
+    set_session_credentials("myuser", "old")
+    try:
+        update = apply_password_change("myuser", "new")
+        assert resolve_credentials() == ("myuser", "new")
+    finally:
+        clear_session_credentials()
+    assert not update.env_override
+
+
+def test_apply_password_change_reports_an_environment_override(config_dir, monkeypatch):
+    monkeypatch.setenv("REVENANT_PASS", "old")
+
+    update = apply_password_change("myuser", "new")
+
+    assert update.env_override
 
 
 def test_clear_credentials(config_dir):

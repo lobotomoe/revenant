@@ -10,6 +10,7 @@
 // transport setup, and TLS registration are handled internally; no
 // SigningTransport instance ever crosses the API boundary.
 export {
+  changePassword,
   type DetachedSignOptions,
   getCertInfo,
   type SignOptions,
@@ -21,6 +22,7 @@ export {
 } from "./api.js";
 // Configuration
 export { getSignerName } from "./config/config.js";
+export { applyPasswordChange, type StoredPasswordUpdate } from "./config/credentials.js";
 // Constants
 export { VERSION } from "./constants.js";
 // Identity payload returned by getCertInfo (CN, email, organization,

@@ -345,6 +345,30 @@ Missing `/Info` or `/ID` causes rejection with "Подлинность файл�
 EKENG locks accounts after **5 consecutive failed authentication attempts**.
 The CLI and GUI warn about this on auth failure.
 
+### Password policy (2026-11-16)
+
+The appliance does not publish its password rules and answers every refused
+password with the same `90020150`. Observed by changing a test account's
+password and changing it back:
+
+| Candidate | Result |
+|-----------|--------|
+| 1, 3 and 5 characters | refused |
+| 6 lowercase letters | accepted |
+| 6 digits | accepted |
+| 8 symbols from `-_.!@#$%*+=?` | accepted |
+| 8 characters including `< > & " '` | accepted |
+| 64 letters and digits | accepted |
+
+So the only rule found is a minimum of 6 characters: no mix of character
+classes is required and symbols are allowed. A previous password can be set
+again immediately. Not tested: lengths above 64, spaces, non-ASCII characters,
+and passwords resembling the user name. This is an observation of one server on
+one day, which is why the clients do not enforce it and leave the verdict to
+the server. They use it only afterwards: when the server refuses a password
+shorter than 6 characters, the error says so (`observed_min_password_length` in
+the profile).
+
 ### Certificate filtering
 
 Credential PDFs from EKENG contain both the user's personal signature and

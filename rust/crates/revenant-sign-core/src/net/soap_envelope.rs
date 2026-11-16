@@ -27,13 +27,19 @@ pub fn xml_escape(s: &str) -> String {
         .replace('\'', "&apos;")
 }
 
-/// Build the common `DssSign` envelope shared by the sign and enum-certificates
-/// requests. `input_documents` is an already-formed XML fragment;
-/// `extra_namespaces` adds declarations to the envelope element (e.g. the
-/// `xmlns:ds` used by the hash request).
+/// Build the common `DssSign` envelope shared by the sign, enum-certificates
+/// and password-change requests. `input_documents` is an already-formed XML
+/// fragment; `extra_namespaces` adds declarations to the envelope element (e.g.
+/// the `xmlns:ds` used by the hash request).
+///
+/// `new_password` adds `NewLogonPassword` after `LogonPassword`, the order the
+/// WSDL's `CoSignAuthDataType` sequence declares. The appliance changes the
+/// password on any logon that carries it, so it is `None` for everything but
+/// the password-change request.
 fn build_soap_envelope(
     username: &str,
     password: &str,
+    new_password: Option<&str>,
     sig_type: &str,
     input_documents: &str,
     extra_namespaces: &str,
@@ -41,6 +47,10 @@ fn build_soap_envelope(
     let safe_user = xml_escape(username);
     let safe_pass = xml_escape(password);
     let safe_type = xml_escape(sig_type);
+    let new_password_part = new_password.map_or_else(String::new, |new_password| {
+        let safe_new_pass = xml_escape(new_password);
+        format!("\n              <arx:NewLogonPassword>{safe_new_pass}</arx:NewLogonPassword>")
+    });
     let ns_part = if extra_namespaces.is_empty() {
         String::new()
     } else {
@@ -57,7 +67,7 @@ fn build_soap_envelope(
           <ClaimedIdentity>
             <Name>{safe_user}</Name>
             <SupportingInfo>
-              <arx:LogonPassword>{safe_pass}</arx:LogonPassword>
+              <arx:LogonPassword>{safe_pass}</arx:LogonPassword>{new_password_part}
             </SupportingInfo>
           </ClaimedIdentity>
           <SignatureType>{safe_type}</SignatureType>
@@ -87,7 +97,7 @@ pub fn build_sign_envelope(
         r#"<Document><Base64Data MimeType="application/pdf">{}</Base64Data></Document>"#,
         xml_escape(data_b64)
     );
-    build_soap_envelope(username, password, sig_type, &input_docs, "")
+    build_soap_envelope(username, password, None, sig_type, &input_docs, "")
 }
 
 /// Build the envelope for signing a pre-computed SHA-1 hash.
@@ -108,7 +118,7 @@ pub fn build_sign_hash_envelope(
         xml_escape(hash_b64)
     );
     let extra_ns = r#"xmlns:ds="http://www.w3.org/2000/09/xmldsig#""#;
-    build_soap_envelope(username, password, sig_type, &input_docs, extra_ns)
+    build_soap_envelope(username, password, None, sig_type, &input_docs, extra_ns)
 }
 
 /// Build the envelope for enumerating the user's certificates.
@@ -116,7 +126,28 @@ pub fn build_sign_hash_envelope(
 /// Authentication is required, but nothing is signed.
 #[must_use]
 pub fn build_enum_certificates_envelope(username: &str, password: &str) -> String {
-    build_soap_envelope(username, password, SIGNATURE_TYPE_ENUM_CERTS, "", "")
+    build_soap_envelope(username, password, None, SIGNATURE_TYPE_ENUM_CERTS, "", "")
+}
+
+/// Build the envelope that changes the user's password.
+///
+/// The appliance has no dedicated operation for this: it changes the password
+/// on a logon that carries `NewLogonPassword`. The logon rides on
+/// enum-certificates because that operation signs nothing.
+#[must_use]
+pub fn build_change_password_envelope(
+    username: &str,
+    password: &str,
+    new_password: &str,
+) -> String {
+    build_soap_envelope(
+        username,
+        password,
+        Some(new_password),
+        SIGNATURE_TYPE_ENUM_CERTS,
+        "",
+        "",
+    )
 }
 
 /// Build the `DssVerify` envelope for server-side signature verification.
@@ -228,6 +259,31 @@ mod tests {
         assert!(got.contains(
             r#"<Document><Base64Data MimeType="application/pdf">UERG</Base64Data></Document>"#
         ));
+    }
+
+    #[test]
+    fn change_password_envelope_adds_the_new_password_after_the_current_one() {
+        let got = build_change_password_envelope("alice", "old", "n<w");
+        let expected = r"            <Name>alice</Name>
+            <SupportingInfo>
+              <arx:LogonPassword>old</arx:LogonPassword>
+              <arx:NewLogonPassword>n&lt;w</arx:NewLogonPassword>
+            </SupportingInfo>
+          </ClaimedIdentity>
+          <SignatureType>http://arx.com/SAPIWS/DSS/1.0/enum-certificates</SignatureType>";
+        assert!(got.contains(expected), "in {got}");
+    }
+
+    #[test]
+    fn only_the_change_request_carries_a_new_password() {
+        let requests = [
+            build_sign_envelope("u", "p", SIGNATURE_TYPE_CMS, "ZA=="),
+            build_sign_hash_envelope("u", "p", SIGNATURE_TYPE_CMS, "aGFzaA=="),
+            build_enum_certificates_envelope("u", "p"),
+        ];
+        for request in requests {
+            assert!(!request.contains("NewLogonPassword"), "in {request}");
+        }
     }
 
     #[test]

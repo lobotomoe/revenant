@@ -20,8 +20,10 @@ use revenant_sign_core::RevenantError;
 use crate::worker::{Emit, IdentityOutcome, SignedOutcome, VerifyOutcome, WorkerMsg};
 
 mod output;
+mod password;
 
 use output::{batch_output_paths, write_unique_file};
+pub(crate) use password::change_password;
 
 /// Sign `pdf_path` and write the result to `output`, resolving credentials from
 /// the store.

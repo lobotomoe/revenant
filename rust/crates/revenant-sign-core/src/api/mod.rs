@@ -6,6 +6,7 @@
 //! hidden globals. For lower-level control, call [`crate::signing`] directly
 //! with a [`SoapSigningTransport`].
 
+mod password;
 mod verify;
 
 use std::sync::Arc;
@@ -19,6 +20,7 @@ use crate::pki::CertInfo;
 use crate::signing::{sign_pdf_detached, sign_pdf_embedded, EmbeddedSignatureOptions};
 use crate::{Result, RevenantError};
 
+pub use password::change_password;
 pub use verify::{verify_detached, verify_pdf, verify_pdf_all};
 
 /// Which server to sign against.

@@ -8,6 +8,8 @@ import { logger } from "../logger.js";
 
 const AUTH_MINOR_SUFFIX = ":AuthenticationError";
 
+// Also covers NewLogonPassword: the prefix class takes the "arx:New" in front
+// of "LogonPassword".
 const REDACT_PASSWORD_PATTERN = /<[\w:]*LogonPassword>[^<]*<\/[\w:]*LogonPassword>/g;
 const REDACT_NAME_PATTERN = /<(\w+:)?Name>[^<]*<\/(\w+:)?Name>/g;
 
@@ -16,6 +18,22 @@ function isAuthError(resultMinor: string | null, msg: string): boolean {
     resultMinor?.endsWith(AUTH_MINOR_SUFFIX) ||
     msg.toLowerCase().includes("password") ||
     msg.toLowerCase().includes("user name")
+  );
+}
+
+/**
+ * Detect a refused current password in a password-change response.
+ *
+ * Every failure of this operation mentions "password", so that keyword says
+ * nothing here. The appliance's bad-logon answer, "Failed to verify user name
+ * and password", names the user as well; its refusal of a new password, "Error
+ * changing password err 90020150", does not (both captured live, 2026-11-16).
+ * Reading the refusal as bad credentials would show the account-lockout
+ * warning for a logon that succeeded.
+ */
+function isLogonFailureDuringPasswordChange(resultMinor: string | null, msg: string): boolean {
+  return (
+    (resultMinor?.endsWith(AUTH_MINOR_SUFFIX) ?? false) || msg.toLowerCase().includes("user name")
   );
 }
 
@@ -198,6 +216,39 @@ export function parseEnumCertificatesResponse(xmlStr: string): Uint8Array[] {
   }
 
   throw new ServerError(`enum-certificates failed: ${msg}`);
+}
+
+/**
+ * Parse the response to a password-change request.
+ *
+ * Checked live against the EKENG appliance on 2026-11-16: a success result
+ * means the new password is in force; a new password the appliance will not
+ * take comes back as ResponderError with the message "Error changing password
+ * err 90020150" and the old password still valid.
+ *
+ * Throws AuthError when the current password was refused, ServerError when the
+ * server refused the new one, RevenantError on malformed XML.
+ */
+export function parseChangePasswordResponse(xmlStr: string): void {
+  let parsed: ParsedXml;
+  try {
+    parsed = parseXml(xmlStr);
+  } catch (e) {
+    const safePreview = redactAndTruncateXml(xmlStr.slice(0, 500));
+    throw new RevenantError(`Invalid XML response: ${getErrorMessage(e)}\nRaw: ${safePreview}`);
+  }
+
+  const resultMajor = findValue(parsed, "ResultMajor");
+  if (resultMajor?.endsWith(":Success")) return;
+
+  const resultMinor = findValue(parsed, "ResultMinor");
+  const resultMessage = findValue(parsed, "ResultMessage");
+  const msg = resultMessage ?? resultMinor ?? resultMajor ?? "Unknown error";
+
+  if (isLogonFailureDuringPasswordChange(resultMinor, msg)) {
+    throw new AuthError(`Authentication failed: ${msg}`);
+  }
+  throw new ServerError(`The server refused the new password: ${msg}`);
 }
 
 export interface ServerVerifyResult {

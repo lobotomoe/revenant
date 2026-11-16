@@ -6,10 +6,11 @@
  * TLS 1.0 + RC4 via node-forge; callers pass legacy TLS config for that.
  */
 
-import { DEFAULT_TIMEOUT_HTTP_POST } from "../constants.js";
+import { DEFAULT_MAX_RETRIES, DEFAULT_TIMEOUT_HTTP_POST } from "../constants.js";
 import { httpPost } from "./transport.js";
 
 export {
+  buildChangePasswordEnvelope,
   buildEnumCertificatesEnvelope,
   buildSignEnvelope,
   buildSignHashEnvelope,
@@ -22,6 +23,7 @@ export {
 } from "./soap-envelope.js";
 
 export {
+  parseChangePasswordResponse,
   parseEnumCertificatesResponse,
   parseSignResponse,
   parseVerifyResponse,
@@ -33,12 +35,14 @@ export async function sendSoap(
   envelope: string,
   action: string = "DssSign",
   timeout: number = DEFAULT_TIMEOUT_HTTP_POST,
+  // A request that must not reach the server twice (a password change) passes 0.
+  maxRetries: number = DEFAULT_MAX_RETRIES,
 ): Promise<string> {
   const headers = {
     "Content-Type": "text/xml; charset=utf-8",
     SOAPAction: `http://arx.com/SAPIWS/DSS/1.0/${action}`,
   };
   const body = new TextEncoder().encode(envelope);
-  const response = await httpPost(url, body, { headers, timeout });
+  const response = await httpPost(url, body, { headers, timeout, maxRetries });
   return new TextDecoder("utf-8").decode(response);
 }

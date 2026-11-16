@@ -50,6 +50,7 @@ fn dispatch(cli: Cli) -> CliResult {
         Command::Info(args) => commands::info(&args),
         Command::Cert(args) => commands::cert(&app, &args),
         Command::Setup(args) => commands::setup(&app, &args),
+        Command::Password => commands::password(&app),
         Command::Logout => commands::logout(&app),
         Command::Reset => commands::reset(&app),
     }

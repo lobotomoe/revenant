@@ -7,7 +7,7 @@
 
 use std::time::Duration;
 
-use crate::Result;
+use crate::{Result, RevenantError};
 
 /// A remote digital-signature service.
 ///
@@ -89,5 +89,31 @@ pub trait SigningTransport {
         _timeout: Duration,
     ) -> Result<Vec<Vec<u8>>> {
         Ok(Vec::new())
+    }
+
+    /// Replace the user's password with `new_password`, authenticating with the
+    /// current one.
+    ///
+    /// An optional capability. Implementations send the request once: a
+    /// repeated request after the server already applied the change would
+    /// present a password that no longer works. Callers want
+    /// [`crate::password::change_password`], which also confirms the outcome.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`RevenantError::Auth`] when the current password is wrong,
+    /// [`RevenantError::Server`] when the server refuses the new one, another
+    /// [`RevenantError`] on transport failure, and [`RevenantError::Other`]
+    /// when the transport has no such operation (the default).
+    fn change_password(
+        &self,
+        _username: &str,
+        _password: &str,
+        _new_password: &str,
+        _timeout: Duration,
+    ) -> Result<()> {
+        Err(RevenantError::Other(
+            "This signing transport cannot change passwords.".to_owned(),
+        ))
     }
 }

@@ -16,12 +16,18 @@ const AUTH_MINOR_SUFFIX: &str = ":AuthenticationError";
 /// `:AuthenticationError` minor code. Kept specific so an unrelated failure that
 /// merely mentions "password" (e.g. "password store unavailable") is not
 /// misreported as bad credentials, prompting a pointless re-login.
-const AUTH_MESSAGE_HINTS: [&str; 6] = [
+///
+/// "user name and password" is the one the EKENG appliance really sends: a bad
+/// logon comes back as `GeneralError` with the message
+/// `Failed to verify user name and password` (captured live, 2026-11-16).
+const AUTH_MESSAGE_HINTS: [&str; 8] = [
     "invalid password",
     "wrong password",
     "incorrect password",
     "invalid user name",
+    "unknown user name",
     "user name or password",
+    "user name and password",
     "authentication failed",
 ];
 /// How many characters of a malformed response to keep for the error preview,
@@ -36,7 +42,7 @@ fn decode_b64(s: &str) -> std::result::Result<Vec<u8>, base64::DecodeError> {
 }
 
 /// Whether a failure result denotes an authentication problem.
-fn is_auth_error(result_minor: Option<&str>, msg: &str) -> bool {
+pub(super) fn is_auth_error(result_minor: Option<&str>, msg: &str) -> bool {
     if result_minor.is_some_and(|m| m.ends_with(AUTH_MINOR_SUFFIX)) {
         return true;
     }
@@ -50,6 +56,7 @@ fn is_auth_error(result_minor: Option<&str>, msg: &str) -> bool {
 fn redact_and_truncate(xml: &str) -> String {
     let preview: String = xml.chars().take(RAW_PREVIEW_CHARS).collect();
     let redacted = redact_tag_content(&preview, "LogonPassword");
+    let redacted = redact_tag_content(&redacted, "NewLogonPassword");
     let redacted = redact_tag_content(&redacted, "Name");
     redacted.chars().take(XML_PREVIEW_LENGTH).collect()
 }
@@ -95,7 +102,7 @@ fn find_open_tag(s: &str, tag: &str) -> Option<usize> {
     None
 }
 
-fn parse_dom_or_error(xml: &str) -> Result<Node> {
+pub(super) fn parse_dom_or_error(xml: &str) -> Result<Node> {
     parse_dom(xml).map_err(|e| {
         let preview = redact_and_truncate(xml);
         RevenantError::Other(format!("Invalid XML response: {e}\nRaw: {preview}"))
@@ -104,7 +111,7 @@ fn parse_dom_or_error(xml: &str) -> Result<Node> {
 
 /// Message precedence for a non-success response: message, then minor, then
 /// major, else "Unknown error".
-fn failure_message(
+pub(super) fn failure_message(
     result_message: Option<String>,
     result_minor: Option<&str>,
     result_major: Option<String>,
@@ -286,6 +293,13 @@ mod tests {
         // Message-only auth hint (no minor code) is detected...
         assert!(is_auth_error(None, "Invalid password for user"));
         assert!(is_auth_error(None, "Authentication failed"));
+        // The appliance's real bad-logon answer carries only a generic minor.
+        assert!(is_auth_error(
+            Some("urn:oasis:names:tc:dss:1.0:resultminor:GeneralError"),
+            "Failed to verify user name and password"
+        ));
+        // A refused new password is not a failed logon.
+        assert!(!is_auth_error(None, "Error changing password err 90020150"));
         // ...but an unrelated failure that merely mentions "password" is not.
         assert!(!is_auth_error(
             None,

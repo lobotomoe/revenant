@@ -10,12 +10,13 @@ from __future__ import annotations
 
 import logging
 
-from ..constants import DEFAULT_TIMEOUT_HTTP_POST
+from ..constants import DEFAULT_MAX_RETRIES, DEFAULT_TIMEOUT_HTTP_POST
 from .soap_envelope import (
     SIGNATURE_TYPE_CMS,
     SIGNATURE_TYPE_ENUM_CERTS,
     SIGNATURE_TYPE_FIELD_VERIFY,
     SIGNATURE_TYPE_XMLDSIG,
+    build_change_password_envelope,
     build_enum_certificates_envelope,
     build_sign_envelope,
     build_sign_hash_envelope,
@@ -24,6 +25,7 @@ from .soap_envelope import (
 )
 from .soap_parsers import (
     ServerVerifyResult,
+    parse_change_password_response,
     parse_enum_certificates_response,
     parse_sign_response,
     parse_verify_response,
@@ -38,10 +40,12 @@ __all__ = [
     "SIGNATURE_TYPE_FIELD_VERIFY",
     "SIGNATURE_TYPE_XMLDSIG",
     "ServerVerifyResult",
+    "build_change_password_envelope",
     "build_enum_certificates_envelope",
     "build_sign_envelope",
     "build_sign_hash_envelope",
     "build_verify_envelope",
+    "parse_change_password_response",
     "parse_enum_certificates_response",
     "parse_sign_response",
     "parse_verify_response",
@@ -51,13 +55,20 @@ __all__ = [
 
 
 def send_soap(
-    url: str, envelope: str, action: str = "DssSign", timeout: int = DEFAULT_TIMEOUT_HTTP_POST
+    url: str,
+    envelope: str,
+    action: str = "DssSign",
+    timeout: int = DEFAULT_TIMEOUT_HTTP_POST,
+    max_retries: int = DEFAULT_MAX_RETRIES,
 ) -> str:
     """
     Send a SOAP request to a CoSign endpoint.
 
     TLS mode (standard or legacy) is determined automatically by the
     transport layer based on the target host.
+
+    ``max_retries`` bounds transport-level retries. A request that must not
+    reach the server twice (a password change) passes 0.
 
     Returns the response body as string.
     Raises TLSError on connection issues, RevenantError on failures.
@@ -74,6 +85,7 @@ def send_soap(
         body,
         headers=headers,
         timeout=timeout,
+        max_retries=max_retries,
     )
     decoded = response.decode("utf-8", errors="replace")
     _logger.debug("SOAP response: %d bytes", len(decoded))

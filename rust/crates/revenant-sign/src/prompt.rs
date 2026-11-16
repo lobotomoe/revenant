@@ -86,6 +86,21 @@ pub(crate) fn prompt_credentials(
     Ok((username, password))
 }
 
+/// Prompt for a new password twice, without echo.
+///
+/// # Errors
+///
+/// Returns [`CliError::silent`] if the user cancels, or [`CliError::new`] if
+/// the two entries differ.
+pub(crate) fn prompt_new_password() -> Result<String, CliError> {
+    let first = read_password("New password: ").ok_or_else(CliError::silent)?;
+    let second = read_password("Repeat new password: ").ok_or_else(CliError::silent)?;
+    if first != second {
+        return Err(CliError::new("the two passwords do not match."));
+    }
+    Ok(first)
+}
+
 /// Print an authentication-failure message with the lockout warning, to stderr.
 pub(crate) fn print_auth_failure(message: &str, profile: Option<&ServerProfile>) {
     eprintln!("AUTH FAILED");

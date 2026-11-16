@@ -15,6 +15,7 @@ pub mod config;
 pub mod constants;
 pub mod error;
 pub mod net;
+pub mod password;
 pub mod pdf;
 pub mod pki;
 pub mod signing;

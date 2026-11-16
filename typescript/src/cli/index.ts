@@ -213,6 +213,15 @@ Project:
       await cmdSetup(opts.profile ?? null);
     });
 
+  // password
+  program
+    .command("password")
+    .description("Change the account password on the server")
+    .action(async () => {
+      const { cmdPassword } = await import("./password.js");
+      await cmdPassword();
+    });
+
   // logout
   program
     .command("logout")

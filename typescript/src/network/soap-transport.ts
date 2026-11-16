@@ -8,10 +8,12 @@
 import { logger } from "../logger.js";
 import type { SigningTransport } from "./protocol.js";
 import {
+  buildChangePasswordEnvelope,
   buildEnumCertificatesEnvelope,
   buildSignEnvelope,
   buildSignHashEnvelope,
   buildVerifyEnvelope,
+  parseChangePasswordResponse,
   parseEnumCertificatesResponse,
   parseSignResponse,
   parseVerifyResponse,
@@ -19,6 +21,13 @@ import {
   SIGNATURE_TYPE_CMS,
   sendSoap,
 } from "./soap.js";
+
+/**
+ * A password change is sent once. If the response to a request the appliance
+ * already applied were lost, a retry would present the old password, which no
+ * longer works: a failed logon counted toward the account lockout.
+ */
+const CHANGE_PASSWORD_RETRIES = 0;
 
 function toBase64(bytes: Uint8Array): string {
   return Buffer.from(bytes).toString("base64");
@@ -102,4 +111,26 @@ export async function enumCertificates(
   const envelope = buildEnumCertificatesEnvelope(username, password);
   const response = await sendSoap(url, envelope, "DssSign", timeout);
   return parseEnumCertificatesResponse(response);
+}
+
+/**
+ * Ask the server to replace `password` with `newPassword`.
+ *
+ * One request, never retried. A transport failure leaves the outcome unknown:
+ * the appliance may have applied the change before the connection dropped.
+ * `changePassword` in core/password.ts settles that case.
+ *
+ * Throws AuthError when the current password is wrong and ServerError when the
+ * server refuses the new one.
+ */
+export async function changePassword(
+  url: string,
+  username: string,
+  password: string,
+  newPassword: string,
+  timeout: number,
+): Promise<void> {
+  const envelope = buildChangePasswordEnvelope(username, password, newPassword);
+  const response = await sendSoap(url, envelope, "DssSign", timeout, CHANGE_PASSWORD_RETRIES);
+  parseChangePasswordResponse(response);
 }

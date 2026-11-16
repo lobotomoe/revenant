@@ -13,6 +13,8 @@ describe("src/index.ts re-exports", () => {
     expect(typeof mod.signData).toBe("function");
     expect(typeof mod.getCertInfo).toBe("function");
     expect(typeof mod.verifyCredentials).toBe("function");
+    expect(typeof mod.changePassword).toBe("function");
+    expect(typeof mod.applyPasswordChange).toBe("function");
   });
 
   it("exports configuration helpers", async () => {

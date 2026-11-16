@@ -196,3 +196,40 @@ async function migratePlaintextPassword(kt: KeytarModule | null): Promise<void> 
     // Can't verify keyring has it -- don't remove plaintext
   }
 }
+
+/** What `applyPasswordChange` did with the new password. */
+export interface StoredPasswordUpdate {
+  /** The saved password (keychain or config file) was replaced. */
+  readonly saved: boolean;
+  /**
+   * REVENANT_PASS is set. It outranks every stored password and still holds
+   * the old one; only the user can change it.
+   */
+  readonly envOverride: boolean;
+}
+
+/**
+ * Replace every stored copy of `username`'s password with `newPassword`.
+ *
+ * Call this once the server is known to accept the new password. The
+ * in-memory session copy is replaced if it belongs to `username`. The saved
+ * copy is replaced only if a password was saved for `username` before: a user
+ * who chose not to save one keeps that choice.
+ */
+export async function applyPasswordChange(
+  username: string,
+  newPassword: string,
+): Promise<StoredPasswordUpdate> {
+  if (sessionUsername === username) {
+    sessionPassword = newPassword;
+  }
+
+  const stored = await getCredentials();
+  const savedForUser = stored.username === username && Boolean(stored.password);
+  if (savedForUser) {
+    await saveCredentials(username, newPassword);
+  }
+
+  const envOverride = (process.env[ENV_PASS] ?? "").trim() !== "";
+  return { saved: savedForUser, envOverride };
+}

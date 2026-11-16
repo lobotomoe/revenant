@@ -44,6 +44,7 @@ def test_send_soap_basic():
             "SOAPAction": "http://arx.com/SAPIWS/DSS/1.0/DssSign",
         },
         timeout=120,
+        max_retries=3,
     )
     assert result == "<response/>"
 

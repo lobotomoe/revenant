@@ -10,6 +10,7 @@
 //! The submodules are private; the public surface is re-exported here.
 
 mod credentials;
+mod password_change;
 mod profiles;
 mod secret;
 mod settings;
@@ -26,6 +27,7 @@ use credentials::{KeyringStore, MemorySecretStore, SecretStore};
 use storage::Storage;
 
 pub use credentials::ResolvedCredentials;
+pub use password_change::StoredPasswordUpdate;
 pub use profiles::{
     CertField, CertFieldSource, IdentityMethod, ServerProfile, SigAuto, SigField, SigFieldValue,
     TrustAnchors, BUILTIN_PROFILES, EKENG,

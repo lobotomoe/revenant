@@ -73,6 +73,11 @@ class ServerProfile:
             than a credential. Off unless a deployment is known to work that
             way -- the SOAP envelope escapes and encodes credentials as UTF-8,
             so the transport itself imposes no such limit.
+        observed_min_password_length: The shortest password this deployment
+            has been seen to accept, where that was measured. The server does
+            not publish its password rules, so this only words the message
+            shown after it refuses a password; nothing is refused on the
+            strength of it.
     """
 
     name: str
@@ -85,6 +90,7 @@ class ServerProfile:
     ca_cert_markers: tuple[str, ...] = ()
     max_auth_attempts: int = 0
     ascii_credentials_only: bool = False
+    observed_min_password_length: int | None = None
     cert_fields: tuple[CertField, ...] = ()
     sig_fields: tuple[SigField, ...] = ()
     font: str = "noto-sans"
@@ -115,6 +121,9 @@ BUILTIN_PROFILES: dict[str, ServerProfile] = {
         # entry is the keyboard layout, not the account, and spending one of
         # the five attempts above to prove it risks locking the account.
         ascii_credentials_only=True,
+        # Measured on 2026-11-16, see docs/ekeng/README.md: five characters
+        # were refused, six accepted, whatever they were made of.
+        observed_min_password_length=6,
         cert_fields=(
             CertField(id="name", label="Name", source="name", regex=r"^(.+?)\s+\d{5,}$"),
             # SSN is intentional. Social Services Number

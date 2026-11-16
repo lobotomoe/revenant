@@ -867,3 +867,62 @@ msgstr "НЕ ПРОЙДЕНА"
 #. EN: Certificate:
 msgid "gui.verify_certificate_label"
 msgstr "Сертификат:"
+
+#. EN: Change Password
+msgid "gui.change_password"
+msgstr "Сменить пароль"
+
+#. EN: New password:
+msgid "gui.new_password_label"
+msgstr "Новый пароль:"
+
+#. EN: Repeat new password:
+msgid "gui.repeat_new_password_label"
+msgstr "Повторите новый пароль:"
+
+#. EN: Changing password...
+msgid "gui.changing_password_ellipsis"
+msgstr "Смена пароля..."
+
+#. EN: Password changed.
+msgid "gui.password_changed"
+msgstr "Пароль изменён."
+
+#. EN: The password was changed on the server, but the saved copy could not be updated: {error}\nLog out and log in again with the new password.
+msgid "gui.password_changed_but_not_saved"
+msgstr "Пароль на сервере изменён, но сохранённую копию обновить не удалось: {error}\nВыйдите и войдите снова с новым паролем."
+
+#. EN: The connection failed before the change could be confirmed, so either password may be the valid one now.\n{error}\nLog out and log in again, trying the new password first.
+msgid "gui.password_change_unconfirmed"
+msgstr "Соединение прервалось до подтверждения смены, поэтому сейчас может действовать любой из двух паролей.\n{error}\nВыйдите и войдите снова, сначала попробовав новый пароль."
+
+#. EN: Log in again to change the password.
+msgid "gui.log_in_to_change_the_password"
+msgstr "Чтобы сменить пароль, войдите заново."
+
+#. EN: Enter a new password.
+msgid "gui.enter_a_new_password"
+msgstr "Введите новый пароль."
+
+#. EN: The two passwords do not match.
+msgid "gui.the_two_passwords_do_not_match"
+msgstr "Пароли не совпадают."
+
+#. EN: The new password is the same as the current one.
+msgid "gui.new_password_same_as_current"
+msgstr "Новый пароль совпадает с текущим."
+
+#. EN: The new password must contain only Latin characters.\nPlease check your keyboard layout.
+msgid "gui.new_password_latin_only"
+msgstr "Новый пароль должен содержать только латинские символы.\nПроверьте раскладку клавиатуры."
+
+#. EN: The server refused the new password. It may not meet the server's password rules.\n{error}
+msgid "gui.server_refused_the_new_password"
+msgstr "Сервер отклонил новый пароль. Возможно, он не соответствует требованиям сервера к паролям.\n{error}"
+
+msgid "gui.server_refused_a_short_password"
+msgstr "Сервер отклонил новый пароль. Он короче {min_length} символов, а более короткие пароли этот сервер не принимает.\n{error}"
+
+#. EN: Close
+msgid "gui.close"
+msgstr "Закрыть"

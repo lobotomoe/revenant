@@ -673,3 +673,62 @@ msgstr "ناموفق"
 #. EN: Certificate:
 msgid "gui.verify_certificate_label"
 msgstr "گواهی:"
+
+#. EN: Change Password
+msgid "gui.change_password"
+msgstr "تغییر گذرواژه"
+
+#. EN: New password:
+msgid "gui.new_password_label"
+msgstr "گذرواژه جدید:"
+
+#. EN: Repeat new password:
+msgid "gui.repeat_new_password_label"
+msgstr "تکرار گذرواژه جدید:"
+
+#. EN: Changing password...
+msgid "gui.changing_password_ellipsis"
+msgstr "در حال تغییر گذرواژه..."
+
+#. EN: Password changed.
+msgid "gui.password_changed"
+msgstr "گذرواژه تغییر کرد."
+
+#. EN: The password was changed on the server, but the saved copy could not be updated: {error}\nLog out and log in again with the new password.
+msgid "gui.password_changed_but_not_saved"
+msgstr "گذرواژه در سرور تغییر کرد، اما نسخه ذخیره‌شده به‌روزرسانی نشد: {error}\nخارج شوید و دوباره با گذرواژه جدید وارد شوید."
+
+#. EN: The connection failed before the change could be confirmed, so either password may be the valid one now.\n{error}\nLog out and log in again, trying the new password first.
+msgid "gui.password_change_unconfirmed"
+msgstr "اتصال پیش از تأیید تغییر قطع شد، بنابراین اکنون ممکن است هر یک از دو گذرواژه معتبر باشد.\n{error}\nخارج شوید و دوباره وارد شوید؛ ابتدا گذرواژه جدید را امتحان کنید."
+
+#. EN: Log in again to change the password.
+msgid "gui.log_in_to_change_the_password"
+msgstr "برای تغییر گذرواژه دوباره وارد شوید."
+
+#. EN: Enter a new password.
+msgid "gui.enter_a_new_password"
+msgstr "گذرواژه جدید را وارد کنید."
+
+#. EN: The two passwords do not match.
+msgid "gui.the_two_passwords_do_not_match"
+msgstr "دو گذرواژه یکسان نیستند."
+
+#. EN: The new password is the same as the current one.
+msgid "gui.new_password_same_as_current"
+msgstr "گذرواژه جدید با گذرواژه فعلی یکسان است."
+
+#. EN: The new password must contain only Latin characters.\nPlease check your keyboard layout.
+msgid "gui.new_password_latin_only"
+msgstr "گذرواژه جدید باید فقط شامل حروف لاتین باشد.\nلطفاً چیدمان صفحه‌کلید خود را بررسی کنید."
+
+#. EN: The server refused the new password. It may not meet the server's password rules.\n{error}
+msgid "gui.server_refused_the_new_password"
+msgstr "سرور گذرواژه جدید را نپذیرفت. ممکن است با قواعد گذرواژه سرور سازگار نباشد.\n{error}"
+
+msgid "gui.server_refused_a_short_password"
+msgstr "سرور گذرواژهٔ جدید را نپذیرفت. این گذرواژه کوتاه‌تر از {min_length} نویسه است و این سرور گذرواژهٔ کوتاه‌تر را نمی‌پذیرد.\n{error}"
+
+#. EN: Close
+msgid "gui.close"
+msgstr "بستن"

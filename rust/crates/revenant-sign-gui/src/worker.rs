@@ -11,6 +11,7 @@ use std::thread;
 
 use eframe::egui;
 use revenant_sign_core::net::ServerVerifyResult;
+use revenant_sign_core::password::NewPasswordProblem;
 use revenant_sign_core::pdf::VerificationResult;
 use revenant_sign_core::pki::CertInfo;
 
@@ -64,6 +65,33 @@ pub(crate) enum SignedOutcome {
     Failed(String),
 }
 
+/// Outcome of a background password change. Classified on the worker thread so
+/// the UI thread only has to pick the localized message.
+pub(crate) enum PasswordChangeOutcome {
+    /// The server accepts the new password and the stored copies follow it.
+    Changed,
+    /// The server accepts the new password, but the saved copy could not be
+    /// rewritten; the string is the storage error.
+    ChangedNotSaved(String),
+    /// The request went out and its result could not be confirmed, so either
+    /// password may be the valid one. The string is the connection failure.
+    Unconfirmed(String),
+    /// The app holds no password to authenticate the change with.
+    NoCredentials,
+    /// The new password was refused before being sent.
+    Invalid(NewPasswordProblem),
+    /// The server refused the current password.
+    AuthFailed(String),
+    /// The server refused the new password. `shorter_than` is the profile's
+    /// observed minimum length when the password fell short of it.
+    Refused {
+        detail: String,
+        shorter_than: Option<usize>,
+    },
+    /// Any other failure; the password is unchanged.
+    Failed(String),
+}
+
 /// Outcome of a background verification job.
 pub(crate) enum VerifyOutcome {
     /// The input file could not be read.
@@ -99,6 +127,11 @@ pub(crate) enum WorkerMsg {
         /// alone would not catch a username edited within the same wizard.
         username: String,
         password: Option<String>,
+    },
+    /// A password change finished.
+    PasswordChanged {
+        request: RequestId,
+        outcome: PasswordChangeOutcome,
     },
     /// A signing job finished.
     Signed(SignedOutcome),

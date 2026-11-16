@@ -21,11 +21,19 @@ function buildSoapEnvelope(
   sigType: string,
   inputDocuments: string,
   extraNamespaces: string = "",
+  newPassword: string | null = null,
 ): string {
   const safeUser = xmlEscape(username);
   const safePass = xmlEscape(password);
   const safeType = xmlEscape(sigType);
   const nsPart = extraNamespaces ? `\n               ${extraNamespaces}` : "";
+  // NewLogonPassword follows LogonPassword, the order the WSDL's
+  // CoSignAuthDataType declares. The appliance changes the password on any
+  // logon that carries it, so only the password-change request passes it.
+  const newPasswordPart =
+    newPassword === null
+      ? ""
+      : `\n              <arx:NewLogonPassword>${xmlEscape(newPassword)}</arx:NewLogonPassword>`;
   return `<?xml version="1.0" encoding="utf-8"?>
 <soap:Envelope xmlns:soap="http://schemas.xmlsoap.org/soap/envelope/"
                xmlns:arx="http://arx.com/SAPIWS/DSS/1.0"${nsPart}>
@@ -36,7 +44,7 @@ function buildSoapEnvelope(
           <ClaimedIdentity>
             <Name>${safeUser}</Name>
             <SupportingInfo>
-              <arx:LogonPassword>${safePass}</arx:LogonPassword>
+              <arx:LogonPassword>${safePass}</arx:LogonPassword>${newPasswordPart}
             </SupportingInfo>
           </ClaimedIdentity>
           <SignatureType>${safeType}</SignatureType>
@@ -75,6 +83,21 @@ export function buildSignHashEnvelope(
     `</DocumentHash>`;
   const extraNs = 'xmlns:ds="http://www.w3.org/2000/09/xmldsig#"';
   return buildSoapEnvelope(username, password, sigType, inputDocs, extraNs);
+}
+
+/**
+ * Build the envelope that changes the user's password.
+ *
+ * The appliance has no dedicated operation for this: it changes the password
+ * on a logon that carries NewLogonPassword. The logon rides on
+ * enum-certificates because that operation signs nothing.
+ */
+export function buildChangePasswordEnvelope(
+  username: string,
+  password: string,
+  newPassword: string,
+): string {
+  return buildSoapEnvelope(username, password, SIGNATURE_TYPE_ENUM_CERTS, "", "", newPassword);
 }
 
 export function buildEnumCertificatesEnvelope(username: string, password: string): string {

@@ -2,8 +2,8 @@
 //!
 //! It surfaces who is signing and whether their certificate is still valid --
 //! the signer's cert fields (or a name/org/email fallback), a colored validity
-//! line, where credentials are stored, and a log-out button. This mirrors the
-//! Python client's right-column account info.
+//! line, where credentials are stored, and the log-out and change-password
+//! buttons. This mirrors the Python client's right-column account info.
 
 use eframe::egui;
 use revenant_sign_core::appearance::extract_cert_fields;
@@ -19,6 +19,8 @@ pub(crate) enum AccountAction {
     None,
     /// Clear credentials and identity, dropping back to the login step.
     LogOut,
+    /// Open the change-password dialog.
+    ChangePassword,
 }
 
 pub(crate) fn show(ui: &mut egui::Ui, l10n: &Localizer, store: &ConfigStore) -> AccountAction {
@@ -66,6 +68,14 @@ pub(crate) fn show(ui: &mut egui::Ui, l10n: &Localizer, store: &ConfigStore) -> 
         }
 
         ui.label(egui::RichText::new(store.credential_storage_info()).weak());
+        ui.add_space(2.0);
+        // A row of its own keeps the button at its natural width: the card's
+        // column would stretch it edge to edge.
+        ui.horizontal(|ui| {
+            if ui.button(l10n.t("gui.change_password")).clicked() {
+                action = AccountAction::ChangePassword;
+            }
+        });
     });
     action
 }
