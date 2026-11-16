@@ -70,6 +70,30 @@
   </branding>
 
   <releases>
+    <release version="4.3.0" date="2026-11-16">
+      <description>
+        <p>
+          The account password can now be changed from the app: the account
+          card has a Change Password button. The new password is confirmed
+          with a logon before it replaces the saved one. A wrong password is
+          now reported as one, not as a server error.
+        </p>
+        <p xml:lang="ru">
+          Пароль учётной записи теперь можно сменить прямо в приложении: на
+          карточке учётной записи появилась кнопка «Сменить пароль». Новый
+          пароль сначала подтверждается входом и только потом заменяет
+          сохранённый. О неверном пароле теперь сообщается прямо, а не как об
+          ошибке сервера.
+        </p>
+        <p xml:lang="hy">
+          Հաշվի գաղտնաբառն այժմ կարելի է փոխել հենց ծրագրից․ հաշվի քարտում
+          ավելացել է «Փոխել գաղտնաբառը» կոճակը։ Նոր գաղտնաբառը նախ հաստատվում
+          է մուտքով և միայն դրանից հետո փոխարինում է պահպանվածին։ Սխալ
+          գաղտնաբառի մասին այժմ հաղորդվում է ուղղակիորեն, այլ ոչ թե որպես
+          սերվերի սխալ։
+        </p>
+      </description>
+    </release>
     <release version="4.2.0" date="2026-10-16">
       <description>
         <p>
