@@ -57,6 +57,22 @@ make test     # test both
 
 All checks must pass before submitting a pull request. CI runs them automatically.
 
+### Bumping a pinned Python dependency
+
+The lockfiles in `.github/requirements/` carry hashes and are installed with
+`--require-hashes`. Do not regenerate them on macOS or Windows: the resolver
+works for the machine it runs on and drops the Linux-only packages. To move one
+package, replace its block:
+
+```bash
+cd python
+python scripts/bump_requirement_pin.py certifi 2026.10.18 ../.github/requirements/audit.txt
+```
+
+It writes every hash PyPI lists for the new version, so the file stays valid on
+all platforms. `--help` covers the case where the new version drops a Python
+the project still tests on.
+
 ## How to Contribute
 
 ### Reporting Bugs
