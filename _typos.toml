@@ -54,6 +54,9 @@ abd = "abd"
 # Products / organizations
 EKENG = "EKENG"
 
+# Python package names
+certifi = "certifi"
+
 [files]
 extend-exclude = [
     "docs/",
