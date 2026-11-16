@@ -7,6 +7,21 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- **Change the account password.** The desktop app has a Change password
+  button on the account card, and all three CLIs have a `password` command.
+  The new password is confirmed with a logon before the saved one is replaced.
+  The libraries export `change_password` / `changePassword`.
+
+### Fixed
+
+- **Rust: a wrong password is reported as one.** The EKENG server words a
+  failed logon as "Failed to verify user name and password", which the desktop
+  app and CLI treated as a generic server error. Stopping a batch on the first
+  refused logon, which protects the account from the lockout, depends on
+  telling the two apart.
+
 ## [4.2.0] - 2026-10-16
 
 The desktop app now follows the macOS and Windows design guidelines. Nothing

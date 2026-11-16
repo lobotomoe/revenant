@@ -60,6 +60,33 @@ Key namespace details discovered during probing:
 - `LogonPassword` must be in `http://arx.com/SAPIWS/DSS/1.0` namespace, applied at the element level
 - `SupportingInfo` must be in the default (core DSS) namespace
 
+### Changing the password
+
+There is no operation for it. The appliance changes the password on any logon
+whose `SupportingInfo` carries `NewLogonPassword` after `LogonPassword`
+(`CoSignAuthDataType` in the WSDL):
+
+```xml
+<SupportingInfo>
+  <LogonPassword xmlns="http://arx.com/SAPIWS/DSS/1.0">current_password</LogonPassword>
+  <NewLogonPassword xmlns="http://arx.com/SAPIWS/DSS/1.0">new_password</NewLogonPassword>
+</SupportingInfo>
+```
+
+The clients send it on `enum-certificates`, which signs nothing, send it once
+with no retry, and then log on with the new password to confirm. A retry after
+a lost response would present the old password to a server that may already
+have dropped it, and count as a failed logon.
+
+| Outcome | Response |
+|---------|----------|
+| Changed | `Success`; the old password stops working at once |
+| Current password wrong | `ResponderError` / `GeneralError`, "Failed to verify user name and password" |
+| New password refused | `ResponderError` / `GeneralError`, "Error changing password err 90020150"; the old password stays valid and the logon is not counted as failed |
+
+`90020150` is `SAPI_ERR_FAILED_TO_UPDATE_CREDENTIAL`. The response does not say
+which rule the password broke, and no operation returns the policy.
+
 ## Signature types
 
 ### Standard OASIS DSS types
