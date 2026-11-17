@@ -354,8 +354,17 @@ def _make_pdf_with_acroform() -> tuple[bytes, int, int]:
 # ── build_catalog_override ──────────────────────────────────────────
 
 
-@pytest.mark.parametrize(("generation", "visible"), [(1, True), (513, False)])
-def test_prepare_preserves_catalog_generation(generation, visible):
+@pytest.mark.parametrize(
+    ("fixture", "expected_root", "visible"),
+    [
+        ("catalog_gen_1.pdf", (1, 1), True),
+        ("catalog_gen_513.pdf", (1, 513), False),
+        ("catalog_two_revisions.pdf", (7, 0), True),
+    ],
+)
+def test_prepare_preserves_current_catalog(
+    fixture: str, expected_root: tuple[int, int], visible: bool
+) -> None:
     import io
     from pathlib import Path
 
@@ -365,12 +374,13 @@ def test_prepare_preserves_catalog_generation(generation, visible):
     fixtures = (
         Path(__file__).resolve().parents[2] / "rust/crates/revenant-sign-core/src/pdf/testdata"
     )
-    source = (fixtures / f"catalog_gen_{generation}.pdf").read_bytes()
+    source = (fixtures / fixture).read_bytes()
     prepared, _, _ = prepare_pdf_with_sig_field(source, visible=visible)
 
     assert prepared.startswith(source)
+    assert find_root_obj_num(source) == expected_root
     with pikepdf.open(io.BytesIO(prepared), attempt_recovery=False) as pdf:
-        assert pdf.Root.objgen == (1, generation)
+        assert pdf.Root.objgen == expected_root
         (field,) = pdf.Root.AcroForm.Fields
         (widget,) = pdf.pages[0].Annots
         assert field.objgen == widget.objgen
@@ -762,15 +772,12 @@ def test_serialize_pikepdf_obj(value, expected):
 # ── find_root_obj_num — edge cases ───────────────────────────────────
 
 
-def test_find_root_obj_num_success():
-    pdf = b"trailer << /Root 1 0 R /Size 3 >>"
-    obj_num, gen = find_root_obj_num(pdf)
-    assert obj_num == 1
-    assert gen == 0
+def test_find_root_obj_num_success() -> None:
+    assert find_root_obj_num(_make_blank_pdf()) == (1, 0)
 
 
-def test_find_root_obj_num_missing():
-    with pytest.raises(PDFError, match="Cannot find /Root"):
+def test_find_root_obj_num_missing() -> None:
+    with pytest.raises(PDFError, match="Cannot read PDF trailer"):
         find_root_obj_num(b"%PDF-1.4\nno root here\n")
 
 

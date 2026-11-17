@@ -28,7 +28,6 @@ import {
   assembleIncrementalUpdate,
   findPageObjNum,
   findPrevStartxref,
-  findRootObjNum,
   patchByterange,
 } from "./incremental.js";
 import {
@@ -115,9 +114,9 @@ export async function preparePdfWithSigField(
   } = options;
 
   // Read-only analysis of the original PDF
-  const rootInfo = findRootObjNum(pdfBytes);
-  const pageInfo = await findPageObjNum(pdfBytes, page);
   const prevInfo = await findPrevStartxref(pdfBytes);
+  const { root } = prevInfo;
+  const pageInfo = await findPageObjNum(pdfBytes, page);
 
   let rawObjects: Array<{ raw: Uint8Array; objNum: number }>;
   let newSize: number;
@@ -126,8 +125,8 @@ export async function preparePdfWithSigField(
     const result = await prepareVisible({
       pdfBytes,
       prevSize: prevInfo.maxSize,
-      rootObjNum: rootInfo.objNum,
-      rootGen: rootInfo.genNum,
+      rootObjNum: root.objectNumber,
+      rootGen: root.generationNumber,
       pageObjNum: pageInfo.pageObjNum,
       existingAnnots: pageInfo.existingAnnots,
       pageW: pageInfo.pageWidth,
@@ -149,8 +148,8 @@ export async function preparePdfWithSigField(
     const result = await prepareInvisible(
       pdfBytes,
       prevInfo.maxSize,
-      rootInfo.objNum,
-      rootInfo.genNum,
+      root.objectNumber,
+      root.generationNumber,
       pageInfo.pageObjNum,
       pageInfo.existingAnnots,
       reason,
@@ -166,8 +165,8 @@ export async function preparePdfWithSigField(
     rawObjects,
     newSize,
     prevInfo.prevXref,
-    rootInfo.objNum,
-    rootInfo.genNum,
+    root.objectNumber,
+    root.generationNumber,
     prevInfo.trailerExtra,
     prevInfo.useXrefStream,
   );

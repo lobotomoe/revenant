@@ -10,10 +10,10 @@
 use sha1::{Digest, Sha1};
 
 use super::incremental::{
-    assemble_incremental_update, detect_xref_stream, find_root_obj_num, find_startxref_offset,
-    patch_byterange, PreparedPdf, UpdatePlan,
+    assemble_incremental_update, detect_xref_stream, find_startxref_offset, patch_byterange,
+    PreparedPdf, UpdatePlan,
 };
-use super::objects::{build_catalog_override, build_page_override, RawObject, SigObjectNums};
+use super::objects::{build_page_override, RawObject, SigObjectNums};
 use super::position::{
     compute_sig_rect, resolve_page_index, PageSpec, Position, SigRect, SIG_HEIGHT, SIG_MARGIN_H,
     SIG_MARGIN_V, SIG_WIDTH,
@@ -84,7 +84,6 @@ pub fn prepare_pdf_with_sig_field(
     opts: &PrepareOptions<'_>,
 ) -> Result<PreparedPdf> {
     // Read-only analysis of the original PDF.
-    let root = find_root_obj_num(pdf_bytes)?;
     let reader = PdfReader::open(pdf_bytes)?;
     if reader.is_encrypted() {
         return Err(RevenantError::Pdf(
@@ -93,6 +92,7 @@ pub fn prepare_pdf_with_sig_field(
                 .to_owned(),
         ));
     }
+    let root = reader.catalog_ref()?;
     let page_index = resolve_page_index(opts.page, reader.page_count())?;
     let page_info = reader.page_info(page_index)?;
     let prev_xref = find_startxref_offset(pdf_bytes)?;
@@ -206,7 +206,7 @@ fn prepare_visible(
 
     let annots_list = build_annots_list(&page_info.annots, obj_nums.annot);
     let page_override = build_page_override(reader, page_info.obj_num, &annots_list)?;
-    let catalog_override = build_catalog_override(reader, root, obj_nums.annot)?;
+    let catalog_override = reader.catalog_override_for_ref(root, obj_nums.annot)?;
 
     let mut objects: Vec<RawObject> = Vec::new();
     objects.push((sig, obj_nums.sig));
@@ -242,7 +242,7 @@ fn prepare_invisible(
 
     let annots_list = build_annots_list(&page_info.annots, obj_nums.annot);
     let page_override = build_page_override(reader, page_info.obj_num, &annots_list)?;
-    let catalog_override = build_catalog_override(reader, root, obj_nums.annot)?;
+    let catalog_override = reader.catalog_override_for_ref(root, obj_nums.annot)?;
 
     let objects = vec![
         (sig, obj_nums.sig),

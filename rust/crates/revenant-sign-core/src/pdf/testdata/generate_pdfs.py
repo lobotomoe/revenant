@@ -10,6 +10,7 @@ incremental-update assembly:
   * blank_letter_xref_stream.pdf -- 1 page, cross-reference *stream* (PDF 1.5+)
   * catalog_gen_1.pdf and catalog_gen_513.pdf -- a nonzero catalog generation
     and an embedded text file, with a traditional xref or a cross-reference stream
+  * catalog_two_revisions.pdf -- only the second catalog exposes the attachment
 
 Run from the repo root:
     python/.venv/bin/python \\
@@ -37,7 +38,9 @@ def _new(pages: list[tuple[int, int]]) -> pikepdf.Pdf:
     return pdf
 
 
-def _catalog_generation_pdf(generation: int, *, xref_stream: bool) -> bytes:
+def _catalog_generation_pdf(
+    generation: int, *, xref_stream: bool, revise_catalog: bool = False
+) -> bytes:
     # qpdf renumbers objects at generation 0 when saving. Write the small
     # fixture directly so the catalog, trailer and xref agree on its identity.
     pdf = bytearray(b"%PDF-1.7\n")
@@ -48,7 +51,8 @@ def _catalog_generation_pdf(generation: int, *, xref_stream: bool) -> bytes:
         entries.append((1, len(pdf), gen))
         pdf.extend(f"{number} {gen} obj\n".encode() + body + b"\nendobj\n")
 
-    add_object(b"<< /Type /Catalog /Pages 2 0 R /Names << /EmbeddedFiles 4 0 R >> >>", generation)
+    catalog = b"<< /Type /Catalog /Pages 2 0 R /Names << /EmbeddedFiles 4 0 R >> >>"
+    add_object(b"<< /Type /Catalog /Pages 2 0 R >>" if revise_catalog else catalog, generation)
     add_object(b"<< /Type /Pages /Count 1 /Kids [3 0 R] >>")
     add_object(b"<< /Type /Page /Parent 2 0 R /Resources << >> /MediaBox [0 0 612 792] >>")
     add_object(b"<< /Names [(note.txt) 5 0 R] >>")
@@ -75,6 +79,14 @@ def _catalog_generation_pdf(generation: int, *, xref_stream: bool) -> bytes:
             pdf.extend(f"{position:010} {gen:05} {'n' if kind else 'f'}\r\n".encode())
         pdf.extend(f"trailer\n<< /Size {len(entries)} {root} >>\n".encode())
     pdf.extend(f"startxref\n{offset}\n%%EOF\n".encode())
+    if revise_catalog:
+        number, position = len(entries), len(pdf)
+        add_object(catalog)
+        xref = len(pdf)
+        pdf.extend(f"xref\n{number} 1\n{position:010} 00000 n\r\n".encode())
+        # A comment is legal whitespace between the trailer key and its value.
+        pdf.extend(f"trailer\n<< /Size {len(entries)} /Prev {offset} /Root % New catalog\n".encode())
+        pdf.extend(f"{number} 0 R >>\nstartxref\n{xref}\n%%EOF\n".encode())
     return bytes(pdf)
 
 
@@ -104,6 +116,9 @@ def main() -> None:
 
     (OUT_DIR / "catalog_gen_1.pdf").write_bytes(_catalog_generation_pdf(1, xref_stream=False))
     (OUT_DIR / "catalog_gen_513.pdf").write_bytes(_catalog_generation_pdf(513, xref_stream=True))
+    (OUT_DIR / "catalog_two_revisions.pdf").write_bytes(
+        _catalog_generation_pdf(1, xref_stream=False, revise_catalog=True)
+    )
 
     for name in (
         "blank_letter.pdf",
@@ -111,6 +126,7 @@ def main() -> None:
         "blank_letter_xref_stream.pdf",
         "catalog_gen_1.pdf",
         "catalog_gen_513.pdf",
+        "catalog_two_revisions.pdf",
     ):
         size = (OUT_DIR / name).stat().st_size
         print(f"wrote {name} ({size} bytes)")

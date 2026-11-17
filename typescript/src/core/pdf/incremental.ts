@@ -19,34 +19,6 @@ import { getPageDimensions, resolvePageIndex } from "./position.js";
 
 // -- PDF structure analysis ---------------------------------------------------
 
-/**
- * Find the catalog /Root object number from the trailer.
- *
- * Uses the LAST match -- PDFs with incremental updates may redefine
- * /Root in later trailers, and the last one is always authoritative.
- */
-export function findRootObjNum(pdfBytes: Uint8Array): { objNum: number; genNum: number } {
-  const text = new TextDecoder("latin1").decode(pdfBytes);
-  const pattern = /\/Root\s+(\d+)\s+(\d+)\s+R/g;
-  const matches = [...text.matchAll(pattern)];
-  if (matches.length === 0) {
-    throw new PDFError("Cannot find /Root reference in PDF trailer.");
-  }
-  const last = matches[matches.length - 1];
-  if (last === undefined) {
-    throw new PDFError("Cannot find /Root reference in PDF trailer.");
-  }
-  const objNumStr = last[1];
-  const genNumStr = last[2];
-  if (objNumStr === undefined || genNumStr === undefined) {
-    throw new PDFError("Malformed /Root reference in PDF trailer.");
-  }
-  return {
-    objNum: parseInt(objNumStr, 10),
-    genNum: parseInt(genNumStr, 10),
-  };
-}
-
 export interface PageInfo {
   pageObjNum: number;
   pageWidth: number;
@@ -131,6 +103,7 @@ export async function findPageObjNum(
  */
 export async function findPrevStartxref(pdfBytes: Uint8Array): Promise<{
   prevXref: number;
+  root: PDFRef;
   maxSize: number;
   trailerExtra: string[];
   useXrefStream: boolean;
@@ -161,6 +134,10 @@ export async function findPrevStartxref(pdfBytes: Uint8Array): Promise<{
     updateMetadata: false,
   });
   const pdfLibSize = pdfDoc.context.largestObjectNumber + 1;
+  const root = pdfDoc.context.trailerInfo.Root;
+  if (!(root instanceof PDFRef)) {
+    throw new PDFError("Expected an indirect /Root reference in PDF trailer.");
+  }
   const trailerSize = parseTrailerSize(text);
   const maxSize = Math.max(pdfLibSize, trailerSize);
 
@@ -171,7 +148,7 @@ export async function findPrevStartxref(pdfBytes: Uint8Array): Promise<{
   // use the same format (ISO 32000-1 S7.5.8.4)
   const useXrefStream = detectXrefStreams(pdfBytes, prevXref);
 
-  return { prevXref, maxSize, trailerExtra, useXrefStream };
+  return { prevXref, root, maxSize, trailerExtra, useXrefStream };
 }
 
 /**

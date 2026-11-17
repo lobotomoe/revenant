@@ -1,22 +1,29 @@
-use lopdf::{xref::XrefEntry, Document};
-use revenant_sign_core::pdf::{prepare_pdf_with_sig_field, PrepareOptions};
+use std::num::NonZeroU32;
+
+use lopdf::{xref::XrefEntry, Document, ObjectId};
+use revenant_sign_core::pdf::{
+    build_catalog_override, find_root_obj_num, prepare_pdf_with_sig_field, ObjRef, PdfReader,
+    PrepareOptions,
+};
+
+const TWO_REVISIONS: &[u8] = include_bytes!("../src/pdf/testdata/catalog_two_revisions.pdf");
 
 #[test]
-fn preserves_catalog_generation_in_the_incremental_update() -> Result<(), Box<dyn std::error::Error>>
-{
-    let cases: &[(&[u8], u16, bool)] = &[
+fn preserves_current_catalog_in_the_incremental_update() -> Result<(), Box<dyn std::error::Error>> {
+    let cases: &[(&[u8], ObjectId, bool)] = &[
         (
             include_bytes!("../src/pdf/testdata/catalog_gen_1.pdf"),
-            1,
+            (1, 1),
             true,
         ),
         (
             include_bytes!("../src/pdf/testdata/catalog_gen_513.pdf"),
-            513,
+            (1, 513),
             false,
         ),
+        (TWO_REVISIONS, (7, 0), true),
     ];
-    for &(input, generation, visible) in cases {
+    for &(input, expected_root, visible) in cases {
         let options = PrepareOptions {
             visible,
             ..Default::default()
@@ -26,7 +33,8 @@ fn preserves_catalog_generation_in_the_incremental_update() -> Result<(), Box<dy
 
         let doc = Document::load_mem(&prepared.bytes)?;
         let root = doc.trailer.get(b"Root")?.as_reference()?;
-        assert_eq!(root, (1, generation));
+        assert_eq!(root, expected_root);
+        assert_eq!(find_root_obj_num(input)?, ObjRef::new(root.0, root.1));
         let Some(XrefEntry::Normal {
             offset,
             generation: xref_gen,
@@ -34,10 +42,12 @@ fn preserves_catalog_generation_in_the_incremental_update() -> Result<(), Box<dy
         else {
             panic!("expected an in-use catalog in the new xref")
         };
-        assert_eq!(*xref_gen, generation);
+        assert_eq!(*xref_gen, root.1);
         let offset = *offset as usize;
         assert!(offset >= input.len());
-        assert!(prepared.bytes[offset..].starts_with(format!("1 {generation} obj\n").as_bytes()));
+        assert!(
+            prepared.bytes[offset..].starts_with(format!("{} {} obj\n", root.0, root.1).as_bytes())
+        );
 
         let catalog = doc.catalog()?;
         let fields = catalog
@@ -59,5 +69,18 @@ fn preserves_catalog_generation_in_the_incremental_update() -> Result<(), Box<dy
             (4, 0)
         );
     }
+    Ok(())
+}
+
+#[test]
+fn catalog_helpers_accept_inferred_u32_conversions() -> revenant_sign_core::Result<()> {
+    let reader = PdfReader::open(include_bytes!("../src/pdf/testdata/catalog_gen_1.pdf"))?;
+    let root = NonZeroU32::new(1).unwrap();
+    let catalog = build_catalog_override(&reader, root.into(), 9)?;
+    assert!(catalog.starts_with(b"1 1 obj\n"));
+    assert_eq!(
+        reader.catalog_override_with_sig_field(root.into(), 9)?,
+        catalog
+    );
     Ok(())
 }

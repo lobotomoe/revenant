@@ -26,10 +26,9 @@ from ..appearance import (
 )
 from .incremental import (
     assemble_incremental_update,
-    find_page_obj_num,
     find_prev_startxref,
-    find_root_obj_num,
     patch_byterange,
+    read_root_and_page,
 )
 from .objects import (
     SigObjectNums,
@@ -107,10 +106,8 @@ def prepare_pdf_with_sig_field(
         (pdf_bytes, contents_hex_offset, contents_hex_length)
     """
     # ── Read-only analysis of the original PDF ──────────────────
-    root_obj_num, root_gen = find_root_obj_num(pdf_bytes)
-    page_obj_num, page_w, page_h, _has_annots, existing_annots = find_page_obj_num(
-        pdf_bytes, root_obj_num, page
-    )
+    (root_obj_num, root_gen), page_info = read_root_and_page(pdf_bytes, page)
+    page_obj_num, page_w, page_h, _has_annots, existing_annots = page_info
     prev_xref, prev_size, trailer_extra, use_xref_stream = find_prev_startxref(pdf_bytes)
 
     if visible:

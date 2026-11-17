@@ -10,7 +10,7 @@ use std::io::Write as _;
 use flate2::write::ZlibEncoder;
 use flate2::Compression;
 
-use super::reader::{ObjRef, PdfReader};
+use super::reader::PdfReader;
 use crate::{Result, RevenantError};
 
 /// A raw PDF object as `(serialized_bytes, object_number)`, the unit the
@@ -251,10 +251,10 @@ pub(super) fn deflate(data: &[u8]) -> Result<Vec<u8>> {
 /// object cannot be read.
 pub fn build_catalog_override(
     reader: &PdfReader,
-    root: impl Into<ObjRef>,
+    root_obj_num: u32,
     annot_obj_num: u32,
 ) -> Result<Vec<u8>> {
-    reader.catalog_override_with_sig_field(root, annot_obj_num)
+    reader.catalog_override_with_sig_field(root_obj_num, annot_obj_num)
 }
 
 #[cfg(test)]

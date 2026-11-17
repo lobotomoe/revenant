@@ -1,12 +1,8 @@
 //! PDF structure analysis and incremental-update assembly.
 //!
-//! Reads the bits of existing PDF structure that a byte-level scan handles best
-//! -- the authoritative `/Root` reference, the last `startxref`, and whether the
-//! file uses cross-reference streams -- then assembles the incremental update:
-//! the new objects, a matching xref (table or stream), and the trailer. The
-//! `/Size` and `/Info`+`/ID` carry-forward come from [`super::reader::PdfReader`]
-//! (which resolves xref streams correctly); object dictionaries are read there
-//! too.
+//! Locates the last `startxref` and detects the cross-reference format before
+//! appending the new objects, xref table or stream, and trailer.
+//! [`PdfReader`] resolves `/Root`, `/Size`, `/Info`, and `/ID` from the trailer.
 
 use std::collections::BTreeMap;
 use std::sync::LazyLock;
@@ -14,12 +10,9 @@ use std::sync::LazyLock;
 use regex::bytes::Regex;
 
 use super::objects::{deflate, BYTERANGE_PLACEHOLDER, CMS_HEX_SIZE};
-use super::reader::ObjRef;
+use super::reader::{ObjRef, PdfReader};
 use crate::{Result, RevenantError};
 
-/// The last `/Root N G R` wins: incremental updates may redefine it.
-static ROOT_RE: LazyLock<Regex> =
-    LazyLock::new(|| Regex::new(r"/Root\s+(\d+)\s+(\d+)\s+R").expect("valid /Root regex"));
 /// Lenient `startxref` match (some PDFs have trailing junk after `%%EOF`).
 static STARTXREF_RE: LazyLock<Regex> =
     LazyLock::new(|| Regex::new(r"startxref\s+(\d+)\s+%%EOF").expect("valid startxref regex"));
@@ -34,14 +27,9 @@ static XREF_STREAM_RE: LazyLock<Regex> =
 ///
 /// # Errors
 ///
-/// Returns [`RevenantError::Pdf`] if no `/Root` reference is present.
+/// Returns [`RevenantError::Pdf`] if the PDF or its catalog reference cannot be read.
 pub fn find_root_obj_num(pdf_bytes: &[u8]) -> Result<ObjRef> {
-    let caps = ROOT_RE.captures_iter(pdf_bytes).last().ok_or_else(|| {
-        RevenantError::Pdf("Cannot find /Root reference in PDF trailer.".to_owned())
-    })?;
-    let num = parse_uint::<u32>(&caps[1])?;
-    let gen = parse_uint::<u16>(&caps[2])?;
-    Ok(ObjRef::new(num, gen))
+    PdfReader::open(pdf_bytes)?.catalog_ref()
 }
 
 /// Find the byte offset from the last `startxref`.
