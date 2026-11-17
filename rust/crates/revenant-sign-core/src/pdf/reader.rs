@@ -37,6 +37,12 @@ impl ObjRef {
     }
 }
 
+impl From<u32> for ObjRef {
+    fn from(num: u32) -> Self {
+        Self::new(num, 0)
+    }
+}
+
 impl std::fmt::Display for ObjRef {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         write!(f, "{} {} R", self.num, self.gen)
@@ -297,19 +303,20 @@ impl PdfReader {
     /// a dictionary.
     pub fn catalog_override_with_sig_field(
         &self,
-        root_obj_num: u32,
+        root: impl Into<ObjRef>,
         new_field_obj_num: u32,
     ) -> Result<Vec<u8>> {
+        let root = root.into();
         let obj = self
             .doc
-            .get_object((root_obj_num, 0))
-            .map_err(|e| RevenantError::Pdf(format!("Cannot read catalog {root_obj_num}: {e}")))?;
-        let dict = obj.as_dict().map_err(|e| {
-            RevenantError::Pdf(format!("Catalog {root_obj_num} is not a dictionary: {e}"))
-        })?;
+            .get_object((root.num, root.gen))
+            .map_err(|e| RevenantError::Pdf(format!("Cannot read catalog {root}: {e}")))?;
+        let dict = obj
+            .as_dict()
+            .map_err(|e| RevenantError::Pdf(format!("Catalog {root} is not a dictionary: {e}")))?;
 
         let mut out = Vec::new();
-        out.extend_from_slice(format!("{root_obj_num} 0 obj\n<<\n").as_bytes());
+        out.extend_from_slice(format!("{} {} obj\n<<\n", root.num, root.gen).as_bytes());
         for (key, value) in dict {
             if key.as_slice() == b"AcroForm" {
                 continue;

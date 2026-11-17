@@ -7,6 +7,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+
+- Embedded signing now preserves the generation of the PDF catalog in incremental
+  updates. PDFs whose `/Root` has a nonzero generation can be signed directly.
+
 ## [4.3.0] - 2026-11-16
 
 ### Added

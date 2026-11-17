@@ -400,7 +400,10 @@ export function buildXrefAndTrailer(options: XrefTrailerOptions): Uint8Array {
       if (offset === undefined) {
         throw new PDFError(`Missing xref offset for object ${objNum}.`);
       }
-      lines.push(`${offset.toString().padStart(10, "0")} 00000 n\r`);
+      const generation = objNum === rootObjNum ? rootGen : 0;
+      lines.push(
+        `${offset.toString().padStart(10, "0")} ${generation.toString().padStart(5, "0")} n\r`,
+      );
     }
   }
 
@@ -442,9 +445,10 @@ export function buildXrefStream(options: XrefStreamOptions): Uint8Array {
   // Determine W (column widths for binary entries per ISO 32000-1 Table 17)
   // Column 1: type (1 byte, value 1 = in-use uncompressed)
   // Column 2: byte offset (variable width, big-endian)
-  // Column 3: generation number (1 byte, always 0 for new objects)
+  // Column 3: generation number (the catalog keeps its original generation)
   const maxOffset = Math.max(...allEntries.values());
   const w2 = bytesNeeded(maxOffset);
+  const w3 = bytesNeeded(rootGen);
 
   // Build /Index subsections and binary stream data
   const sortedNums = [...allEntries.keys()].sort((a, b) => a - b);
@@ -465,7 +469,10 @@ export function buildXrefStream(options: XrefStreamOptions): Uint8Array {
       for (let i = w2 - 1; i >= 0; i--) {
         binaryParts.push((offset >>> (i * 8)) & 0xff);
       }
-      binaryParts.push(0);
+      const generation = objNum === rootObjNum ? rootGen : 0;
+      for (let i = w3 - 1; i >= 0; i--) {
+        binaryParts.push((generation >>> (i * 8)) & 0xff);
+      }
     }
   }
 
@@ -480,7 +487,7 @@ export function buildXrefStream(options: XrefStreamOptions): Uint8Array {
   lines.push(`  /Size ${actualSize}`);
   lines.push(`  /Prev ${prevXref}`);
   lines.push(`  /Root ${rootObjNum} ${rootGen} R`);
-  lines.push(`  /W [1 ${w2} 1]`);
+  lines.push(`  /W [1 ${w2} ${w3}]`);
   lines.push(`  /Index [${indexParts.join(" ")}]`);
   lines.push("  /Filter /FlateDecode");
   lines.push(`  /Length ${compressed.length}`);

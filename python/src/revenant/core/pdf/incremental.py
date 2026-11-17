@@ -291,7 +291,9 @@ def build_xref_and_trailer(
         # PDF spec S7.5.4: each xref entry is exactly 20 bytes including EOL.
         # Format: "oooooooooo ggggg n\r\n" = 18 chars + \r + \n = 20 bytes.
         # The \r is part of the format string; \n comes from "\n".join().
-        xref_lines.extend(f"{xref_entries[obj_num]:010d} 00000 n\r" for obj_num in group)
+        for obj_num in group:
+            generation = root_gen if obj_num == root_obj_num else 0
+            xref_lines.append(f"{xref_entries[obj_num]:010d} {generation:05d} n\r")
 
     # Trailer -- must carry forward all entries from the previous trailer
     # (per PDF spec S7.5.6: entries from previous trailer that are not
@@ -348,9 +350,10 @@ def build_xref_stream(
     # Determine W (column widths for binary entries per ISO 32000-1 Table 17)
     # Column 1: type (1 byte, value 1 = in-use uncompressed)
     # Column 2: byte offset (variable width, big-endian)
-    # Column 3: generation number (1 byte, always 0 for new objects)
+    # Column 3: generation number (the catalog keeps its original generation)
     max_offset = max(all_entries.values())
     w2 = _bytes_needed(max_offset)
+    w3 = _bytes_needed(root_gen)
 
     # Build /Index subsections and binary stream data
     sorted_nums = sorted(all_entries.keys())
@@ -364,7 +367,8 @@ def build_xref_stream(
             offset = all_entries[obj_num]
             binary_parts.append(1)  # type 1 = in-use, uncompressed
             binary_parts.extend(offset.to_bytes(w2, byteorder="big"))
-            binary_parts.append(0)  # generation = 0
+            generation = root_gen if obj_num == root_obj_num else 0
+            binary_parts.extend(generation.to_bytes(w3, byteorder="big"))
 
     compressed = zlib.compress(bytes(binary_parts))
 
@@ -376,7 +380,7 @@ def build_xref_stream(
     lines.append(f"  /Size {actual_size}")
     lines.append(f"  /Prev {prev_xref}")
     lines.append(f"  /Root {root_obj_num} {root_gen} R")
-    lines.append(f"  /W [1 {w2} 1]")
+    lines.append(f"  /W [1 {w2} {w3}]")
     lines.append(f"  /Index [{' '.join(index_parts)}]")
     lines.append("  /Filter /FlateDecode")
     lines.append(f"  /Length {len(compressed)}")

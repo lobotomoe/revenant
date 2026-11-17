@@ -118,6 +118,7 @@ def prepare_pdf_with_sig_field(
             pdf_bytes,
             prev_size,
             root_obj_num,
+            root_gen,
             page_obj_num,
             existing_annots,
             page_w,
@@ -138,6 +139,7 @@ def prepare_pdf_with_sig_field(
             pdf_bytes,
             prev_size,
             root_obj_num,
+            root_gen,
             page_obj_num,
             existing_annots,
             reason,
@@ -164,6 +166,7 @@ def _prepare_visible(
     pdf_bytes: bytes,
     prev_size: int,
     root_obj_num: int,
+    root_gen: int,
     page_obj_num: int,
     existing_annots: list[str],
     page_w: float,
@@ -216,6 +219,7 @@ def _prepare_visible(
         pdf_bytes=pdf_bytes,
         obj_nums=obj_nums,
         root_obj_num=root_obj_num,
+        root_gen=root_gen,
         page_obj_num=page_obj_num,
         existing_annots=existing_annots,
         x=x,
@@ -235,6 +239,7 @@ def _prepare_invisible(
     pdf_bytes: bytes,
     prev_size: int,
     root_obj_num: int,
+    root_gen: int,
     page_obj_num: int,
     existing_annots: list[str],
     reason: str,
@@ -252,7 +257,9 @@ def _prepare_invisible(
     annots_list += f"{obj_nums['annot']} 0 R"
 
     page_override = build_page_override(pdf_bytes, page_obj_num, annots_list)
-    catalog_override = build_catalog_override(pdf_bytes, root_obj_num, obj_nums["annot"])
+    catalog_override = build_catalog_override(
+        pdf_bytes, root_obj_num, obj_nums["annot"], root_gen=root_gen
+    )
 
     raw_objects = [
         (_to_bytes(sig_dict_raw), obj_nums["sig"]),
@@ -267,6 +274,7 @@ def _build_all_objects(
     pdf_bytes: bytes,
     obj_nums: SigObjectNums,
     root_obj_num: int,
+    root_gen: int,
     page_obj_num: int,
     existing_annots: list[str],
     x: float,
@@ -301,7 +309,9 @@ def _build_all_objects(
     annots_list += f"{obj_nums['annot']} 0 R"
 
     page_override = build_page_override(pdf_bytes, page_obj_num, annots_list)
-    catalog_override = build_catalog_override(pdf_bytes, root_obj_num, obj_nums["annot"])
+    catalog_override = build_catalog_override(
+        pdf_bytes, root_obj_num, obj_nums["annot"], root_gen=root_gen
+    )
 
     return _collect_objects(
         sig_dict_raw=sig_dict_raw,

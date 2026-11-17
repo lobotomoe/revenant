@@ -3,12 +3,24 @@
  * cms-extraction, cms-info, incremental updates, builder, render, and verify.
  */
 
-import { unlinkSync, writeFileSync } from "node:fs";
+import { readFileSync, unlinkSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 
 import * as asn1js from "asn1js";
-import { PDFArray, PDFDict, PDFDocument, PDFName, PDFNumber, PDFRef, PDFString } from "pdf-lib";
+import {
+  PDFArray,
+  PDFContext,
+  PDFDict,
+  PDFDocument,
+  PDFName,
+  PDFNumber,
+  PDFObjectParser,
+  PDFRawStream,
+  PDFRef,
+  PDFString,
+  PDFXRefStreamParser,
+} from "pdf-lib";
 import * as pkijs from "pkijs";
 import { describe, expect, it } from "vitest";
 
@@ -1218,14 +1230,16 @@ describe("buildXrefAndTrailer", () => {
       xrefEntries: entries,
       newSize: 13,
       prevXref: 500,
-      rootObjNum: 1,
-      rootGen: 0,
+      rootObjNum: 10,
+      rootGen: 1,
       trailerExtra: [],
       xrefOffset: 5000,
     });
     const text = new TextDecoder().decode(result);
     expect(text).toContain("xref");
     expect(text).toContain("10 3"); // consecutive group: 10, 11, 12
+    expect(text).toContain("/Root 10 1 R");
+    expect(text).toContain("0000001000 00001 n\r\n0000002000 00000 n\r\n");
     expect(text).toContain("/Size 13");
     expect(text).toContain("/Prev 500");
     expect(text).toContain("startxref");
@@ -1294,8 +1308,8 @@ describe("buildXrefStream", () => {
       xrefEntries: entries,
       newSize: 12,
       prevXref: 500,
-      rootObjNum: 1,
-      rootGen: 0,
+      rootObjNum: 10,
+      rootGen: 513,
       trailerExtra: [],
       xrefOffset: 5000,
       xrefObjNum: 12,
@@ -1305,7 +1319,7 @@ describe("buildXrefStream", () => {
     expect(text).toContain("/Type /XRef");
     expect(text).toContain("/Size 13"); // xrefObjNum + 1
     expect(text).toContain("/Prev 500");
-    expect(text).toContain("/Root 1 0 R");
+    expect(text).toContain("/Root 10 513 R");
     expect(text).toContain("/Filter /FlateDecode");
     expect(text).toContain("stream");
     expect(text).toContain("endstream");
@@ -1314,6 +1328,18 @@ describe("buildXrefStream", () => {
     expect(text).toContain("%%EOF");
     // Should NOT contain traditional "trailer" keyword
     expect(text).not.toContain("trailer");
+
+    const stream = PDFObjectParser.forBytes(
+      result.subarray("12 0 obj\n".length),
+      PDFContext.create(),
+    ).parseObject();
+    if (!(stream instanceof PDFRawStream)) throw new Error("Expected a cross-reference stream");
+    const xref = PDFXRefStreamParser.forStream(stream).parseIntoContext();
+    expect(xref.map(({ ref, offset }) => [ref.toString(), offset])).toEqual([
+      ["10 513 R", 1000],
+      ["11 0 R", 2000],
+      ["12 0 R", 5000],
+    ]);
   });
 
   it("includes trailer extras in XRef stream dict", () => {
@@ -1484,6 +1510,31 @@ describe("patchByterange", () => {
 // =============================================================================
 
 describe("preparePdfWithSigField", () => {
+  it.each([
+    { generation: 1, visible: true },
+    { generation: 513, visible: false },
+  ])("preserves catalog generation $generation", async ({ generation, visible }) => {
+    const source = readFileSync(
+      new URL(
+        `../../rust/crates/revenant-sign-core/src/pdf/testdata/catalog_gen_${generation}.pdf`,
+        import.meta.url,
+      ),
+    );
+    const { pdf } = await preparePdfWithSigField(source, { visible });
+    expect(Buffer.from(pdf.subarray(0, source.length))).toEqual(source);
+
+    const doc = await PDFDocument.load(pdf, { updateMetadata: false });
+    expect(doc.context.trailerInfo.Root).toEqual(PDFRef.of(1, generation));
+    const form = doc.catalog.lookup(PDFName.of("AcroForm"), PDFDict);
+    const fields = form.lookup(PDFName.of("Fields"), PDFArray);
+    expect(fields.size()).toBe(1);
+    const annots = doc.getPage(0).node.lookup(PDFName.of("Annots"), PDFArray);
+    expect(annots.asArray()).toEqual(fields.asArray());
+    expect(fields.lookup(0, PDFDict).get(PDFName.of("FT"))).toEqual(PDFName.of("Sig"));
+    const names = doc.catalog.lookup(PDFName.of("Names"), PDFDict);
+    expect(names.get(PDFName.of("EmbeddedFiles"))).toEqual(PDFRef.of(4, 0));
+  });
+
   it("prepares PDF with invisible signature", async () => {
     const pdfBytes = await createValidPdf();
     const result = await preparePdfWithSigField(pdfBytes, { visible: false });

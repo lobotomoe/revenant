@@ -127,6 +127,7 @@ export async function preparePdfWithSigField(
       pdfBytes,
       prevSize: prevInfo.maxSize,
       rootObjNum: rootInfo.objNum,
+      rootGen: rootInfo.genNum,
       pageObjNum: pageInfo.pageObjNum,
       existingAnnots: pageInfo.existingAnnots,
       pageW: pageInfo.pageWidth,
@@ -149,6 +150,7 @@ export async function preparePdfWithSigField(
       pdfBytes,
       prevInfo.maxSize,
       rootInfo.objNum,
+      rootInfo.genNum,
       pageInfo.pageObjNum,
       pageInfo.existingAnnots,
       reason,
@@ -230,6 +232,7 @@ interface VisibleSigParams {
   pdfBytes: Uint8Array;
   prevSize: number;
   rootObjNum: number;
+  rootGen: number;
   pageObjNum: number;
   existingAnnots: string[];
   pageW: number;
@@ -297,6 +300,7 @@ async function prepareVisible(
     params.pdfBytes,
     objNums,
     params.rootObjNum,
+    params.rootGen,
     params.pageObjNum,
     params.existingAnnots,
     x,
@@ -319,6 +323,7 @@ async function prepareInvisible(
   pdfBytes: Uint8Array,
   prevSize: number,
   rootObjNum: number,
+  rootGen: number,
   pageObjNum: number,
   existingAnnots: string[],
   reason: string,
@@ -334,7 +339,7 @@ async function prepareInvisible(
   annotsList += `${objNums.annot} 0 R`;
 
   const pageOverride = await buildPageOverride(pdfBytes, pageObjNum, annotsList);
-  const catalogOverride = await buildCatalogOverride(pdfBytes, rootObjNum, objNums.annot);
+  const catalogOverride = await buildCatalogOverride(pdfBytes, rootObjNum, objNums.annot, rootGen);
 
   const rawObjects: Array<{ raw: Uint8Array; objNum: number }> = [
     { raw: toBytes(sigDictRaw), objNum: objNums.sig },
@@ -352,6 +357,7 @@ async function buildAllObjects(
   pdfBytes: Uint8Array,
   objNums: SigObjectNums,
   rootObjNum: number,
+  rootGen: number,
   pageObjNum: number,
   existingAnnots: string[],
   x: number,
@@ -374,7 +380,7 @@ async function buildAllObjects(
   annotsList += `${objNums.annot} 0 R`;
 
   const pageOverride = await buildPageOverride(pdfBytes, pageObjNum, annotsList);
-  const catalogOverride = await buildCatalogOverride(pdfBytes, rootObjNum, objNums.annot);
+  const catalogOverride = await buildCatalogOverride(pdfBytes, rootObjNum, objNums.annot, rootGen);
 
   return collectObjects(
     sigDictRaw,

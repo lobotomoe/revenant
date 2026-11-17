@@ -354,6 +354,30 @@ def _make_pdf_with_acroform() -> tuple[bytes, int, int]:
 # ── build_catalog_override ──────────────────────────────────────────
 
 
+@pytest.mark.parametrize(("generation", "visible"), [(1, True), (513, False)])
+def test_prepare_preserves_catalog_generation(generation, visible):
+    import io
+    from pathlib import Path
+
+    from revenant.core.pdf import prepare_pdf_with_sig_field
+
+    pikepdf = pytest.importorskip("pikepdf")
+    fixtures = (
+        Path(__file__).resolve().parents[2] / "rust/crates/revenant-sign-core/src/pdf/testdata"
+    )
+    source = (fixtures / f"catalog_gen_{generation}.pdf").read_bytes()
+    prepared, _, _ = prepare_pdf_with_sig_field(source, visible=visible)
+
+    assert prepared.startswith(source)
+    with pikepdf.open(io.BytesIO(prepared), attempt_recovery=False) as pdf:
+        assert pdf.Root.objgen == (1, generation)
+        (field,) = pdf.Root.AcroForm.Fields
+        (widget,) = pdf.pages[0].Annots
+        assert field.objgen == widget.objgen
+        assert field["/FT"] == pikepdf.Name.Sig
+        assert pdf.attachments["note.txt"].get_file().read_bytes() == b"note\n"
+
+
 def test_build_catalog_override_creates_acroform_when_absent():
     """No existing form: the minimal field-only AcroForm, byte-identical to
     the pre-merge behavior, so plain-document signing is unchanged."""
