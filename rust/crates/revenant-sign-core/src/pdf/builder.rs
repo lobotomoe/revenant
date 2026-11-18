@@ -10,10 +10,10 @@
 use sha1::{Digest, Sha1};
 
 use super::incremental::{
-    assemble_incremental_update, detect_xref_stream, find_root_obj_num, find_startxref_offset,
-    patch_byterange, PreparedPdf, UpdatePlan,
+    assemble_incremental_update, detect_xref_stream, find_startxref_offset, patch_byterange,
+    PreparedPdf, UpdatePlan,
 };
-use super::objects::{build_catalog_override, build_page_override, RawObject, SigObjectNums};
+use super::objects::{build_page_override, RawObject, SigObjectNums};
 use super::position::{
     compute_sig_rect, resolve_page_index, PageSpec, Position, SigRect, SIG_HEIGHT, SIG_MARGIN_H,
     SIG_MARGIN_V, SIG_WIDTH,
@@ -84,18 +84,6 @@ pub fn prepare_pdf_with_sig_field(
     opts: &PrepareOptions<'_>,
 ) -> Result<PreparedPdf> {
     // Read-only analysis of the original PDF.
-    let root = find_root_obj_num(pdf_bytes)?;
-    // The incremental-update assembly redefines the catalog as `N 0 obj` and
-    // lists every appended object in the xref at generation 0. A catalog at a
-    // non-zero generation (effectively never seen in practice) would leave the
-    // new `/Root N G R` reference dangling against a gen-0 xref entry, so reject
-    // it up front rather than emit a structurally inconsistent file.
-    if root.gen != 0 {
-        return Err(RevenantError::Pdf(format!(
-            "Catalog /Root has generation {}; only generation 0 is supported.",
-            root.gen
-        )));
-    }
     let reader = PdfReader::open(pdf_bytes)?;
     if reader.is_encrypted() {
         return Err(RevenantError::Pdf(
@@ -104,6 +92,7 @@ pub fn prepare_pdf_with_sig_field(
                 .to_owned(),
         ));
     }
+    let root = reader.catalog_ref()?;
     let page_index = resolve_page_index(opts.page, reader.page_count())?;
     let page_info = reader.page_info(page_index)?;
     let prev_xref = find_startxref_offset(pdf_bytes)?;
@@ -113,9 +102,9 @@ pub fn prepare_pdf_with_sig_field(
     let use_xref_stream = detect_xref_stream(pdf_bytes, prev_xref);
 
     let (raw_objects, new_size) = if opts.visible {
-        prepare_visible(&reader, prev_size, root.num, &page_info, opts)?
+        prepare_visible(&reader, prev_size, root, &page_info, opts)?
     } else {
-        prepare_invisible(&reader, prev_size, root.num, &page_info, opts)?
+        prepare_invisible(&reader, prev_size, root, &page_info, opts)?
     };
 
     let plan = UpdatePlan {
@@ -134,7 +123,7 @@ pub fn prepare_pdf_with_sig_field(
 fn prepare_visible(
     reader: &PdfReader,
     prev_size: u32,
-    root_obj_num: u32,
+    root: ObjRef,
     page_info: &PageInfo,
     opts: &PrepareOptions<'_>,
 ) -> Result<(Vec<RawObject>, u32)> {
@@ -217,7 +206,7 @@ fn prepare_visible(
 
     let annots_list = build_annots_list(&page_info.annots, obj_nums.annot);
     let page_override = build_page_override(reader, page_info.obj_num, &annots_list)?;
-    let catalog_override = build_catalog_override(reader, root_obj_num, obj_nums.annot)?;
+    let catalog_override = reader.catalog_override_for_ref(root, obj_nums.annot)?;
 
     let mut objects: Vec<RawObject> = Vec::new();
     objects.push((sig, obj_nums.sig));
@@ -234,7 +223,7 @@ fn prepare_visible(
         objects.push((bytes, num));
     }
     objects.push((page_override, page_info.obj_num));
-    objects.push((catalog_override, root_obj_num));
+    objects.push((catalog_override, root.num));
 
     Ok((objects, obj_nums.new_size))
 }
@@ -243,7 +232,7 @@ fn prepare_visible(
 fn prepare_invisible(
     reader: &PdfReader,
     prev_size: u32,
-    root_obj_num: u32,
+    root: ObjRef,
     page_info: &PageInfo,
     opts: &PrepareOptions<'_>,
 ) -> Result<(Vec<RawObject>, u32)> {
@@ -253,13 +242,13 @@ fn prepare_invisible(
 
     let annots_list = build_annots_list(&page_info.annots, obj_nums.annot);
     let page_override = build_page_override(reader, page_info.obj_num, &annots_list)?;
-    let catalog_override = build_catalog_override(reader, root_obj_num, obj_nums.annot)?;
+    let catalog_override = reader.catalog_override_for_ref(root, obj_nums.annot)?;
 
     let objects = vec![
         (sig, obj_nums.sig),
         (annot, obj_nums.annot),
         (page_override, page_info.obj_num),
-        (catalog_override, root_obj_num),
+        (catalog_override, root.num),
     ];
     Ok((objects, obj_nums.new_size))
 }

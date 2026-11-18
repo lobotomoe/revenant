@@ -9,7 +9,7 @@
 //! on plain data (numbers, strings, [`PageInfo`]) rather than a specific PDF
 //! library -- if the backing library ever changes, only this file moves.
 
-use lopdf::{Dictionary, Document, Object, ObjectId};
+use lopdf::{xref::XrefEntry, Dictionary, Document, Object, ObjectId};
 
 use crate::{Result, RevenantError};
 
@@ -72,6 +72,17 @@ impl PdfReader {
         let doc = Document::load_mem(pdf_bytes)
             .map_err(|e| RevenantError::Pdf(format!("Cannot parse PDF: {e}")))?;
         Ok(Self { doc })
+    }
+
+    /// Catalog reference from the active trailer, including its generation.
+    pub(super) fn catalog_ref(&self) -> Result<ObjRef> {
+        let (num, generation) = self
+            .doc
+            .trailer
+            .get(b"Root")
+            .and_then(Object::as_reference)
+            .map_err(|e| RevenantError::Pdf(format!("Cannot read /Root from PDF trailer: {e}")))?;
+        Ok(ObjRef::new(num, generation))
     }
 
     /// Number of pages in the document.
@@ -300,16 +311,28 @@ impl PdfReader {
         root_obj_num: u32,
         new_field_obj_num: u32,
     ) -> Result<Vec<u8>> {
+        let generation = match self.doc.reference_table.get(root_obj_num) {
+            Some(XrefEntry::Normal { generation, .. }) => *generation,
+            _ => 0, // Objects stored in object streams always have generation zero.
+        };
+        self.catalog_override_for_ref(ObjRef::new(root_obj_num, generation), new_field_obj_num)
+    }
+
+    pub(super) fn catalog_override_for_ref(
+        &self,
+        root: ObjRef,
+        new_field_obj_num: u32,
+    ) -> Result<Vec<u8>> {
         let obj = self
             .doc
-            .get_object((root_obj_num, 0))
-            .map_err(|e| RevenantError::Pdf(format!("Cannot read catalog {root_obj_num}: {e}")))?;
-        let dict = obj.as_dict().map_err(|e| {
-            RevenantError::Pdf(format!("Catalog {root_obj_num} is not a dictionary: {e}"))
-        })?;
+            .get_object((root.num, root.gen))
+            .map_err(|e| RevenantError::Pdf(format!("Cannot read catalog {root}: {e}")))?;
+        let dict = obj
+            .as_dict()
+            .map_err(|e| RevenantError::Pdf(format!("Catalog {root} is not a dictionary: {e}")))?;
 
         let mut out = Vec::new();
-        out.extend_from_slice(format!("{root_obj_num} 0 obj\n<<\n").as_bytes());
+        out.extend_from_slice(format!("{} {} obj\n<<\n", root.num, root.gen).as_bytes());
         for (key, value) in dict {
             if key.as_slice() == b"AcroForm" {
                 continue;

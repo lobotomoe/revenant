@@ -189,12 +189,13 @@ export async function buildCatalogOverride(
   pdfBytes: Uint8Array,
   rootObjNum: number,
   annotObjNum: number,
+  rootGen = 0,
 ): Promise<string> {
   const pdfDoc = await PDFDocument.load(pdfBytes, {
     updateMetadata: false,
   });
   const context = pdfDoc.context;
-  const ref = PDFRef.of(rootObjNum, 0);
+  const ref = PDFRef.of(rootObjNum, rootGen);
   const catalog = context.lookup(ref);
 
   if (!(catalog instanceof PDFDict)) {
@@ -217,7 +218,7 @@ export async function buildCatalogOverride(
   entries.push(`  /AcroForm << ${acroformBody} >>`);
 
   const body = entries.join("\n");
-  return `${rootObjNum} 0 obj\n<<\n${body}\n>>\nendobj\n`;
+  return `${rootObjNum} ${rootGen} obj\n<<\n${body}\n>>\nendobj\n`;
 }
 
 /**

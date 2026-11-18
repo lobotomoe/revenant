@@ -10,43 +10,56 @@ High-level signing API is in builder.py.
 
 from __future__ import annotations
 
+import io
 import re
 import zlib
+from typing import TYPE_CHECKING
 
 from ...errors import PDFError
 from .. import require_pikepdf as _require_pikepdf
 from .objects import BYTERANGE_PLACEHOLDER, CMS_HEX_SIZE
 
+if TYPE_CHECKING:
+    import pikepdf
+
+_PageInfo = tuple[int, float, float, bool, list[str]]
+
 # ── PDF structure analysis ───────────────────────────────────────────
 
 
+def _open_pdf(pdf_bytes: bytes) -> pikepdf.Pdf:
+    pikepdf = _require_pikepdf()
+    try:
+        return pikepdf.open(io.BytesIO(pdf_bytes))
+    except pikepdf.PdfError as exc:
+        raise PDFError(f"Cannot read PDF trailer: {exc}") from exc
+
+
+def _catalog_ref(pdf: pikepdf.Pdf) -> tuple[int, int]:
+    root = pdf.Root
+    if not root.is_indirect:
+        raise PDFError("Expected an indirect /Root reference in PDF trailer.")
+    return root.objgen
+
+
 def find_root_obj_num(pdf_bytes: bytes) -> tuple[int, int]:
-    """Find the catalog /Root object number from the trailer.
-
-    Uses the LAST match -- PDFs with incremental updates may redefine
-    /Root in later trailers, and the last one is always authoritative.
-    """
-    matches = list(re.finditer(rb"/Root\s+(\d+)\s+(\d+)\s+R", pdf_bytes))
-    if not matches:
-        raise PDFError("Cannot find /Root reference in PDF trailer.")
-    m = matches[-1]
-    return int(m.group(1)), int(m.group(2))
+    """Read the catalog object number and generation from the active trailer."""
+    with _open_pdf(pdf_bytes) as pdf:
+        return _catalog_ref(pdf)
 
 
-def find_page_obj_num(
-    pdf_bytes: bytes, _root_obj_num: int, page_spec: int | str
-) -> tuple[int, float, float, bool, list[str]]:
-    """Find the object number of the target page.
+def find_page_obj_num(pdf_bytes: bytes, _root_obj_num: int, page_spec: int | str) -> _PageInfo:
+    """Find the target page and its geometry and annotations."""
+    _, page_info = read_root_and_page(pdf_bytes, page_spec)
+    return page_info
 
-    Uses pikepdf only for reading -- never saves the PDF.
-    Uses BytesIO for in-memory PDF access (no temp files).
-    """
-    import io
 
+def read_root_and_page(pdf_bytes: bytes, page_spec: int | str) -> tuple[tuple[int, int], _PageInfo]:
+    """Resolve the catalog and target page from the same document revision."""
     from .position import get_page_dimensions, resolve_page_index
 
-    pikepdf = _require_pikepdf()
-    with pikepdf.open(io.BytesIO(pdf_bytes)) as pdf:
+    with _open_pdf(pdf_bytes) as pdf:
+        root = _catalog_ref(pdf)
         page_idx = resolve_page_index(pdf, page_spec)
         page_obj = pdf.pages[page_idx].obj
         page_obj_num = page_obj.objgen[0]
@@ -59,7 +72,7 @@ def find_page_obj_num(
             for i in range(len(annots)):
                 ref = annots[i]
                 existing_annots.append(f"{ref.objgen[0]} {ref.objgen[1]} R")
-        return page_obj_num, page_w, page_h, has_annots, existing_annots
+        return root, (page_obj_num, page_w, page_h, has_annots, existing_annots)
 
 
 def find_prev_startxref(pdf_bytes: bytes) -> tuple[int, int, list[str], bool]:
@@ -83,8 +96,6 @@ def find_prev_startxref(pdf_bytes: bytes) -> tuple[int, int, list[str], bool]:
     # streams, incremental updates, and hybrid-reference files.
     # A regex-based approach fails when a PDF has both a cross-reference stream
     # (with large /Size) and a later traditional trailer (with smaller /Size).
-    import io
-
     pikepdf = _require_pikepdf()
     try:
         with pikepdf.open(io.BytesIO(pdf_bytes)) as pdf:
@@ -128,8 +139,6 @@ def _extract_trailer_entries(pdf_bytes: bytes) -> list[str]:
 
     # No traditional trailer or no entries found -- use pikepdf to read
     # trailer data from cross-reference streams.
-    import io
-
     pikepdf = _require_pikepdf()
     with pikepdf.open(io.BytesIO(pdf_bytes)) as pdf:
         trailer = pdf.trailer
@@ -291,7 +300,9 @@ def build_xref_and_trailer(
         # PDF spec S7.5.4: each xref entry is exactly 20 bytes including EOL.
         # Format: "oooooooooo ggggg n\r\n" = 18 chars + \r + \n = 20 bytes.
         # The \r is part of the format string; \n comes from "\n".join().
-        xref_lines.extend(f"{xref_entries[obj_num]:010d} 00000 n\r" for obj_num in group)
+        for obj_num in group:
+            generation = root_gen if obj_num == root_obj_num else 0
+            xref_lines.append(f"{xref_entries[obj_num]:010d} {generation:05d} n\r")
 
     # Trailer -- must carry forward all entries from the previous trailer
     # (per PDF spec S7.5.6: entries from previous trailer that are not
@@ -348,9 +359,10 @@ def build_xref_stream(
     # Determine W (column widths for binary entries per ISO 32000-1 Table 17)
     # Column 1: type (1 byte, value 1 = in-use uncompressed)
     # Column 2: byte offset (variable width, big-endian)
-    # Column 3: generation number (1 byte, always 0 for new objects)
+    # Column 3: generation number (the catalog keeps its original generation)
     max_offset = max(all_entries.values())
     w2 = _bytes_needed(max_offset)
+    w3 = _bytes_needed(root_gen)
 
     # Build /Index subsections and binary stream data
     sorted_nums = sorted(all_entries.keys())
@@ -364,7 +376,8 @@ def build_xref_stream(
             offset = all_entries[obj_num]
             binary_parts.append(1)  # type 1 = in-use, uncompressed
             binary_parts.extend(offset.to_bytes(w2, byteorder="big"))
-            binary_parts.append(0)  # generation = 0
+            generation = root_gen if obj_num == root_obj_num else 0
+            binary_parts.extend(generation.to_bytes(w3, byteorder="big"))
 
     compressed = zlib.compress(bytes(binary_parts))
 
@@ -376,7 +389,7 @@ def build_xref_stream(
     lines.append(f"  /Size {actual_size}")
     lines.append(f"  /Prev {prev_xref}")
     lines.append(f"  /Root {root_obj_num} {root_gen} R")
-    lines.append(f"  /W [1 {w2} 1]")
+    lines.append(f"  /W [1 {w2} {w3}]")
     lines.append(f"  /Index [{' '.join(index_parts)}]")
     lines.append("  /Filter /FlateDecode")
     lines.append(f"  /Length {len(compressed)}")

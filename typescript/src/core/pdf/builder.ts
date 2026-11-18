@@ -28,7 +28,6 @@ import {
   assembleIncrementalUpdate,
   findPageObjNum,
   findPrevStartxref,
-  findRootObjNum,
   patchByterange,
 } from "./incremental.js";
 import {
@@ -115,9 +114,9 @@ export async function preparePdfWithSigField(
   } = options;
 
   // Read-only analysis of the original PDF
-  const rootInfo = findRootObjNum(pdfBytes);
-  const pageInfo = await findPageObjNum(pdfBytes, page);
   const prevInfo = await findPrevStartxref(pdfBytes);
+  const { root } = prevInfo;
+  const pageInfo = await findPageObjNum(pdfBytes, page);
 
   let rawObjects: Array<{ raw: Uint8Array; objNum: number }>;
   let newSize: number;
@@ -126,7 +125,8 @@ export async function preparePdfWithSigField(
     const result = await prepareVisible({
       pdfBytes,
       prevSize: prevInfo.maxSize,
-      rootObjNum: rootInfo.objNum,
+      rootObjNum: root.objectNumber,
+      rootGen: root.generationNumber,
       pageObjNum: pageInfo.pageObjNum,
       existingAnnots: pageInfo.existingAnnots,
       pageW: pageInfo.pageWidth,
@@ -148,7 +148,8 @@ export async function preparePdfWithSigField(
     const result = await prepareInvisible(
       pdfBytes,
       prevInfo.maxSize,
-      rootInfo.objNum,
+      root.objectNumber,
+      root.generationNumber,
       pageInfo.pageObjNum,
       pageInfo.existingAnnots,
       reason,
@@ -164,8 +165,8 @@ export async function preparePdfWithSigField(
     rawObjects,
     newSize,
     prevInfo.prevXref,
-    rootInfo.objNum,
-    rootInfo.genNum,
+    root.objectNumber,
+    root.generationNumber,
     prevInfo.trailerExtra,
     prevInfo.useXrefStream,
   );
@@ -230,6 +231,7 @@ interface VisibleSigParams {
   pdfBytes: Uint8Array;
   prevSize: number;
   rootObjNum: number;
+  rootGen: number;
   pageObjNum: number;
   existingAnnots: string[];
   pageW: number;
@@ -297,6 +299,7 @@ async function prepareVisible(
     params.pdfBytes,
     objNums,
     params.rootObjNum,
+    params.rootGen,
     params.pageObjNum,
     params.existingAnnots,
     x,
@@ -319,6 +322,7 @@ async function prepareInvisible(
   pdfBytes: Uint8Array,
   prevSize: number,
   rootObjNum: number,
+  rootGen: number,
   pageObjNum: number,
   existingAnnots: string[],
   reason: string,
@@ -334,7 +338,7 @@ async function prepareInvisible(
   annotsList += `${objNums.annot} 0 R`;
 
   const pageOverride = await buildPageOverride(pdfBytes, pageObjNum, annotsList);
-  const catalogOverride = await buildCatalogOverride(pdfBytes, rootObjNum, objNums.annot);
+  const catalogOverride = await buildCatalogOverride(pdfBytes, rootObjNum, objNums.annot, rootGen);
 
   const rawObjects: Array<{ raw: Uint8Array; objNum: number }> = [
     { raw: toBytes(sigDictRaw), objNum: objNums.sig },
@@ -352,6 +356,7 @@ async function buildAllObjects(
   pdfBytes: Uint8Array,
   objNums: SigObjectNums,
   rootObjNum: number,
+  rootGen: number,
   pageObjNum: number,
   existingAnnots: string[],
   x: number,
@@ -374,7 +379,7 @@ async function buildAllObjects(
   annotsList += `${objNums.annot} 0 R`;
 
   const pageOverride = await buildPageOverride(pdfBytes, pageObjNum, annotsList);
-  const catalogOverride = await buildCatalogOverride(pdfBytes, rootObjNum, objNums.annot);
+  const catalogOverride = await buildCatalogOverride(pdfBytes, rootObjNum, objNums.annot, rootGen);
 
   return collectObjects(
     sigDictRaw,

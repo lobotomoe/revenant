@@ -36,7 +36,6 @@ export {
   buildXrefStream,
   findPageObjNum,
   findPrevStartxref,
-  findRootObjNum,
   type PageInfo,
   patchByterange,
 } from "./incremental.js";
