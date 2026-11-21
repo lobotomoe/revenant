@@ -62,7 +62,9 @@ cms = "0.2"
 # (p256/p384/...), Ed25519, SHA-2. `x509` adds `verify(&Certificate)`, `sha1`
 # covers legacy SHA-1-signed CA certs. No RSA-PSS support -> such certs downgrade
 # to an indeterminate chain result rather than a hard failure.
-x509-verify = { version = "0.4.8", features = ["x509", "std", "sha1"] }
+# Exact pin: 0.4.9 and later moved to the der-0.8 family in a patch release, so
+# `^0.4.8` would let `cargo update` pull in types this workspace cannot use.
+x509-verify = { version = "=0.4.8", features = ["x509", "std", "sha1"] }
 
 # -- Date/time --------------------------------------------------------------
 # `time` handles certificate validity arithmetic (parsing DER dates). `chrono`
