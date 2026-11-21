@@ -8,7 +8,8 @@ use std::collections::HashMap;
 use std::fmt::Write as _;
 use std::hash::BuildHasher;
 
-use chrono::{Datelike, Local, Offset, Timelike};
+use jiff::tz::TimeZone;
+use jiff::{Timestamp, ZonedDateTime};
 
 use crate::config::{CertField, CertFieldSource, SigAuto, SigField, SigFieldValue};
 use crate::pki::CertInfo;
@@ -42,13 +43,12 @@ pub fn format_utc_offset(offset_seconds: i32) -> String {
 
 /// Generate a human-friendly local date string with UTC offset.
 ///
-/// Example: `7 Feb 2026, 09:51:42 UTC+4`. Uses the machine's local time zone via
-/// `chrono::Local` and the fixed month table for locale independence.
+/// Example: `7 Feb 2026, 09:51:42 UTC+4`. Uses the machine's local time zone and
+/// the fixed month table for locale independence.
 #[must_use]
 pub fn make_date_str() -> String {
-    let now = Local::now();
-    let offset_seconds = now.offset().fix().local_minus_utc();
-    let month = MONTH_ABBR[now.month() as usize];
+    let now = local_now();
+    let month = MONTH_ABBR[usize::from(now.month().unsigned_abs())];
     format!(
         "{} {} {}, {:02}:{:02}:{:02} {}",
         now.day(),
@@ -57,8 +57,21 @@ pub fn make_date_str() -> String {
         now.hour(),
         now.minute(),
         now.second(),
-        format_utc_offset(offset_seconds),
+        format_utc_offset(now.offset().seconds()),
     )
+}
+
+/// The current time in the system zone.
+///
+/// When the zone cannot be determined the date is rendered in UTC. The string
+/// carries its offset, so it stays correct, only less local; the reason is
+/// logged instead of dropped.
+fn local_now() -> ZonedDateTime {
+    let zone = TimeZone::try_system().unwrap_or_else(|e| {
+        log::warn!("Cannot determine the local time zone, using UTC: {e}");
+        TimeZone::UTC
+    });
+    Timestamp::now().to_zoned_datetime(zone)
 }
 
 /// Read the signer-info value a [`CertField`] draws from.

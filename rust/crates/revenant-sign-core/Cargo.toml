@@ -28,9 +28,9 @@ x509-cert.workspace = true
 cms.workspace = true
 x509-verify.workspace = true
 
-# Certificate validity-date arithmetic (time) + appearance date string (chrono)
+# Certificate validity-date arithmetic (time) + wall clock and local zone (jiff)
 time.workspace = true
-chrono.workspace = true
+jiff.workspace = true
 
 # PDF read-side parsing; writes are raw bytes
 lopdf.workspace = true
