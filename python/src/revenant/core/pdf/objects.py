@@ -142,6 +142,8 @@ def build_object_override(
     obj_num: int,
     skip_key: str,
     new_entry: str,
+    *,
+    generation: int = 0,
 ) -> str:
     """Build a raw override of a PDF object with a new/replaced entry.
 
@@ -153,6 +155,7 @@ def build_object_override(
     Args:
         pdf_bytes: Raw PDF content.
         obj_num: Target object number.
+        generation: Generation of the object to redefine.
         skip_key: Key to omit from the original object (e.g., "/Annots").
         new_entry: New entry to append (e.g., "  /Annots [5 0 R]").
 
@@ -163,7 +166,7 @@ def build_object_override(
 
     pikepdf = _require_pikepdf()
     with pikepdf.open(io.BytesIO(pdf_bytes)) as pdf:
-        obj = pdf.get_object((obj_num, 0))
+        obj = pdf.get_object((obj_num, generation))
         # pikepdf dict requires .keys() -- __iter__ yields values, not keys
         obj_keys = list(obj.keys())
         entries: list[str] = []
@@ -174,16 +177,19 @@ def build_object_override(
 
     entries.append(new_entry)
     body = "\n".join(entries)
-    return f"{obj_num} 0 obj\n<<\n{body}\n>>\nendobj\n"
+    return f"{obj_num} {generation} obj\n<<\n{body}\n>>\nendobj\n"
 
 
-def build_page_override(pdf_bytes: bytes, page_obj_num: int, annots_list: str) -> str:
+def build_page_override(
+    pdf_bytes: bytes, page_obj_num: int, annots_list: str, *, page_gen: int = 0
+) -> str:
     """Build a raw override of the page object that adds /Annots."""
     return build_object_override(
         pdf_bytes,
         page_obj_num,
         skip_key="/Annots",
         new_entry=f"  /Annots [{annots_list}]",
+        generation=page_gen,
     )
 
 

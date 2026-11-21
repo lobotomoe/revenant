@@ -11,6 +11,7 @@ incremental-update assembly:
   * catalog_gen_1.pdf and catalog_gen_513.pdf -- a nonzero catalog generation
     and an embedded text file, with a traditional xref or a cross-reference stream
   * catalog_two_revisions.pdf -- only the second catalog exposes the attachment
+  * page_gen_1.pdf and page_gen_513.pdf -- a nonzero target page generation
 
 Run from the repo root:
     python/.venv/bin/python \\
@@ -38,11 +39,11 @@ def _new(pages: list[tuple[int, int]]) -> pikepdf.Pdf:
     return pdf
 
 
-def _catalog_generation_pdf(
-    generation: int, *, xref_stream: bool, revise_catalog: bool = False
+def _generation_pdf(
+    root_gen: int, *, xref_stream: bool, page_gen: int = 0, revise_catalog: bool = False
 ) -> bytes:
     # qpdf renumbers objects at generation 0 when saving. Write the small
-    # fixture directly so the catalog, trailer and xref agree on its identity.
+    # fixture directly to control the generations used in references and the xref.
     pdf = bytearray(b"%PDF-1.7\n")
     entries = [(0, 0, 65535)]
 
@@ -52,9 +53,12 @@ def _catalog_generation_pdf(
         pdf.extend(f"{number} {gen} obj\n".encode() + body + b"\nendobj\n")
 
     catalog = b"<< /Type /Catalog /Pages 2 0 R /Names << /EmbeddedFiles 4 0 R >> >>"
-    add_object(b"<< /Type /Catalog /Pages 2 0 R >>" if revise_catalog else catalog, generation)
-    add_object(b"<< /Type /Pages /Count 1 /Kids [3 0 R] >>")
-    add_object(b"<< /Type /Page /Parent 2 0 R /Resources << >> /MediaBox [0 0 612 792] >>")
+    add_object(b"<< /Type /Catalog /Pages 2 0 R >>" if revise_catalog else catalog, root_gen)
+    add_object(f"<< /Type /Pages /Count 1 /Kids [3 {page_gen} R] >>".encode())
+    add_object(
+        b"<< /Type /Page /Parent 2 0 R /Resources << >> /MediaBox [0 0 612 792] >>",
+        page_gen,
+    )
     add_object(b"<< /Names [(note.txt) 5 0 R] >>")
     add_object(b"<< /Type /Filespec /F (note.txt) /EF << /F 6 0 R >> >>")
     note = zlib.compress(b"note\n")
@@ -65,7 +69,7 @@ def _catalog_generation_pdf(
     )
 
     offset = len(pdf)
-    root = f"/Root 1 {generation} R"
+    root = f"/Root 1 {root_gen} R"
     if xref_stream:
         number = len(entries)
         entries.append((1, offset, 0))
@@ -114,11 +118,13 @@ def main() -> None:
             fix_metadata_version=False,
         )
 
-    (OUT_DIR / "catalog_gen_1.pdf").write_bytes(_catalog_generation_pdf(1, xref_stream=False))
-    (OUT_DIR / "catalog_gen_513.pdf").write_bytes(_catalog_generation_pdf(513, xref_stream=True))
+    (OUT_DIR / "catalog_gen_1.pdf").write_bytes(_generation_pdf(1, xref_stream=False))
+    (OUT_DIR / "catalog_gen_513.pdf").write_bytes(_generation_pdf(513, xref_stream=True))
     (OUT_DIR / "catalog_two_revisions.pdf").write_bytes(
-        _catalog_generation_pdf(1, xref_stream=False, revise_catalog=True)
+        _generation_pdf(1, xref_stream=False, revise_catalog=True)
     )
+    (OUT_DIR / "page_gen_1.pdf").write_bytes(_generation_pdf(0, page_gen=1, xref_stream=False))
+    (OUT_DIR / "page_gen_513.pdf").write_bytes(_generation_pdf(1, page_gen=513, xref_stream=True))
 
     for name in (
         "blank_letter.pdf",
@@ -127,6 +133,8 @@ def main() -> None:
         "catalog_gen_1.pdf",
         "catalog_gen_513.pdf",
         "catalog_two_revisions.pdf",
+        "page_gen_1.pdf",
+        "page_gen_513.pdf",
     ):
         size = (OUT_DIR / name).stat().st_size
         print(f"wrote {name} ({size} bytes)")

@@ -355,15 +355,17 @@ def _make_pdf_with_acroform() -> tuple[bytes, int, int]:
 
 
 @pytest.mark.parametrize(
-    ("fixture", "expected_root", "visible"),
+    ("fixture", "expected_root", "expected_page", "visible"),
     [
-        ("catalog_gen_1.pdf", (1, 1), True),
-        ("catalog_gen_513.pdf", (1, 513), False),
-        ("catalog_two_revisions.pdf", (7, 0), True),
+        ("catalog_gen_1.pdf", (1, 1), (3, 0), True),
+        ("catalog_gen_513.pdf", (1, 513), (3, 0), False),
+        ("catalog_two_revisions.pdf", (7, 0), (3, 0), True),
+        ("page_gen_1.pdf", (1, 0), (3, 1), True),
+        ("page_gen_513.pdf", (1, 1), (3, 513), False),
     ],
 )
-def test_prepare_preserves_current_catalog(
-    fixture: str, expected_root: tuple[int, int], visible: bool
+def test_prepare_preserves_catalog_and_page(
+    fixture: str, expected_root: tuple[int, int], expected_page: tuple[int, int], visible: bool
 ) -> None:
     import io
     from pathlib import Path
@@ -382,7 +384,10 @@ def test_prepare_preserves_current_catalog(
     with pikepdf.open(io.BytesIO(prepared), attempt_recovery=False) as pdf:
         assert pdf.Root.objgen == expected_root
         (field,) = pdf.Root.AcroForm.Fields
-        (widget,) = pdf.pages[0].Annots
+        (page,) = pdf.pages
+        assert page.objgen == expected_page
+        (widget,) = page.Annots
+        assert widget.P.objgen == expected_page
         assert field.objgen == widget.objgen
         assert field["/FT"] == pikepdf.Name.Sig
         assert pdf.attachments["note.txt"].get_file().read_bytes() == b"note\n"

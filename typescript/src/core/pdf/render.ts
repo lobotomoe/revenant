@@ -12,6 +12,8 @@
 import { readFileSync } from "node:fs";
 import { deflateSync } from "node:zlib";
 
+import type { PDFRef } from "pdf-lib";
+
 import { VERSION } from "../../constants.js";
 import { PDFError } from "../../errors.js";
 import type { FontMetrics } from "../appearance/fonts.js";
@@ -23,6 +25,7 @@ import {
   CMS_HEX_SIZE,
   pdfString,
   type SigObjectNums,
+  toPdfRef,
 } from "./objects.js";
 
 // -- Signature dictionary -----------------------------------------------------
@@ -265,7 +268,7 @@ export function buildFormXobjects(
 
 export function buildAnnotWidget(
   objNums: SigObjectNums,
-  pageObjNum: number,
+  page: number | PDFRef,
   x: number,
   y: number,
   w: number,
@@ -281,7 +284,7 @@ export function buildAnnotWidget(
     `  /V ${objNums.sig} 0 R\n` +
     `  /T (Signature_${objNums.annot})\n` +
     `  /F ${ANNOT_FLAGS_SIG_WIDGET}\n` +
-    `  /P ${pageObjNum} 0 R\n` +
+    `  /P ${toPdfRef(page)}\n` +
     `  /AP << /N ${objNums.ap} 0 R >>\n` +
     `  /Border [0 0 0]\n` +
     `>>\n` +
@@ -289,7 +292,7 @@ export function buildAnnotWidget(
   );
 }
 
-export function buildInvisibleAnnotWidget(objNums: SigObjectNums, pageObjNum: number): string {
+export function buildInvisibleAnnotWidget(objNums: SigObjectNums, page: number | PDFRef): string {
   return (
     `${objNums.annot} 0 obj\n` +
     `<<\n` +
@@ -300,7 +303,7 @@ export function buildInvisibleAnnotWidget(objNums: SigObjectNums, pageObjNum: nu
     `  /V ${objNums.sig} 0 R\n` +
     `  /T (Signature_${objNums.annot})\n` +
     `  /F ${ANNOT_FLAGS_SIG_WIDGET}\n` +
-    `  /P ${pageObjNum} 0 R\n` +
+    `  /P ${toPdfRef(page)}\n` +
     `  /Border [0 0 0]\n` +
     `>>\n` +
     `endobj\n`

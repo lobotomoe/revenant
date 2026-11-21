@@ -10,10 +10,10 @@
 use sha1::{Digest, Sha1};
 
 use super::incremental::{
-    assemble_incremental_update, detect_xref_stream, find_startxref_offset, patch_byterange,
-    PreparedPdf, UpdatePlan,
+    assemble_with_refs, detect_xref_stream, find_startxref_offset, patch_byterange, PreparedPdf,
+    UpdatePlan,
 };
-use super::objects::{build_page_override, RawObject, SigObjectNums};
+use super::objects::{page_override_for_ref, RawObject, SigObjectNums};
 use super::position::{
     compute_sig_rect, resolve_page_index, PageSpec, Position, SigRect, SIG_HEIGHT, SIG_MARGIN_H,
     SIG_MARGIN_V, SIG_WIDTH,
@@ -94,7 +94,7 @@ pub fn prepare_pdf_with_sig_field(
     }
     let root = reader.catalog_ref()?;
     let page_index = resolve_page_index(opts.page, reader.page_count())?;
-    let page_info = reader.page_info(page_index)?;
+    let (page, page_info) = reader.page_info_with_ref(page_index)?;
     let prev_xref = find_startxref_offset(pdf_bytes)?;
     let prev_size = u32::try_from(reader.size()?)
         .map_err(|_| RevenantError::Pdf("PDF /Size is negative or too large.".to_owned()))?;
@@ -102,9 +102,9 @@ pub fn prepare_pdf_with_sig_field(
     let use_xref_stream = detect_xref_stream(pdf_bytes, prev_xref);
 
     let (raw_objects, new_size) = if opts.visible {
-        prepare_visible(&reader, prev_size, root, &page_info, opts)?
+        prepare_visible(&reader, prev_size, root, page, &page_info, opts)?
     } else {
-        prepare_invisible(&reader, prev_size, root, &page_info, opts)?
+        prepare_invisible(&reader, prev_size, root, page, &page_info, opts)?
     };
 
     let plan = UpdatePlan {
@@ -115,7 +115,7 @@ pub fn prepare_pdf_with_sig_field(
         trailer_extra: &trailer_extra,
         use_xref_stream,
     };
-    let full_pdf = assemble_incremental_update(pdf_bytes, &plan)?;
+    let full_pdf = assemble_with_refs(pdf_bytes, &plan, &[root, page])?;
     patch_byterange(full_pdf, pdf_bytes.len())
 }
 
@@ -124,6 +124,7 @@ fn prepare_visible(
     reader: &PdfReader,
     prev_size: u32,
     root: ObjRef,
+    page: ObjRef,
     page_info: &PageInfo,
     opts: &PrepareOptions<'_>,
 ) -> Result<(Vec<RawObject>, u32)> {
@@ -196,16 +197,10 @@ fn prepare_visible(
     let sig = build_sig_dict(obj_nums.sig, opts.reason, opts.name);
     let font_objects = build_embedded_font_objects(v.fonts, font)?;
     let forms = build_form_xobjects(&v, rect.w, rect.h, &ap_info, img_data.as_ref());
-    let annot = build_annot_widget(
-        obj_nums.sig,
-        obj_nums.annot,
-        v.forms.ap,
-        page_info.obj_num,
-        rect,
-    );
+    let annot = build_annot_widget(obj_nums.sig, obj_nums.annot, v.forms.ap, page, rect);
 
     let annots_list = build_annots_list(&page_info.annots, obj_nums.annot);
-    let page_override = build_page_override(reader, page_info.obj_num, &annots_list)?;
+    let page_override = page_override_for_ref(reader, page, &annots_list)?;
     let catalog_override = reader.catalog_override_for_ref(root, obj_nums.annot)?;
 
     let mut objects: Vec<RawObject> = Vec::new();
@@ -222,7 +217,7 @@ fn prepare_visible(
     if let (Some(bytes), Some(num)) = (forms.smask, v.smask) {
         objects.push((bytes, num));
     }
-    objects.push((page_override, page_info.obj_num));
+    objects.push((page_override, page.num));
     objects.push((catalog_override, root.num));
 
     Ok((objects, obj_nums.new_size))
@@ -233,21 +228,22 @@ fn prepare_invisible(
     reader: &PdfReader,
     prev_size: u32,
     root: ObjRef,
+    page: ObjRef,
     page_info: &PageInfo,
     opts: &PrepareOptions<'_>,
 ) -> Result<(Vec<RawObject>, u32)> {
     let obj_nums = SigObjectNums::allocate(prev_size, false, false, false);
     let sig = build_sig_dict(obj_nums.sig, opts.reason, opts.name);
-    let annot = build_invisible_annot_widget(obj_nums.sig, obj_nums.annot, page_info.obj_num);
+    let annot = build_invisible_annot_widget(obj_nums.sig, obj_nums.annot, page);
 
     let annots_list = build_annots_list(&page_info.annots, obj_nums.annot);
-    let page_override = build_page_override(reader, page_info.obj_num, &annots_list)?;
+    let page_override = page_override_for_ref(reader, page, &annots_list)?;
     let catalog_override = reader.catalog_override_for_ref(root, obj_nums.annot)?;
 
     let objects = vec![
         (sig, obj_nums.sig),
         (annot, obj_nums.annot),
-        (page_override, page_info.obj_num),
+        (page_override, page.num),
         (catalog_override, root.num),
     ];
     Ok((objects, obj_nums.new_size))

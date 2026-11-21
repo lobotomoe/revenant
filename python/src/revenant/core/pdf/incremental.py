@@ -22,7 +22,7 @@ from .objects import BYTERANGE_PLACEHOLDER, CMS_HEX_SIZE
 if TYPE_CHECKING:
     import pikepdf
 
-_PageInfo = tuple[int, float, float, bool, list[str]]
+_PageInfo = tuple[tuple[int, int], float, float, bool, list[str]]
 
 # ── PDF structure analysis ───────────────────────────────────────────
 
@@ -48,10 +48,12 @@ def find_root_obj_num(pdf_bytes: bytes) -> tuple[int, int]:
         return _catalog_ref(pdf)
 
 
-def find_page_obj_num(pdf_bytes: bytes, _root_obj_num: int, page_spec: int | str) -> _PageInfo:
+def find_page_obj_num(
+    pdf_bytes: bytes, _root_obj_num: int, page_spec: int | str
+) -> tuple[int, float, float, bool, list[str]]:
     """Find the target page and its geometry and annotations."""
-    _, page_info = read_root_and_page(pdf_bytes, page_spec)
-    return page_info
+    _, (page_ref, width, height, has_annots, annots) = read_root_and_page(pdf_bytes, page_spec)
+    return page_ref[0], width, height, has_annots, annots
 
 
 def read_root_and_page(pdf_bytes: bytes, page_spec: int | str) -> tuple[tuple[int, int], _PageInfo]:
@@ -62,7 +64,6 @@ def read_root_and_page(pdf_bytes: bytes, page_spec: int | str) -> tuple[tuple[in
         root = _catalog_ref(pdf)
         page_idx = resolve_page_index(pdf, page_spec)
         page_obj = pdf.pages[page_idx].obj
-        page_obj_num = page_obj.objgen[0]
         page_w, page_h = get_page_dimensions(pdf, page_idx)
         # Check if page already has /Annots
         has_annots = "/Annots" in page_obj
@@ -72,7 +73,7 @@ def read_root_and_page(pdf_bytes: bytes, page_spec: int | str) -> tuple[tuple[in
             for i in range(len(annots)):
                 ref = annots[i]
                 existing_annots.append(f"{ref.objgen[0]} {ref.objgen[1]} R")
-        return root, (page_obj_num, page_w, page_h, has_annots, existing_annots)
+        return root, (page_obj.objgen, page_w, page_h, has_annots, existing_annots)
 
 
 def find_prev_startxref(pdf_bytes: bytes) -> tuple[int, int, list[str], bool]:
@@ -164,6 +165,8 @@ def assemble_incremental_update(
     root_gen: int,
     trailer_extra: list[str],
     use_xref_stream: bool = False,
+    *,
+    page_ref: tuple[int, int] | None = None,
 ) -> bytes:
     """Assemble the full PDF with incremental update appended."""
     # Ensure original PDF ends with \n after %%EOF
@@ -198,6 +201,7 @@ def assemble_incremental_update(
             trailer_extra=trailer_extra,
             xref_offset=xref_offset,
             xref_obj_num=xref_obj_num,
+            page_ref=page_ref,
         )
         return base + all_objects + xref_data
 
@@ -209,6 +213,7 @@ def assemble_incremental_update(
         root_gen=root_gen,
         trailer_extra=trailer_extra,
         xref_offset=xref_offset,
+        page_ref=page_ref,
     )
 
     return base + all_objects + xref_data
@@ -255,6 +260,16 @@ def patch_byterange(full_pdf: bytes, original_len: int) -> tuple[bytes, int, int
 # ── Xref table builder ──────────────────────────────────────────────
 
 
+def _updated_generations(
+    root_obj_num: int, root_gen: int, page_ref: tuple[int, int] | None
+) -> dict[int, int]:
+    generations = {root_obj_num: root_gen}
+    if page_ref is not None:
+        page_num, page_gen = page_ref
+        generations[page_num] = page_gen
+    return generations
+
+
 def build_xref_and_trailer(
     xref_entries: dict[int, int],
     new_size: int,
@@ -263,6 +278,8 @@ def build_xref_and_trailer(
     root_gen: int,
     trailer_extra: list[str],
     xref_offset: int,
+    *,
+    page_ref: tuple[int, int] | None = None,
 ) -> bytes:
     """Build an xref table and trailer for an incremental update.
 
@@ -272,12 +289,14 @@ def build_xref_and_trailer(
         prev_xref: Previous xref offset (/Prev value).
         root_obj_num: Catalog object number for /Root reference.
         root_gen: Catalog generation number.
+        page_ref: Page object number and generation when redefining a page.
         trailer_extra: Extra trailer entries to carry forward (/Info, /ID).
         xref_offset: Byte offset where this xref table starts.
 
     Returns:
         Raw bytes of the xref table, trailer, and %%EOF.
     """
+    generations = _updated_generations(root_obj_num, root_gen, page_ref)
     xref_lines = ["xref"]
 
     if not xref_entries:
@@ -301,7 +320,7 @@ def build_xref_and_trailer(
         # Format: "oooooooooo ggggg n\r\n" = 18 chars + \r + \n = 20 bytes.
         # The \r is part of the format string; \n comes from "\n".join().
         for obj_num in group:
-            generation = root_gen if obj_num == root_obj_num else 0
+            generation = generations.get(obj_num, 0)
             xref_lines.append(f"{xref_entries[obj_num]:010d} {generation:05d} n\r")
 
     # Trailer -- must carry forward all entries from the previous trailer
@@ -330,6 +349,8 @@ def build_xref_stream(
     trailer_extra: list[str],
     xref_offset: int,
     xref_obj_num: int,
+    *,
+    page_ref: tuple[int, int] | None = None,
 ) -> bytes:
     """Build a cross-reference stream for an incremental update (PDF 1.5+).
 
@@ -342,6 +363,7 @@ def build_xref_stream(
         prev_xref: Previous xref offset (/Prev value).
         root_obj_num: Catalog object number for /Root reference.
         root_gen: Catalog generation number.
+        page_ref: Page object number and generation when redefining a page.
         trailer_extra: Extra trailer entries to carry forward (/Info, /ID).
         xref_offset: Byte offset where this XRef stream object starts.
         xref_obj_num: Object number for the XRef stream itself.
@@ -359,10 +381,11 @@ def build_xref_stream(
     # Determine W (column widths for binary entries per ISO 32000-1 Table 17)
     # Column 1: type (1 byte, value 1 = in-use uncompressed)
     # Column 2: byte offset (variable width, big-endian)
-    # Column 3: generation number (the catalog keeps its original generation)
+    # Column 3: generation number of each redefined object
     max_offset = max(all_entries.values())
     w2 = _bytes_needed(max_offset)
-    w3 = _bytes_needed(root_gen)
+    generations = _updated_generations(root_obj_num, root_gen, page_ref)
+    w3 = _bytes_needed(max(generations.values()))
 
     # Build /Index subsections and binary stream data
     sorted_nums = sorted(all_entries.keys())
@@ -376,7 +399,7 @@ def build_xref_stream(
             offset = all_entries[obj_num]
             binary_parts.append(1)  # type 1 = in-use, uncompressed
             binary_parts.extend(offset.to_bytes(w2, byteorder="big"))
-            generation = root_gen if obj_num == root_obj_num else 0
+            generation = generations.get(obj_num, 0)
             binary_parts.extend(generation.to_bytes(w3, byteorder="big"))
 
     compressed = zlib.compress(bytes(binary_parts))

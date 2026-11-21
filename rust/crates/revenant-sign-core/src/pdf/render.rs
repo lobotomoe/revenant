@@ -12,6 +12,7 @@ use super::objects::{
     CMS_HEX_SIZE,
 };
 use super::position::SigRect;
+use super::reader::ObjRef;
 use crate::appearance::{AppearanceData, Font, SignatureImageData};
 use crate::constants::VERSION;
 use crate::Result;
@@ -241,13 +242,13 @@ pub(crate) fn build_annot_widget(
     sig_num: u32,
     annot_num: u32,
     ap_num: u32,
-    page_obj_num: u32,
+    page: ObjRef,
     rect: SigRect,
 ) -> Vec<u8> {
     format!(
         "{annot_num} 0 obj\n<<\n  /Type /Annot\n  /Subtype /Widget\n  /FT /Sig\n  \
          /Rect [{:.2} {:.2} {:.2} {:.2}]\n  /V {sig_num} 0 R\n  /T (Signature_{annot_num})\n  \
-         /F {ANNOT_FLAGS_SIG_WIDGET}\n  /P {page_obj_num} 0 R\n  /AP << /N {ap_num} 0 R >>\n  \
+         /F {ANNOT_FLAGS_SIG_WIDGET}\n  /P {page}\n  /AP << /N {ap_num} 0 R >>\n  \
          /Border [0 0 0]\n>>\nendobj\n",
         rect.x,
         rect.y,
@@ -259,15 +260,11 @@ pub(crate) fn build_annot_widget(
 
 /// Build an invisible annotation widget (`/Rect [0 0 0 0]`, no `/AP`).
 #[must_use]
-pub(crate) fn build_invisible_annot_widget(
-    sig_num: u32,
-    annot_num: u32,
-    page_obj_num: u32,
-) -> Vec<u8> {
+pub(crate) fn build_invisible_annot_widget(sig_num: u32, annot_num: u32, page: ObjRef) -> Vec<u8> {
     format!(
         "{annot_num} 0 obj\n<<\n  /Type /Annot\n  /Subtype /Widget\n  /FT /Sig\n  \
          /Rect [0 0 0 0]\n  /V {sig_num} 0 R\n  /T (Signature_{annot_num})\n  \
-         /F {ANNOT_FLAGS_SIG_WIDGET}\n  /P {page_obj_num} 0 R\n  /Border [0 0 0]\n>>\nendobj\n"
+         /F {ANNOT_FLAGS_SIG_WIDGET}\n  /P {page}\n  /Border [0 0 0]\n>>\nendobj\n"
     )
     .into_bytes()
 }
@@ -400,7 +397,7 @@ mod tests {
             w: 210.0,
             h: 70.0,
         };
-        let s = String::from_utf8(build_annot_widget(5, 6, 15, 3, rect)).unwrap();
+        let s = String::from_utf8(build_annot_widget(5, 6, 15, ObjRef::new(3, 0), rect)).unwrap();
         assert!(s.contains("/Rect [100.00 50.00 310.00 120.00]"), "{s}");
         assert!(s.contains("/V 5 0 R"), "{s}");
         assert!(s.contains("/AP << /N 15 0 R >>"), "{s}");
@@ -409,7 +406,7 @@ mod tests {
 
     #[test]
     fn invisible_widget_has_zero_rect_and_no_ap() {
-        let s = String::from_utf8(build_invisible_annot_widget(5, 6, 3)).unwrap();
+        let s = String::from_utf8(build_invisible_annot_widget(5, 6, ObjRef::new(3, 0))).unwrap();
         assert!(s.contains("/Rect [0 0 0 0]"), "{s}");
         assert!(!s.contains("/AP"), "{s}");
     }

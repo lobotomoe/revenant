@@ -44,14 +44,14 @@ export interface PageInfo {
 export async function findPageObjNum(
   pdfBytes: Uint8Array,
   pageSpec: number | string,
-): Promise<PageInfo> {
+): Promise<PageInfo & { pageRef: PDFRef }> {
   const pdfDoc = await PDFDocument.load(pdfBytes, {
     updateMetadata: false,
   });
   const pageIdx = resolvePageIndex(pdfDoc, pageSpec);
   const page = pdfDoc.getPage(pageIdx);
 
-  // Get the page's indirect reference to determine object number
+  // Validate the page tree before updating the selected page.
   const pagesArray = pdfDoc.catalog.get(PDFName.of("Pages"));
   if (!(pagesArray instanceof PDFRef)) {
     throw new PDFError("Cannot resolve /Pages reference in catalog");
@@ -61,21 +61,7 @@ export async function findPageObjNum(
     throw new PDFError("Cannot find /Pages dictionary");
   }
 
-  // Use the page node's own reference if available
   const pageNode = page.node;
-  let pageObjNum = 0;
-
-  // Search all objects to find the one matching our page node
-  for (const [ref, obj] of pdfDoc.context.enumerateIndirectObjects()) {
-    if (obj === pageNode) {
-      pageObjNum = ref.objectNumber;
-      break;
-    }
-  }
-  if (pageObjNum === 0) {
-    throw new PDFError(`Cannot determine object number for page ${pageIdx}`);
-  }
-
   const dims = getPageDimensions(pdfDoc, pageIdx);
 
   // Check if page already has /Annots
@@ -99,7 +85,8 @@ export async function findPageObjNum(
   }
 
   return {
-    pageObjNum,
+    pageObjNum: page.ref.objectNumber,
+    pageRef: page.ref,
     pageWidth: dims.width,
     pageHeight: dims.height,
     hasAnnots,
@@ -284,6 +271,7 @@ export function assembleIncrementalUpdate(
   rootGen: number,
   trailerExtra: string[],
   useXrefStream: boolean = false,
+  pageRef?: PDFRef,
 ): Uint8Array {
   // Ensure original PDF ends with \n after %%EOF
   let base = pdfBytes;
@@ -323,6 +311,7 @@ export function assembleIncrementalUpdate(
       trailerExtra,
       xrefOffset,
       xrefObjNum,
+      pageRef,
     });
     return Buffer.concat([base, allObjects, xrefData]);
   }
@@ -335,6 +324,7 @@ export function assembleIncrementalUpdate(
     rootGen,
     trailerExtra,
     xrefOffset,
+    pageRef,
   });
 
   return Buffer.concat([base, allObjects, xrefData]);
@@ -392,6 +382,7 @@ export function patchByterange(
 // -- Xref table builder -------------------------------------------------------
 
 interface XrefTrailerOptions {
+  pageRef?: PDFRef;
   xrefEntries: Map<number, number>;
   newSize: number;
   prevXref: number;
@@ -405,12 +396,23 @@ interface XrefStreamOptions extends XrefTrailerOptions {
   xrefObjNum: number;
 }
 
+function updatedGenerations({
+  rootObjNum,
+  rootGen,
+  pageRef,
+}: XrefTrailerOptions): Map<number, number> {
+  const generations = new Map([[rootObjNum, rootGen]]);
+  if (pageRef) generations.set(pageRef.objectNumber, pageRef.generationNumber);
+  return generations;
+}
+
 /**
  * Build an xref table and trailer for an incremental update.
  */
 export function buildXrefAndTrailer(options: XrefTrailerOptions): Uint8Array {
   const { xrefEntries, newSize, prevXref, rootObjNum, rootGen, trailerExtra, xrefOffset } = options;
 
+  const generations = updatedGenerations(options);
   const lines: string[] = ["xref"];
 
   if (xrefEntries.size === 0) {
@@ -430,7 +432,7 @@ export function buildXrefAndTrailer(options: XrefTrailerOptions): Uint8Array {
       if (offset === undefined) {
         throw new PDFError(`Missing xref offset for object ${objNum}.`);
       }
-      const generation = objNum === rootObjNum ? rootGen : 0;
+      const generation = generations.get(objNum) ?? 0;
       lines.push(
         `${offset.toString().padStart(10, "0")} ${generation.toString().padStart(5, "0")} n\r`,
       );
@@ -475,10 +477,11 @@ export function buildXrefStream(options: XrefStreamOptions): Uint8Array {
   // Determine W (column widths for binary entries per ISO 32000-1 Table 17)
   // Column 1: type (1 byte, value 1 = in-use uncompressed)
   // Column 2: byte offset (variable width, big-endian)
-  // Column 3: generation number (the catalog keeps its original generation)
+  // Column 3: generation number of each redefined object
   const maxOffset = Math.max(...allEntries.values());
   const w2 = bytesNeeded(maxOffset);
-  const w3 = bytesNeeded(rootGen);
+  const generations = updatedGenerations(options);
+  const w3 = bytesNeeded(Math.max(...generations.values()));
 
   // Build /Index subsections and binary stream data
   const sortedNums = [...allEntries.keys()].sort((a, b) => a - b);
@@ -499,7 +502,7 @@ export function buildXrefStream(options: XrefStreamOptions): Uint8Array {
       for (let i = w2 - 1; i >= 0; i--) {
         binaryParts.push((offset >>> (i * 8)) & 0xff);
       }
-      const generation = objNum === rootObjNum ? rootGen : 0;
+      const generation = generations.get(objNum) ?? 0;
       for (let i = w3 - 1; i >= 0; i--) {
         binaryParts.push((generation >>> (i * 8)) & 0xff);
       }
