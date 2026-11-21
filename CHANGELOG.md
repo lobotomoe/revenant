@@ -12,6 +12,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Embedded signing now preserves the generation of the PDF catalog in incremental
   updates. PDFs whose `/Root` has a nonzero generation can be signed directly.
 
+### Security
+
+- The TypeScript package requires node-forge 1.4.3, zod 4.6.7 and
+  fast-xml-parser 5.12.1, which fix the published advisories against the
+  versions it allowed before.
+
 ## [4.3.0] - 2026-11-16
 
 ### Added
