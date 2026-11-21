@@ -405,7 +405,7 @@ Run `revenant setup` and choose "Custom URL" to configure any CoSign server. The
 
 ## Prerequisites
 
-- Python 3.10+
+- Python 3.11+
 - `pikepdf` — for embedded PDF signatures (brings in `qpdf`, `Pillow`, `lxml`)
 - `asn1crypto` — certificate parsing (PKCS#7, X.509)
 - `tlslite-ng` — legacy TLS for servers requiring TLS 1.0 / RC4 (e.g. EKENG)
@@ -517,7 +517,7 @@ python scripts/build.py mac --no-dmg
 python scripts/build.py dmg
 ```
 
-**Requires:** Python 3.10+, tkinter (`brew install python-tk@3.13`), Xcode Command Line Tools.
+**Requires:** Python 3.11+, tkinter (`brew install python-tk@3.13`), Xcode Command Line Tools.
 
 **Output:** `dist/Revenant.app`, `dist/Revenant.dmg`
 
@@ -542,7 +542,7 @@ python scripts/build.py gui
 python scripts/build_appimage.py
 ```
 
-**Requires:** Python 3.10+, tkinter (`apt install python3-tk` for GUI).
+**Requires:** Python 3.11+, tkinter (`apt install python3-tk` for GUI).
 
 **Output:** `dist/revenant` (CLI), `dist/revenant-gui` (GUI), `dist/Revenant-{arch}.AppImage` (e.g. `Revenant-x86_64.AppImage`, `Revenant-aarch64.AppImage`)
 
@@ -567,7 +567,7 @@ python scripts/build.py gui
 python scripts/build_msix.py
 ```
 
-**Requires:** Python 3.10+, tkinter (included with Python on Windows), Windows SDK (for MSIX only).
+**Requires:** Python 3.11+, tkinter (included with Python on Windows), Windows SDK (for MSIX only).
 
 **Output:** `dist/revenant-standalone/` (folder with `revenant.exe` + `revenant-gui.exe`), `dist/RevenantSign.msix`
 

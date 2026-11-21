@@ -7,7 +7,7 @@ Thank you for your interest in contributing to Revenant.
 ### Prerequisites
 
 **Python client:**
-- Python 3.10+
+- Python 3.11+
 - [ruff](https://docs.astral.sh/ruff/) (linting/formatting)
 - [pyright](https://github.com/microsoft/pyright) (type checking)
 

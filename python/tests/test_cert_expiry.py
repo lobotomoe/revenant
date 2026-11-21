@@ -16,7 +16,7 @@ from revenant.core.cert_expiry import (
 
 def _iso(delta_days: int) -> str:
     """Helper: ISO 8601 timestamp offset from now by delta_days."""
-    dt = datetime.datetime.now(datetime.timezone.utc) + datetime.timedelta(days=delta_days)
+    dt = datetime.datetime.now(datetime.UTC) + datetime.timedelta(days=delta_days)
     return dt.isoformat()
 
 
@@ -41,7 +41,7 @@ def test_days_remaining_today():
 
 def test_days_remaining_naive_timestamp():
     """Naive (no timezone) timestamps are treated as UTC."""
-    dt = datetime.datetime.now(datetime.timezone.utc) + datetime.timedelta(days=50)
+    dt = datetime.datetime.now(datetime.UTC) + datetime.timedelta(days=50)
     naive_iso = dt.replace(tzinfo=None).isoformat()
     result = days_remaining(naive_iso)
     assert 49 <= result <= 50
@@ -123,13 +123,13 @@ def test_format_validity_period_none_after():
 
 def test_format_validity_period_one_day():
     # Create a timestamp approximately 1 day from now
-    dt = datetime.datetime.now(datetime.timezone.utc) + datetime.timedelta(days=1, hours=12)
+    dt = datetime.datetime.now(datetime.UTC) + datetime.timedelta(days=1, hours=12)
     result = format_validity_period("2024-01-01T00:00:00+00:00", dt.isoformat())
     assert "1 day remaining" in result
 
 
 def test_format_validity_period_expires_today():
-    dt = datetime.datetime.now(datetime.timezone.utc) + datetime.timedelta(hours=6)
+    dt = datetime.datetime.now(datetime.UTC) + datetime.timedelta(hours=6)
     result = format_validity_period("2024-01-01T00:00:00+00:00", dt.isoformat())
     assert "expires today" in result
 

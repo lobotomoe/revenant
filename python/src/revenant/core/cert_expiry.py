@@ -26,8 +26,8 @@ def days_remaining(not_after_iso: str) -> int:
     """
     not_after = datetime.datetime.fromisoformat(not_after_iso)
     if not_after.tzinfo is None:
-        not_after = not_after.replace(tzinfo=datetime.timezone.utc)
-    now = datetime.datetime.now(datetime.timezone.utc)
+        not_after = not_after.replace(tzinfo=datetime.UTC)
+    now = datetime.datetime.now(datetime.UTC)
     delta = not_after - now
     return delta.days
 
@@ -67,8 +67,8 @@ def not_yet_valid(not_before_iso: str) -> bool:
     """
     not_before = datetime.datetime.fromisoformat(not_before_iso)
     if not_before.tzinfo is None:
-        not_before = not_before.replace(tzinfo=datetime.timezone.utc)
-    now = datetime.datetime.now(datetime.timezone.utc)
+        not_before = not_before.replace(tzinfo=datetime.UTC)
+    now = datetime.datetime.now(datetime.UTC)
     return now < not_before
 
 

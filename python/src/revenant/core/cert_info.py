@@ -59,7 +59,7 @@ def _extract_info_from_cert_object(cert: asn1_x509.Certificate) -> dict[str, str
             not_before_iso = not_before.isoformat()
         if not_after:
             not_after_iso = not_after.isoformat()
-        now = datetime.datetime.now(datetime.timezone.utc)
+        now = datetime.datetime.now(datetime.UTC)
         if not_before and now < not_before:
             _logger.warning("Certificate is not yet valid (notBefore: %s)", not_before)
         elif not_after and now > not_after:
@@ -168,7 +168,7 @@ def extract_all_cert_info_from_pdf(pdf_bytes: bytes) -> list[dict[str, str | Non
             if dn and dn not in seen_dns:
                 seen_dns.add(dn)
                 results.append(info)
-        except RevenantError as exc:  # noqa: PERF203 -- each iteration parses independent CMS blobs; try-except must be per-item
+        except RevenantError as exc:
             _logger.debug("Skipping signature (extraction failed): %s", exc)
             continue
 

@@ -12,12 +12,12 @@ Usage:
 
     # The new version dropped a Python the project still tests on: keep the
     # old pin there and add the new one beside it.
-    python scripts/bump_requirement_pin.py pillow 13.0.0 ../.github/requirements/dev.txt \\
-        --keep-old-when 'python_version < "3.11"' --new-when 'python_version >= "3.11"'
+    python scripts/bump_requirement_pin.py pillow 14.0.0 ../.github/requirements/dev.txt \\
+        --keep-old-when 'python_version < "3.12"' --new-when 'python_version >= "3.12"'
 
     # The file already holds one block per marker: name the one to bump.
-    python scripts/bump_requirement_pin.py pillow 13.0.1 ../.github/requirements/dev.txt \\
-        --only-marker 'python_version >= "3.11"'
+    python scripts/bump_requirement_pin.py pillow 14.0.1 ../.github/requirements/dev.txt \\
+        --only-marker 'python_version >= "3.12"'
 """
 
 from __future__ import annotations

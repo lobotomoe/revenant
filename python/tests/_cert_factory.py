@@ -35,8 +35,8 @@ def make_root_ca(cn: str = "Test Root CA") -> tuple[x509.Certificate, rsa.RSAPri
         .issuer_name(issuer)
         .public_key(key.public_key())
         .serial_number(x509.random_serial_number())
-        .not_valid_before(datetime.datetime(2025, 1, 1, tzinfo=datetime.timezone.utc))
-        .not_valid_after(datetime.datetime(2035, 1, 1, tzinfo=datetime.timezone.utc))
+        .not_valid_before(datetime.datetime(2025, 1, 1, tzinfo=datetime.UTC))
+        .not_valid_after(datetime.datetime(2035, 1, 1, tzinfo=datetime.UTC))
         .add_extension(x509.BasicConstraints(ca=True, path_length=None), critical=True)
         .add_extension(
             x509.KeyUsage(
@@ -77,8 +77,8 @@ def make_intermediate(
         .issuer_name(issuer_cert.subject)
         .public_key(key.public_key())
         .serial_number(x509.random_serial_number())
-        .not_valid_before(datetime.datetime(2025, 1, 1, tzinfo=datetime.timezone.utc))
-        .not_valid_after(datetime.datetime(2034, 1, 1, tzinfo=datetime.timezone.utc))
+        .not_valid_before(datetime.datetime(2025, 1, 1, tzinfo=datetime.UTC))
+        .not_valid_after(datetime.datetime(2034, 1, 1, tzinfo=datetime.UTC))
         .add_extension(x509.BasicConstraints(ca=True, path_length=0), critical=True)
         .add_extension(
             x509.KeyUsage(
@@ -119,8 +119,8 @@ def make_leaf(
         .issuer_name(issuer_cert.subject)
         .public_key(key.public_key())
         .serial_number(x509.random_serial_number())
-        .not_valid_before(datetime.datetime(2025, 1, 1, tzinfo=datetime.timezone.utc))
-        .not_valid_after(datetime.datetime(2032, 1, 1, tzinfo=datetime.timezone.utc))
+        .not_valid_before(datetime.datetime(2025, 1, 1, tzinfo=datetime.UTC))
+        .not_valid_after(datetime.datetime(2032, 1, 1, tzinfo=datetime.UTC))
         .add_extension(x509.BasicConstraints(ca=False, path_length=None), critical=True)
         .add_extension(
             x509.SubjectKeyIdentifier.from_public_key(key.public_key()),
