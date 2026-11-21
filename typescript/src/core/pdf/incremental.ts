@@ -11,41 +11,22 @@
 
 import { deflateSync } from "node:zlib";
 
-import { PDFArray, PDFDocument, PDFName, PDFRef } from "pdf-lib";
+import {
+  CharCodes,
+  PDFArray,
+  PDFCatalog,
+  type PDFDict,
+  PDFDocument,
+  PDFName,
+  PDFParser,
+  PDFRef,
+} from "pdf-lib";
 
-import { PDFError } from "../../errors.js";
+import { getErrorMessage, PDFError } from "../../errors.js";
 import { BYTERANGE_PLACEHOLDER_BYTES, CMS_HEX_SIZE } from "./objects.js";
 import { getPageDimensions, resolvePageIndex } from "./position.js";
 
 // -- PDF structure analysis ---------------------------------------------------
-
-/**
- * Find the catalog /Root object number from the trailer.
- *
- * Uses the LAST match -- PDFs with incremental updates may redefine
- * /Root in later trailers, and the last one is always authoritative.
- */
-export function findRootObjNum(pdfBytes: Uint8Array): { objNum: number; genNum: number } {
-  const text = new TextDecoder("latin1").decode(pdfBytes);
-  const pattern = /\/Root\s+(\d+)\s+(\d+)\s+R/g;
-  const matches = [...text.matchAll(pattern)];
-  if (matches.length === 0) {
-    throw new PDFError("Cannot find /Root reference in PDF trailer.");
-  }
-  const last = matches[matches.length - 1];
-  if (last === undefined) {
-    throw new PDFError("Cannot find /Root reference in PDF trailer.");
-  }
-  const objNumStr = last[1];
-  const genNumStr = last[2];
-  if (objNumStr === undefined || genNumStr === undefined) {
-    throw new PDFError("Malformed /Root reference in PDF trailer.");
-  }
-  return {
-    objNum: parseInt(objNumStr, 10),
-    genNum: parseInt(genNumStr, 10),
-  };
-}
 
 export interface PageInfo {
   pageObjNum: number;
@@ -131,6 +112,7 @@ export async function findPageObjNum(
  */
 export async function findPrevStartxref(pdfBytes: Uint8Array): Promise<{
   prevXref: number;
+  root: PDFRef;
   maxSize: number;
   trailerExtra: string[];
   useXrefStream: boolean;
@@ -153,6 +135,10 @@ export async function findPrevStartxref(pdfBytes: Uint8Array): Promise<{
   }
   const prevXref = parseInt(prevXrefStr, 10);
 
+  // PDFDocument.load() may recover a missing /Root from a catalog object.
+  // Signing needs the reference explicitly stored in this revision.
+  const { root, useXrefStream } = new XRefTrailerParser(pdfBytes.subarray(prevXref)).read();
+
   // Determine /Size: use the maximum of pdf-lib's object count and the
   // /Size value from the trailer or XRef stream.  pdf-lib unpacks ObjStm
   // contents but doesn't count ObjStm/XRef stream objects themselves,
@@ -160,6 +146,9 @@ export async function findPrevStartxref(pdfBytes: Uint8Array): Promise<{
   const pdfDoc = await PDFDocument.load(pdfBytes, {
     updateMetadata: false,
   });
+  if (!(pdfDoc.catalog instanceof PDFCatalog) || pdfDoc.context.lookup(root) !== pdfDoc.catalog) {
+    throw new PDFError("The trailer /Root reference does not resolve to the document catalog.");
+  }
   const pdfLibSize = pdfDoc.context.largestObjectNumber + 1;
   const trailerSize = parseTrailerSize(text);
   const maxSize = Math.max(pdfLibSize, trailerSize);
@@ -167,11 +156,52 @@ export async function findPrevStartxref(pdfBytes: Uint8Array): Promise<{
   // Extract extra trailer entries to carry forward (/Info, /ID, etc.)
   const trailerExtra = extractTrailerEntries(pdfBytes, text);
 
-  // Detect if source PDF uses XRef streams -- incremental updates must
-  // use the same format (ISO 32000-1 S7.5.8.4)
-  const useXrefStream = detectXrefStreams(pdfBytes, prevXref);
+  return { prevXref, root, maxSize, trailerExtra, useXrefStream };
+}
 
-  return { prevXref, maxSize, trailerExtra, useXrefStream };
+/** Read the trailer dictionary starting at the byte offset from startxref. */
+class XRefTrailerParser extends PDFParser {
+  read(): { root: PDFRef; useXrefStream: boolean } {
+    this.skipWhitespaceAndComments();
+    const isTable = this.matchKeyword([...Buffer.from("xref")]);
+    let trailer: PDFDict;
+    try {
+      if (isTable) {
+        // Both subsection headers and entries occupy numeric lines.
+        this.skipWhitespaceAndComments();
+        while (this.bytes.peek() >= CharCodes.Zero && this.bytes.peek() <= CharCodes.Nine) {
+          this.skipLine();
+          this.skipWhitespaceAndComments();
+        }
+      } else {
+        // Object number and generation of the cross-reference stream.
+        this.parseRawInt();
+        this.skipWhitespaceAndComments();
+        this.parseRawInt();
+        this.skipWhitespaceAndComments();
+      }
+      const keyword = isTable ? "trailer" : "obj";
+      if (!this.matchKeyword([...Buffer.from(keyword)])) throw new Error(`Expected ${keyword}`);
+      this.skipWhitespaceAndComments();
+      trailer = this.parseDict();
+      this.skipWhitespaceAndComments();
+      if (
+        !isTable &&
+        (trailer.get(PDFName.of("Type")) !== PDFName.of("XRef") ||
+          !this.matchKeyword([...Buffer.from("stream")]))
+      ) {
+        throw new Error("Expected a cross-reference stream");
+      }
+    } catch (error) {
+      throw new PDFError(`Cannot read active PDF trailer: ${getErrorMessage(error)}`);
+    }
+
+    const root = trailer.get(PDFName.of("Root"));
+    if (!(root instanceof PDFRef)) {
+      throw new PDFError("Expected an indirect /Root reference in PDF trailer.");
+    }
+    return { root, useXrefStream: !isTable };
+  }
 }
 
 /**
@@ -400,7 +430,10 @@ export function buildXrefAndTrailer(options: XrefTrailerOptions): Uint8Array {
       if (offset === undefined) {
         throw new PDFError(`Missing xref offset for object ${objNum}.`);
       }
-      lines.push(`${offset.toString().padStart(10, "0")} 00000 n\r`);
+      const generation = objNum === rootObjNum ? rootGen : 0;
+      lines.push(
+        `${offset.toString().padStart(10, "0")} ${generation.toString().padStart(5, "0")} n\r`,
+      );
     }
   }
 
@@ -442,9 +475,10 @@ export function buildXrefStream(options: XrefStreamOptions): Uint8Array {
   // Determine W (column widths for binary entries per ISO 32000-1 Table 17)
   // Column 1: type (1 byte, value 1 = in-use uncompressed)
   // Column 2: byte offset (variable width, big-endian)
-  // Column 3: generation number (1 byte, always 0 for new objects)
+  // Column 3: generation number (the catalog keeps its original generation)
   const maxOffset = Math.max(...allEntries.values());
   const w2 = bytesNeeded(maxOffset);
+  const w3 = bytesNeeded(rootGen);
 
   // Build /Index subsections and binary stream data
   const sortedNums = [...allEntries.keys()].sort((a, b) => a - b);
@@ -465,7 +499,10 @@ export function buildXrefStream(options: XrefStreamOptions): Uint8Array {
       for (let i = w2 - 1; i >= 0; i--) {
         binaryParts.push((offset >>> (i * 8)) & 0xff);
       }
-      binaryParts.push(0);
+      const generation = objNum === rootObjNum ? rootGen : 0;
+      for (let i = w3 - 1; i >= 0; i--) {
+        binaryParts.push((generation >>> (i * 8)) & 0xff);
+      }
     }
   }
 
@@ -480,7 +517,7 @@ export function buildXrefStream(options: XrefStreamOptions): Uint8Array {
   lines.push(`  /Size ${actualSize}`);
   lines.push(`  /Prev ${prevXref}`);
   lines.push(`  /Root ${rootObjNum} ${rootGen} R`);
-  lines.push(`  /W [1 ${w2} 1]`);
+  lines.push(`  /W [1 ${w2} ${w3}]`);
   lines.push(`  /Index [${indexParts.join(" ")}]`);
   lines.push("  /Filter /FlateDecode");
   lines.push(`  /Length ${compressed.length}`);
@@ -532,19 +569,6 @@ function parseTrailerSize(text: string): number {
   }
 
   return maxSize;
-}
-
-/**
- * Detect whether the PDF uses cross-reference streams (PDF 1.5+).
- *
- * Checks the bytes at the last startxref offset: if they match an object
- * definition (N N obj) rather than "xref", the PDF uses XRef streams.
- */
-function detectXrefStreams(pdfBytes: Uint8Array, startxrefOffset: number): boolean {
-  const end = Math.min(startxrefOffset + 40, pdfBytes.length);
-  const slice = pdfBytes.subarray(startxrefOffset, end);
-  const text = new TextDecoder("latin1").decode(slice);
-  return /^\s*\d+\s+\d+\s+obj\b/.test(text);
 }
 
 /**

@@ -354,6 +354,40 @@ def _make_pdf_with_acroform() -> tuple[bytes, int, int]:
 # ── build_catalog_override ──────────────────────────────────────────
 
 
+@pytest.mark.parametrize(
+    ("fixture", "expected_root", "visible"),
+    [
+        ("catalog_gen_1.pdf", (1, 1), True),
+        ("catalog_gen_513.pdf", (1, 513), False),
+        ("catalog_two_revisions.pdf", (7, 0), True),
+    ],
+)
+def test_prepare_preserves_current_catalog(
+    fixture: str, expected_root: tuple[int, int], visible: bool
+) -> None:
+    import io
+    from pathlib import Path
+
+    from revenant.core.pdf import prepare_pdf_with_sig_field
+
+    pikepdf = pytest.importorskip("pikepdf")
+    fixtures = (
+        Path(__file__).resolve().parents[2] / "rust/crates/revenant-sign-core/src/pdf/testdata"
+    )
+    source = (fixtures / fixture).read_bytes()
+    prepared, _, _ = prepare_pdf_with_sig_field(source, visible=visible)
+
+    assert prepared.startswith(source)
+    assert find_root_obj_num(source) == expected_root
+    with pikepdf.open(io.BytesIO(prepared), attempt_recovery=False) as pdf:
+        assert pdf.Root.objgen == expected_root
+        (field,) = pdf.Root.AcroForm.Fields
+        (widget,) = pdf.pages[0].Annots
+        assert field.objgen == widget.objgen
+        assert field["/FT"] == pikepdf.Name.Sig
+        assert pdf.attachments["note.txt"].get_file().read_bytes() == b"note\n"
+
+
 def test_build_catalog_override_creates_acroform_when_absent():
     """No existing form: the minimal field-only AcroForm, byte-identical to
     the pre-merge behavior, so plain-document signing is unchanged."""
@@ -738,15 +772,12 @@ def test_serialize_pikepdf_obj(value, expected):
 # ── find_root_obj_num — edge cases ───────────────────────────────────
 
 
-def test_find_root_obj_num_success():
-    pdf = b"trailer << /Root 1 0 R /Size 3 >>"
-    obj_num, gen = find_root_obj_num(pdf)
-    assert obj_num == 1
-    assert gen == 0
+def test_find_root_obj_num_success() -> None:
+    assert find_root_obj_num(_make_blank_pdf()) == (1, 0)
 
 
-def test_find_root_obj_num_missing():
-    with pytest.raises(PDFError, match="Cannot find /Root"):
+def test_find_root_obj_num_missing() -> None:
+    with pytest.raises(PDFError, match="Cannot read PDF trailer"):
         find_root_obj_num(b"%PDF-1.4\nno root here\n")
 
 

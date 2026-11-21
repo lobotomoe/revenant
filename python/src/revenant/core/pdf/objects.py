@@ -187,7 +187,9 @@ def build_page_override(pdf_bytes: bytes, page_obj_num: int, annots_list: str) -
     )
 
 
-def build_catalog_override(pdf_bytes: bytes, root_obj_num: int, annot_obj_num: int) -> str:
+def build_catalog_override(
+    pdf_bytes: bytes, root_obj_num: int, annot_obj_num: int, *, root_gen: int = 0
+) -> str:
     """Build a raw catalog override that installs the signature field into
     the document's AcroForm, merging with any AcroForm the document already
     has instead of replacing it.
@@ -207,7 +209,7 @@ def build_catalog_override(pdf_bytes: bytes, root_obj_num: int, annot_obj_num: i
 
     pikepdf = _require_pikepdf()
     with pikepdf.open(io.BytesIO(pdf_bytes)) as pdf:
-        catalog = pdf.get_object((root_obj_num, 0))
+        catalog = pdf.get_object((root_obj_num, root_gen))
         entries: list[str] = []
         acroform = None
         for key in list(catalog.keys()):
@@ -219,7 +221,7 @@ def build_catalog_override(pdf_bytes: bytes, root_obj_num: int, annot_obj_num: i
         entries.append(f"  /AcroForm << {acroform_body} >>")
 
     body = "\n".join(entries)
-    return f"{root_obj_num} 0 obj\n<<\n{body}\n>>\nendobj\n"
+    return f"{root_obj_num} {root_gen} obj\n<<\n{body}\n>>\nendobj\n"
 
 
 def _merged_acroform_body(acroform: pikepdf.Object | None, annot_obj_num: int) -> str:

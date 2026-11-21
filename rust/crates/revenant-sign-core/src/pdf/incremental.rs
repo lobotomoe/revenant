@@ -1,12 +1,8 @@
 //! PDF structure analysis and incremental-update assembly.
 //!
-//! Reads the bits of existing PDF structure that a byte-level scan handles best
-//! -- the authoritative `/Root` reference, the last `startxref`, and whether the
-//! file uses cross-reference streams -- then assembles the incremental update:
-//! the new objects, a matching xref (table or stream), and the trailer. The
-//! `/Size` and `/Info`+`/ID` carry-forward come from [`super::reader::PdfReader`]
-//! (which resolves xref streams correctly); object dictionaries are read there
-//! too.
+//! Locates the last `startxref` and detects the cross-reference format before
+//! appending the new objects, xref table or stream, and trailer.
+//! [`PdfReader`] resolves `/Root`, `/Size`, `/Info`, and `/ID` from the trailer.
 
 use std::collections::BTreeMap;
 use std::sync::LazyLock;
@@ -14,12 +10,9 @@ use std::sync::LazyLock;
 use regex::bytes::Regex;
 
 use super::objects::{deflate, BYTERANGE_PLACEHOLDER, CMS_HEX_SIZE};
-use super::reader::ObjRef;
+use super::reader::{ObjRef, PdfReader};
 use crate::{Result, RevenantError};
 
-/// The last `/Root N G R` wins: incremental updates may redefine it.
-static ROOT_RE: LazyLock<Regex> =
-    LazyLock::new(|| Regex::new(r"/Root\s+(\d+)\s+(\d+)\s+R").expect("valid /Root regex"));
 /// Lenient `startxref` match (some PDFs have trailing junk after `%%EOF`).
 static STARTXREF_RE: LazyLock<Regex> =
     LazyLock::new(|| Regex::new(r"startxref\s+(\d+)\s+%%EOF").expect("valid startxref regex"));
@@ -34,14 +27,9 @@ static XREF_STREAM_RE: LazyLock<Regex> =
 ///
 /// # Errors
 ///
-/// Returns [`RevenantError::Pdf`] if no `/Root` reference is present.
+/// Returns [`RevenantError::Pdf`] if the PDF or its catalog reference cannot be read.
 pub fn find_root_obj_num(pdf_bytes: &[u8]) -> Result<ObjRef> {
-    let caps = ROOT_RE.captures_iter(pdf_bytes).last().ok_or_else(|| {
-        RevenantError::Pdf("Cannot find /Root reference in PDF trailer.".to_owned())
-    })?;
-    let num = parse_uint::<u32>(&caps[1])?;
-    let gen = parse_uint::<u16>(&caps[2])?;
-    Ok(ObjRef::new(num, gen))
+    PdfReader::open(pdf_bytes)?.catalog_ref()
 }
 
 /// Find the byte offset from the last `startxref`.
@@ -248,8 +236,9 @@ pub fn build_xref_and_trailer(
         lines.push(format!("{} {}", group[0], group.len()));
         for obj_num in group {
             let offset = xref_entries[&obj_num];
+            let generation = if obj_num == root_obj_num { root_gen } else { 0 };
             // 20-byte entry: "oooooooooo ggggg n\r" + the joining "\n".
-            lines.push(format!("{offset:010} 00000 n\r"));
+            lines.push(format!("{offset:010} {generation:05} n\r"));
         }
     }
 
@@ -303,6 +292,7 @@ pub fn build_xref_stream(
         ));
     }
     let w2 = bytes_needed(max_offset);
+    let w3 = bytes_needed(usize::from(root_gen));
 
     let nums: Vec<u32> = all_entries.keys().copied().collect();
     let mut index_parts: Vec<String> = Vec::new();
@@ -311,9 +301,10 @@ pub fn build_xref_stream(
         index_parts.push(format!("{} {}", group[0], group.len()));
         for obj_num in group {
             let offset = all_entries[&obj_num];
+            let generation = if obj_num == root_obj_num { root_gen } else { 0 };
             binary.push(1u8); // type 1 = in-use, uncompressed
             binary.extend_from_slice(&offset_be_bytes(offset, w2));
-            binary.push(0u8); // generation
+            binary.extend_from_slice(&generation.to_be_bytes()[2 - w3..]);
         }
     }
 
@@ -326,7 +317,7 @@ pub fn build_xref_stream(
         format!("  /Size {actual_size}"),
         format!("  /Prev {prev_xref}"),
         format!("  /Root {root_obj_num} {root_gen} R"),
-        format!("  /W [1 {w2} 1]"),
+        format!("  /W [1 {w2} {w3}]"),
         format!("  /Index [{}]", index_parts.join(" ")),
         "  /Filter /FlateDecode".to_owned(),
         format!("  /Length {}", compressed.len()),

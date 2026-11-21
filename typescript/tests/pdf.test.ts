@@ -3,12 +3,24 @@
  * cms-extraction, cms-info, incremental updates, builder, render, and verify.
  */
 
-import { unlinkSync, writeFileSync } from "node:fs";
+import { readFileSync, unlinkSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 
 import * as asn1js from "asn1js";
-import { PDFArray, PDFDict, PDFDocument, PDFName, PDFNumber, PDFRef, PDFString } from "pdf-lib";
+import {
+  PDFArray,
+  PDFContext,
+  PDFDict,
+  PDFDocument,
+  PDFName,
+  PDFNumber,
+  PDFObjectParser,
+  PDFRawStream,
+  PDFRef,
+  PDFString,
+  PDFXRefStreamParser,
+} from "pdf-lib";
 import * as pkijs from "pkijs";
 import { describe, expect, it } from "vitest";
 
@@ -36,7 +48,6 @@ import {
   findByteRanges,
   findPageObjNum,
   findPrevStartxref,
-  findRootObjNum,
   getPageDimensions,
   insertCms,
   inspectCmsBlob,
@@ -493,14 +504,14 @@ describe("constants", () => {
 describe("buildObjectOverride", () => {
   it("builds override with new entry replacing skipped key", async () => {
     const pdfBytes = await createValidPdf();
-    const rootInfo = findRootObjNum(pdfBytes);
+    const { root } = await findPrevStartxref(pdfBytes);
     const result = await buildObjectOverride(
       pdfBytes,
-      rootInfo.objNum,
+      root.objectNumber,
       "/AcroForm",
       "  /AcroForm << /Fields [] >>",
     );
-    expect(result).toContain(`${rootInfo.objNum} 0 obj`);
+    expect(result).toContain(`${root.objectNumber} 0 obj`);
     expect(result).toContain("/AcroForm << /Fields [] >>");
     expect(result).toContain("endobj");
   });
@@ -548,9 +559,9 @@ async function createPdfWithAcroform(): Promise<{ bytes: Uint8Array; fieldNum: n
 describe("buildCatalogOverride", () => {
   it("creates a minimal AcroForm when the document has none", async () => {
     const pdfBytes = await createValidPdf();
-    const rootInfo = findRootObjNum(pdfBytes);
-    const result = await buildCatalogOverride(pdfBytes, rootInfo.objNum, 50);
-    expect(result).toContain(`${rootInfo.objNum} 0 obj`);
+    const { root } = await findPrevStartxref(pdfBytes);
+    const result = await buildCatalogOverride(pdfBytes, root.objectNumber, 50);
+    expect(result).toContain(`${root.objectNumber} 0 obj`);
     expect(result).toContain("/AcroForm << /Fields [50 0 R] /SigFlags 3 >>");
   });
 
@@ -558,8 +569,8 @@ describe("buildCatalogOverride", () => {
     // Regression for the form-destroying bug: signing a PDF that already has
     // an AcroForm must keep the existing fields and merge, not replace.
     const { bytes, fieldNum } = await createPdfWithAcroform();
-    const rootInfo = findRootObjNum(bytes);
-    const result = await buildCatalogOverride(bytes, rootInfo.objNum, 99);
+    const { root } = await findPrevStartxref(bytes);
+    const result = await buildCatalogOverride(bytes, root.objectNumber, 99);
 
     // Existing field preserved, new field appended after it.
     expect(result).toContain(`/Fields [${fieldNum} 0 R 99 0 R]`);
@@ -972,20 +983,6 @@ describe("inspectCmsBlob", () => {
 // incremental.ts
 // =============================================================================
 
-describe("findRootObjNum", () => {
-  it("finds /Root in a standard PDF", async () => {
-    const pdfBytes = await createValidPdf();
-    const root = findRootObjNum(pdfBytes);
-    expect(root.objNum).toBeGreaterThan(0);
-    expect(root.genNum).toBe(0);
-  });
-
-  it("throws when no /Root is found", () => {
-    const bytes = new TextEncoder().encode("not a PDF at all");
-    expect(() => findRootObjNum(bytes)).toThrow(PDFError);
-  });
-});
-
 describe("findPageObjNum", () => {
   it("finds page 0 in a valid PDF", async () => {
     const pdfBytes = await createValidPdf();
@@ -1041,11 +1038,12 @@ describe("findPageObjNum", () => {
 });
 
 describe("findPrevStartxref", () => {
-  it("finds startxref in a valid PDF", async () => {
+  it("reads startxref and the catalog reference in a valid PDF", async () => {
     const pdfBytes = await createValidPdf();
     const result = await findPrevStartxref(pdfBytes);
     expect(result.prevXref).toBeGreaterThan(0);
     expect(result.maxSize).toBeGreaterThan(0);
+    expect(result.root).toEqual(PDFRef.of(2, 0));
   });
 
   it("throws when no startxref is found", async () => {
@@ -1053,36 +1051,67 @@ describe("findPrevStartxref", () => {
     await expect(findPrevStartxref(bytes)).rejects.toThrow(PDFError);
   });
 
-  it("extracts /Info and /ID from traditional trailer", async () => {
-    // Create a valid PDF using pdf-lib, then manually append an incremental
-    // update with a trailer containing /Info and /ID entries.
-    const basePdf = await createValidPdf();
-    const rootInfo = findRootObjNum(basePdf);
+  it.each([
+    { format: "xref table", useObjectStreams: false },
+    { format: "xref stream", useObjectStreams: true },
+  ])("rejects a $format without /Root even when a catalog exists", async ({ useObjectStreams }) => {
+    const doc = await PDFDocument.create();
+    doc.addPage([612, 792]);
+    doc.context.trailerInfo.Root = undefined;
+    const bytes = await doc.save({ useObjectStreams });
 
-    // Build a fake incremental update with /Info and /ID in the trailer
-    const incUpdate =
-      "\n99 0 obj\n<< /Type /Test >>\nendobj\n" +
-      "xref\n99 1\n" +
-      "0000000100 00000 n\r\n" +
-      "trailer\n<<\n" +
-      `  /Size 100\n` +
-      `  /Prev 0\n` +
-      `  /Root ${rootInfo.objNum} ${rootInfo.genNum} R\n` +
-      `  /Info 5 0 R\n` +
-      `  /ID [<abc123> <def456>]\n` +
-      ">>\n" +
-      "startxref\n100\n%%EOF\n";
-    const incBytes = new TextEncoder().encode(incUpdate);
-    const combined = new Uint8Array(basePdf.length + incBytes.length);
-    combined.set(basePdf, 0);
-    combined.set(incBytes, basePdf.length);
+    await expect(findPrevStartxref(bytes)).rejects.toThrow(
+      new PDFError("Expected an indirect /Root reference in PDF trailer."),
+    );
+  });
 
-    const result = await findPrevStartxref(combined);
-    expect(result.trailerExtra.length).toBeGreaterThan(0);
-    const hasInfo = result.trailerExtra.some((e) => e.includes("/Info"));
-    const hasId = result.trailerExtra.some((e) => e.includes("/ID"));
-    expect(hasInfo).toBe(true);
-    expect(hasId).toBe(true);
+  it("rejects a missing /Root in the active trailer even when an earlier trailer has one", async () => {
+    const base = await createValidPdf();
+    const { maxSize, prevXref } = await findPrevStartxref(base);
+    const revision = Buffer.from(
+      "\nxref\n0 1\n0000000000 65535 f\r\n" +
+        `trailer\n<< /Size ${maxSize} /Prev ${prevXref} >>\nstartxref\n${base.length + 1}\n%%EOF\n`,
+    );
+
+    await expect(findPrevStartxref(Buffer.concat([base, revision]))).rejects.toThrow(
+      new PDFError("Expected an indirect /Root reference in PDF trailer."),
+    );
+  });
+
+  it("rejects an explicit /Root that points to a page even when a catalog exists", async () => {
+    const doc = await PDFDocument.create();
+    doc.context.trailerInfo.Root = doc.addPage().ref;
+    const bytes = await doc.save();
+
+    await expect(findPrevStartxref(bytes)).rejects.toThrow(
+      new PDFError("The trailer /Root reference does not resolve to the document catalog."),
+    );
+  });
+
+  it.each([
+    { format: "xref table", useXrefStream: false },
+    { format: "xref stream", useXrefStream: true },
+  ])("extracts /Info and /ID added in a later $format", async ({ useXrefStream }) => {
+    const doc = await PDFDocument.create({ updateMetadata: false });
+    doc.addPage();
+    const base = await doc.save();
+    const { root, maxSize, prevXref } = await findPrevStartxref(base);
+    const info = Buffer.from(`${maxSize} 0 obj\n<< /Title (Updated) >>\nendobj\n`);
+    const extras = [`/Info ${maxSize} 0 R`, "/ID [<aabbcc> <ddeeff>]"];
+    const updated = assembleIncrementalUpdate(
+      base,
+      [{ raw: info, objNum: maxSize }],
+      maxSize + 1,
+      prevXref,
+      root.objectNumber,
+      root.generationNumber,
+      extras,
+      useXrefStream,
+    );
+
+    const result = await findPrevStartxref(updated);
+    expect(result.trailerExtra).toEqual(extras);
+    expect(result.useXrefStream).toBe(useXrefStream);
   });
 
   it("extracts /Info from standard pdf-lib generated PDF", async () => {
@@ -1093,68 +1122,11 @@ describe("findPrevStartxref", () => {
     expect(hasInfo).toBe(true);
   });
 
-  it("extracts /ID from xref stream object when it contains /ID entry", async () => {
-    // pdf-lib generates XRef stream PDFs (no traditional trailer).
-    // The base pdf-lib XRef stream has /Info but no /ID.
-    // Strip /Info from the base so the original XRef stream yields no matches,
-    // then append a new XRef stream carrying BOTH /Info AND /ID.
-    // This forces extractTrailerEntries to reach lines 224-225 (the /ID branch).
-    const basePdf = await createValidPdf();
-    const rootInfo = findRootObjNum(basePdf);
-
-    // Remove /Info from the base so the original XRef stream no longer matches
-    const basePdfText = new TextDecoder("latin1").decode(basePdf);
-    const strippedText = basePdfText.replace(/\/Info\s+\d+\s+\d+\s+R/g, "/InfoRemoved");
-    const strippedBase = new TextEncoder().encode(strippedText);
-
-    const xrefStreamObj =
-      `\n10 0 obj\n` +
-      `<< /Type /XRef /Size 11 /Root ${rootInfo.objNum} ${rootInfo.genNum} R` +
-      ` /Info 3 0 R /ID [<aabbcc> <ddeeff>] /W [1 2 1] /Length 5 >>\n` +
-      `stream\n00000\nendstream\nendobj\n`;
-    const xrefStreamBytes = new TextEncoder().encode(xrefStreamObj);
-    const newStartxrefOffset = strippedBase.length + xrefStreamBytes.length;
-    const footer = new TextEncoder().encode(`startxref\n${newStartxrefOffset}\n%%EOF\n`);
-
-    const combined = new Uint8Array(strippedBase.length + xrefStreamBytes.length + footer.length);
-    combined.set(strippedBase, 0);
-    combined.set(xrefStreamBytes, strippedBase.length);
-    combined.set(footer, strippedBase.length + xrefStreamBytes.length);
-
-    const result = await findPrevStartxref(combined);
-    const hasInfo = result.trailerExtra.some((e) => e.includes("/Info"));
-    const hasId = result.trailerExtra.some((e) => e.includes("/ID"));
-    expect(hasInfo).toBe(true);
-    expect(hasId).toBe(true);
-  });
-
-  it("returns empty trailerExtra when xref stream has no /Info or /ID", async () => {
-    // Build a PDF whose XRef streams carry /Type /XRef but neither /Info nor /ID.
-    // extractTrailerEntries should return an empty array, reaching the final return.
-    const basePdf = await createValidPdf();
-    const rootInfo = findRootObjNum(basePdf);
-
-    // Strip /Info from the base PDF bytes so the original XRef stream no longer carries it
-    const basePdfText = new TextDecoder("latin1").decode(basePdf);
-    const strippedText = basePdfText.replace(/\/Info\s+\d+\s+\d+\s+R/g, "/InfoRemoved");
-    const strippedBase = new TextEncoder().encode(strippedText);
-
-    const xrefStreamObj =
-      `\n10 0 obj\n` +
-      `<< /Type /XRef /Size 11 /Root ${rootInfo.objNum} ${rootInfo.genNum} R` +
-      ` /W [1 2 1] /Length 5 >>\n` +
-      `stream\n00000\nendstream\nendobj\n`;
-    const xrefStreamBytes = new TextEncoder().encode(xrefStreamObj);
-    const newStartxrefOffset = strippedBase.length + xrefStreamBytes.length;
-    const footer = new TextEncoder().encode(`startxref\n${newStartxrefOffset}\n%%EOF\n`);
-
-    const combined = new Uint8Array(strippedBase.length + xrefStreamBytes.length + footer.length);
-    combined.set(strippedBase, 0);
-    combined.set(xrefStreamBytes, strippedBase.length);
-    combined.set(footer, strippedBase.length + xrefStreamBytes.length);
-
-    const result = await findPrevStartxref(combined);
-    expect(result.trailerExtra.length).toBe(0);
+  it("returns empty trailerExtra when the xref stream has no /Info or /ID", async () => {
+    const doc = await PDFDocument.create({ updateMetadata: false });
+    doc.addPage();
+    const result = await findPrevStartxref(await doc.save());
+    expect(result.trailerExtra).toEqual([]);
   });
 });
 
@@ -1218,14 +1190,16 @@ describe("buildXrefAndTrailer", () => {
       xrefEntries: entries,
       newSize: 13,
       prevXref: 500,
-      rootObjNum: 1,
-      rootGen: 0,
+      rootObjNum: 10,
+      rootGen: 1,
       trailerExtra: [],
       xrefOffset: 5000,
     });
     const text = new TextDecoder().decode(result);
     expect(text).toContain("xref");
     expect(text).toContain("10 3"); // consecutive group: 10, 11, 12
+    expect(text).toContain("/Root 10 1 R");
+    expect(text).toContain("0000001000 00001 n\r\n0000002000 00000 n\r\n");
     expect(text).toContain("/Size 13");
     expect(text).toContain("/Prev 500");
     expect(text).toContain("startxref");
@@ -1294,8 +1268,8 @@ describe("buildXrefStream", () => {
       xrefEntries: entries,
       newSize: 12,
       prevXref: 500,
-      rootObjNum: 1,
-      rootGen: 0,
+      rootObjNum: 10,
+      rootGen: 513,
       trailerExtra: [],
       xrefOffset: 5000,
       xrefObjNum: 12,
@@ -1305,7 +1279,7 @@ describe("buildXrefStream", () => {
     expect(text).toContain("/Type /XRef");
     expect(text).toContain("/Size 13"); // xrefObjNum + 1
     expect(text).toContain("/Prev 500");
-    expect(text).toContain("/Root 1 0 R");
+    expect(text).toContain("/Root 10 513 R");
     expect(text).toContain("/Filter /FlateDecode");
     expect(text).toContain("stream");
     expect(text).toContain("endstream");
@@ -1314,6 +1288,18 @@ describe("buildXrefStream", () => {
     expect(text).toContain("%%EOF");
     // Should NOT contain traditional "trailer" keyword
     expect(text).not.toContain("trailer");
+
+    const stream = PDFObjectParser.forBytes(
+      result.subarray("12 0 obj\n".length),
+      PDFContext.create(),
+    ).parseObject();
+    if (!(stream instanceof PDFRawStream)) throw new Error("Expected a cross-reference stream");
+    const xref = PDFXRefStreamParser.forStream(stream).parseIntoContext();
+    expect(xref.map(({ ref, offset }) => [ref.toString(), offset])).toEqual([
+      ["10 513 R", 1000],
+      ["11 0 R", 2000],
+      ["12 0 R", 5000],
+    ]);
   });
 
   it("includes trailer extras in XRef stream dict", () => {
@@ -1360,44 +1346,10 @@ describe("findPrevStartxref useXrefStream detection", () => {
   });
 
   it("returns useXrefStream=false for traditional xref PDFs", async () => {
-    const basePdf = await createValidPdf();
-    const rootInfo = findRootObjNum(basePdf);
-
-    // Append a traditional xref incremental update so startxref points to "xref"
-    const xrefStart = basePdf.length + 50;
-    const incUpdate =
-      "\n99 0 obj\n<< /Type /Test >>\nendobj\n" +
-      "xref\n99 1\n" +
-      `${xrefStart.toString().padStart(10, "0")} 00000 n\r\n` +
-      "trailer\n<<\n" +
-      `  /Size 100\n` +
-      `  /Prev 0\n` +
-      `  /Root ${rootInfo.objNum} ${rootInfo.genNum} R\n` +
-      ">>\n" +
-      `startxref\n${basePdf.length + 50}\n%%EOF\n`;
-    const incBytes = new TextEncoder().encode(incUpdate);
-    const combined = new Uint8Array(basePdf.length + incBytes.length);
-    combined.set(basePdf, 0);
-    combined.set(incBytes, basePdf.length);
-
-    // Fix: startxref should point to "xref" keyword
-    const xrefPos = new TextDecoder().decode(combined).lastIndexOf("xref\n99");
-    const fixedInc =
-      "\n99 0 obj\n<< /Type /Test >>\nendobj\n" +
-      "xref\n99 1\n" +
-      `${xrefStart.toString().padStart(10, "0")} 00000 n\r\n` +
-      "trailer\n<<\n" +
-      `  /Size 100\n` +
-      `  /Prev 0\n` +
-      `  /Root ${rootInfo.objNum} ${rootInfo.genNum} R\n` +
-      ">>\n" +
-      `startxref\n${xrefPos}\n%%EOF\n`;
-    const fixedIncBytes = new TextEncoder().encode(fixedInc);
-    const fixedCombined = new Uint8Array(basePdf.length + fixedIncBytes.length);
-    fixedCombined.set(basePdf, 0);
-    fixedCombined.set(fixedIncBytes, basePdf.length);
-
-    const result = await findPrevStartxref(fixedCombined);
+    const doc = await PDFDocument.create();
+    doc.addPage();
+    const bytes = await doc.save({ useObjectStreams: false });
+    const result = await findPrevStartxref(bytes);
     expect(result.useXrefStream).toBe(false);
   });
 });
@@ -1484,6 +1436,29 @@ describe("patchByterange", () => {
 // =============================================================================
 
 describe("preparePdfWithSigField", () => {
+  it.each([
+    { fixture: "catalog_gen_1.pdf", root: PDFRef.of(1, 1), visible: true },
+    { fixture: "catalog_gen_513.pdf", root: PDFRef.of(1, 513), visible: false },
+    { fixture: "catalog_two_revisions.pdf", root: PDFRef.of(7, 0), visible: true },
+  ])("preserves the current catalog in $fixture", async ({ fixture, root, visible }) => {
+    const source = readFileSync(
+      new URL(`../../rust/crates/revenant-sign-core/src/pdf/testdata/${fixture}`, import.meta.url),
+    );
+    const { pdf } = await preparePdfWithSigField(source, { visible });
+    expect(Buffer.from(pdf.subarray(0, source.length))).toEqual(source);
+
+    const doc = await PDFDocument.load(pdf, { updateMetadata: false });
+    expect(doc.context.trailerInfo.Root).toEqual(root);
+    const form = doc.catalog.lookup(PDFName.of("AcroForm"), PDFDict);
+    const fields = form.lookup(PDFName.of("Fields"), PDFArray);
+    expect(fields.size()).toBe(1);
+    const annots = doc.getPage(0).node.lookup(PDFName.of("Annots"), PDFArray);
+    expect(annots.asArray()).toEqual(fields.asArray());
+    expect(fields.lookup(0, PDFDict).get(PDFName.of("FT"))).toEqual(PDFName.of("Sig"));
+    const names = doc.catalog.lookup(PDFName.of("Names"), PDFDict);
+    expect(names.get(PDFName.of("EmbeddedFiles"))).toEqual(PDFRef.of(4, 0));
+  });
+
   it("prepares PDF with invisible signature", async () => {
     const pdfBytes = await createValidPdf();
     const result = await preparePdfWithSigField(pdfBytes, { visible: false });
