@@ -408,7 +408,7 @@ def test_certificate_that_has_not_started_is_not_shown_as_normal():
 
     from revenant.ui.gui.sign_panels import format_cert_validity
 
-    now = datetime.datetime.now(datetime.timezone.utc)
+    now = datetime.datetime.now(datetime.UTC)
     start = (now + datetime.timedelta(days=90)).isoformat()
     end = (now + datetime.timedelta(days=365)).isoformat()
 
@@ -423,7 +423,7 @@ def test_a_currently_valid_certificate_is_still_normal():
 
     from revenant.ui.gui.sign_panels import format_cert_validity
 
-    now = datetime.datetime.now(datetime.timezone.utc)
+    now = datetime.datetime.now(datetime.UTC)
     start = (now - datetime.timedelta(days=10)).isoformat()
     end = (now + datetime.timedelta(days=365)).isoformat()
 

@@ -1,6 +1,7 @@
 """Tests for revenant.core.appearance — visual signature stream generation."""
 
 import re
+from datetime import UTC
 
 import pytest
 
@@ -117,7 +118,7 @@ def test_format_utc_offset(tz, expected):
     from datetime import datetime, timedelta, timezone
 
     if tz is None or tz == "utc":
-        dt = datetime(2026, 2, 7, 12, 0, tzinfo=timezone.utc)
+        dt = datetime(2026, 2, 7, 12, 0, tzinfo=UTC)
     else:
         sign = -1 if tz.startswith("-") else 1
         parts = tz.lstrip("+-").split(":")

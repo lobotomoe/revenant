@@ -180,7 +180,7 @@ def parse_enum_certificates_response(xml_str: str) -> list[bytes]:
         for cert_b64 in certs_b64:
             try:
                 certs.append(base64.b64decode(cert_b64))
-            except binascii.Error as e:  # noqa: PERF203 -- try-except skips individual malformed certificates
+            except binascii.Error as e:
                 _logger.warning("Skipping malformed certificate Base64: %s", e)
         _logger.debug("enum-certificates: %d certificates returned", len(certs))
         return certs

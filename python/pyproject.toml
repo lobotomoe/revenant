@@ -7,7 +7,7 @@ name = "revenant"
 version = "4.3.0"
 description = "Cross-platform Python client for ARX CoSign electronic signatures via SOAP API"
 readme = "README.md"
-requires-python = ">=3.10"
+requires-python = ">=3.11"
 license = "Apache-2.0"
 authors = [
     { name = "Aleksandr Kraiz" },
@@ -22,7 +22,6 @@ classifiers = [
     "Operating System :: Microsoft :: Windows",
     "Operating System :: POSIX :: Linux",
     "Programming Language :: Python :: 3",
-    "Programming Language :: Python :: 3.10",
     "Programming Language :: Python :: 3.11",
     "Programming Language :: Python :: 3.12",
     "Programming Language :: Python :: 3.13",
@@ -33,7 +32,7 @@ dependencies = ["pikepdf>=8.0,<11", "asn1crypto>=1.5,<2", "tlslite-ng>=0.8.0,<0.
 
 [project.optional-dependencies]
 secure = ["keyring>=21.0,<26"]
-dev = ["pytest>=9.0.3,<10", "pytest-cov>=4.0,<8", "ruff>=0.9,<1.0", "pyright>=1.1,<2.0", "pillow>=12.2.0,<14", "keyring>=21.0,<26", "fonttools>=4.0,<5"]
+dev = ["pytest>=9.0.3,<10", "pytest-cov>=4.0,<8", "ruff>=0.9,<1.0", "pyright>=1.1,<2.0", "pillow>=13.0.0,<14", "keyring>=21.0,<26", "fonttools>=4.0,<5"]
 build = ["pyinstaller>=6.0,<7"]
 build-win = ["nuitka>=2.0,<5", "ordered-set>=4.0,<5", "zstandard>=0.20,<1"]
 build-mac = ["py2app>=0.28,<1", "keyring>=21.0,<26"]
@@ -61,7 +60,7 @@ where = ["src"]
 # ── Ruff (linter + formatter) ────────────────────────────────────────
 
 [tool.ruff]
-target-version = "py310"
+target-version = "py311"
 line-length = 100
 src = ["src"]
 

@@ -10,7 +10,7 @@ These helpers are called by builder.py's orchestration layer.
 
 from __future__ import annotations
 
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from typing import TYPE_CHECKING
 
 from ...constants import __version__
@@ -31,7 +31,7 @@ if TYPE_CHECKING:
 def build_sig_dict(obj_num: int, reason: str, name: str | None) -> str:
     """Build the /Type /Sig dictionary object."""
 
-    now = datetime.now(timezone.utc)
+    now = datetime.now(UTC)
     pdf_date = now.strftime("D:%Y%m%d%H%M%S+00'00'")
     contents_zeros = "0" * CMS_HEX_SIZE
     name_entry = f"  /Name ({pdf_string(name)})\n" if name else ""
