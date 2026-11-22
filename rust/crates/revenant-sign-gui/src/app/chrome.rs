@@ -28,50 +28,48 @@ impl RevenantApp {
             top: title_bar_inset + 4,
             bottom: 8,
         });
-        egui::Panel::top("toolbar")
-            .frame(frame)
-            .show_inside(ui, |ui| {
-                let (row, _) = ui.allocate_exact_size(
-                    egui::vec2(ui.available_width(), TOOLBAR_HEIGHT),
-                    egui::Sense::hover(),
-                );
+        egui::Panel::top("toolbar").frame(frame).show(ui, |ui| {
+            let (row, _) = ui.allocate_exact_size(
+                egui::vec2(ui.available_width(), TOOLBAR_HEIGHT),
+                egui::Sense::hover(),
+            );
 
-                let options = [
-                    (Tab::Sign, self.l10n.t("gui.sign")),
-                    (Tab::Verify, self.l10n.t("gui.verify")),
-                ];
-                let switch = Segmented::new(&mut self.tab, &options);
-                let switch_rect = egui::Rect::from_center_size(row.center(), switch.size(ui));
-                ui.put(switch_rect, switch);
+            let options = [
+                (Tab::Sign, self.l10n.t("gui.sign")),
+                (Tab::Verify, self.l10n.t("gui.verify")),
+            ];
+            let switch = Segmented::new(&mut self.tab, &options);
+            let switch_rect = egui::Rect::from_center_size(row.center(), switch.size(ui));
+            ui.put(switch_rect, switch);
 
-                let trailing = egui::Rect::from_min_max(
-                    egui::pos2(switch_rect.right(), row.top()),
-                    row.right_bottom(),
-                );
-                let mut dialog = None;
-                let mut confirm = None;
-                let mut open_settings = false;
-                ui.scope_builder(
-                    UiBuilder::new()
-                        .max_rect(trailing)
-                        .layout(Layout::right_to_left(Align::Center)),
-                    |ui| {
-                        if !self.window_style.menu_bar {
-                            open_settings = self.settings_menu(ui);
-                        }
-                        self.server_menu(ui, &mut dialog, &mut confirm);
-                    },
-                );
-                if dialog.is_some() {
-                    self.dialog = dialog;
-                }
-                if confirm.is_some() {
-                    self.confirm = confirm;
-                }
-                if open_settings {
-                    self.open_settings(ui.ctx());
-                }
-            });
+            let trailing = egui::Rect::from_min_max(
+                egui::pos2(switch_rect.right(), row.top()),
+                row.right_bottom(),
+            );
+            let mut dialog = None;
+            let mut confirm = None;
+            let mut open_settings = false;
+            ui.scope_builder(
+                UiBuilder::new()
+                    .max_rect(trailing)
+                    .layout(Layout::right_to_left(Align::Center)),
+                |ui| {
+                    if !self.window_style.menu_bar {
+                        open_settings = self.settings_menu(ui);
+                    }
+                    self.server_menu(ui, &mut dialog, &mut confirm);
+                },
+            );
+            if dialog.is_some() {
+                self.dialog = dialog;
+            }
+            if confirm.is_some() {
+                self.confirm = confirm;
+            }
+            if open_settings {
+                self.open_settings(ui.ctx());
+            }
+        });
     }
 
     /// The server name, opening a menu to connect or disconnect.
