@@ -2,7 +2,7 @@
   "venvPath": "python",
   "venv": ".venv",
   "include": ["python/src"],
-  "pythonVersion": "3.10",
+  "pythonVersion": "3.11",
   "pythonPlatform": "All",
   "typeCheckingMode": "strict",
   "reportMissingImports": "error",

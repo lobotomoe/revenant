@@ -67,13 +67,15 @@ cms = "0.2"
 x509-verify = { version = "=0.4.8", features = ["x509", "std", "sha1"] }
 
 # -- Date/time --------------------------------------------------------------
-# `time` handles certificate validity arithmetic (parsing DER dates). `chrono`
-# is used only for the signature-appearance date string, which needs the
-# machine's *local* wall-clock offset: `time::OffsetDateTime::now_local()`
-# returns Err in a multi-threaded process (the real CLI), silently degrading to
-# UTC, whereas `chrono::Local` reads the zone reliably.
+# `time` handles certificate validity arithmetic (parsing DER dates). `jiff`
+# reads the wall clock: the signing time and the appearance date string, which
+# needs the machine's *local* offset. `time::OffsetDateTime::now_local()` returns
+# Err in a multi-threaded process (the real CLI), while jiff reads the system
+# zone reliably. Keep the major in step with the one env_logger uses, so the
+# binary carries one tz database. jiff replaced chrono, which is unmaintained
+# (RUSTSEC-2026-0543).
 time = { version = "0.3", features = ["parsing", "formatting", "macros"] }
-chrono = { version = "0.4", default-features = false, features = ["clock", "std"] }
+jiff = "1"
 
 # -- PDF (read-side structure parsing only; writes are raw bytes) ------------
 # 0.44+ is required: it transparently decrypts empty-user-password documents on

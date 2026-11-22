@@ -39,7 +39,7 @@ def test_catch_all_with_base():
     for cls in (AuthError, ServerError, TLSError):
         try:
             raise cls("test")
-        except RevenantError:  # noqa: PERF203
+        except RevenantError:
             pass  # expected
 
 

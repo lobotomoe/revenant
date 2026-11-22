@@ -26,8 +26,8 @@ const FONT_FLAGS_NONSYMBOLIC: u32 = 32;
 /// both patched later once the final byte offsets are known.
 #[must_use]
 pub(crate) fn build_sig_dict(sig_num: u32, reason: &str, name: Option<&str>) -> Vec<u8> {
-    let now = chrono::Utc::now();
-    let pdf_date = now.format("D:%Y%m%d%H%M%S+00'00'").to_string();
+    let now = jiff::Timestamp::now().to_zoned_datetime(jiff::tz::TimeZone::UTC);
+    let pdf_date = now.strftime("D:%Y%m%d%H%M%S+00'00'").to_string();
     let contents_zeros = "0".repeat(CMS_HEX_SIZE);
     let name_entry = match name {
         Some(n) if !n.is_empty() => format!("  /Name {}\n", pdf_text_string(n)),

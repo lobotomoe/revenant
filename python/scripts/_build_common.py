@@ -15,11 +15,11 @@ CLI_SPEC = SPEC_DIR / "revenant-cli.spec"
 
 
 def check_python():
-    """Verify Python version is 3.10+."""
+    """Verify Python version is 3.11+."""
     major = sys.version_info.major
     minor = sys.version_info.minor
-    if major < 3 or (major == 3 and minor < 10):
-        print(f"ERROR: Python 3.10+ required, got {major}.{minor}", file=sys.stderr)
+    if major < 3 or (major == 3 and minor < 11):
+        print(f"ERROR: Python 3.11+ required, got {major}.{minor}", file=sys.stderr)
         sys.exit(1)
     print(f"Python: {sys.executable} ({major}.{minor})")
 

@@ -13,6 +13,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   selected page. Pages with a nonzero generation can receive a visible or
   invisible signature.
 
+### Removed
+
+- The Python package requires Python 3.11 or newer. Python 3.10 reached end of
+  life in October 2026, and Pillow 13, which fixes the open Pillow advisories,
+  no longer supports it.
+
 ### Security
 
 - The TypeScript package requires node-forge 1.4.3, zod 4.6.7 and

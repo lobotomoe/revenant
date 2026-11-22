@@ -171,7 +171,7 @@ def _with_retry(
     for attempt in range(max_retries + 1):
         try:
             return fn()
-        except RevenantError as exc:  # noqa: PERF203 -- try-except is the retry mechanism
+        except RevenantError as exc:
             last_exc = exc
             if attempt >= max_retries or not _is_retryable_error(exc):
                 raise
