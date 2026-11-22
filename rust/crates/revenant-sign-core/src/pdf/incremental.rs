@@ -85,44 +85,50 @@ pub struct UpdatePlan<'a> {
 /// Returns [`RevenantError::Pdf`] if there are no objects to reference, or if
 /// xref-stream compression fails.
 pub fn assemble_incremental_update(pdf_bytes: &[u8], plan: &UpdatePlan<'_>) -> Result<Vec<u8>> {
+    assemble_with_refs(pdf_bytes, plan, &[plan.root])
+}
+
+/// References of the existing objects redefined in this revision retain their generations.
+pub(super) fn assemble_with_refs(
+    pdf_bytes: &[u8],
+    plan: &UpdatePlan<'_>,
+    redefined: &[ObjRef],
+) -> Result<Vec<u8>> {
     let mut base = pdf_bytes.to_vec();
     if !base.ends_with(b"\n") {
         base.push(b'\n');
     }
     let update_start = base.len();
 
-    let mut xref_entries: BTreeMap<u32, usize> = BTreeMap::new();
+    let mut xref_entries = BTreeMap::new();
     let mut running = update_start;
     let mut objects = Vec::new();
     for (raw, obj_num) in plan.raw_objects {
-        xref_entries.insert(*obj_num, running);
+        let generation = redefined
+            .iter()
+            .find(|r| r.num == *obj_num)
+            .map_or(0, |r| r.gen);
+        xref_entries.insert(*obj_num, (running, generation));
         objects.extend_from_slice(raw);
         running = running.saturating_add(raw.len());
     }
 
     let xref_offset = update_start + objects.len();
-    let ObjRef {
-        num: root_obj_num,
-        gen: root_gen,
-    } = plan.root;
-
     let tail = if plan.use_xref_stream {
-        build_xref_stream(
+        write_xref_stream(
             &xref_entries,
             plan.prev_xref,
-            root_obj_num,
-            root_gen,
+            plan.root,
             plan.trailer_extra,
             xref_offset,
             plan.new_size,
         )?
     } else {
-        build_xref_and_trailer(
+        write_xref_table(
             &xref_entries,
             plan.new_size,
             plan.prev_xref,
-            root_obj_num,
-            root_gen,
+            plan.root,
             plan.trailer_extra,
             xref_offset,
         )?
@@ -210,6 +216,14 @@ pub fn patch_byterange(mut full_pdf: Vec<u8>, original_len: usize) -> Result<Pre
 
 // ── Xref builders ───────────────────────────────────────────────────────
 
+/// The public offset-only builders identify the catalog separately.
+fn entries_with_root(offsets: &BTreeMap<u32, usize>, root: ObjRef) -> BTreeMap<u32, (usize, u16)> {
+    offsets
+        .iter()
+        .map(|(&num, &offset)| (num, (offset, if num == root.num { root.gen } else { 0 })))
+        .collect()
+}
+
 /// Build an xref table and trailer for an incremental update.
 ///
 /// # Errors
@@ -224,6 +238,25 @@ pub fn build_xref_and_trailer(
     trailer_extra: &[String],
     xref_offset: usize,
 ) -> Result<Vec<u8>> {
+    let root = ObjRef::new(root_obj_num, root_gen);
+    write_xref_table(
+        &entries_with_root(xref_entries, root),
+        new_size,
+        prev_xref,
+        root,
+        trailer_extra,
+        xref_offset,
+    )
+}
+
+fn write_xref_table(
+    xref_entries: &BTreeMap<u32, (usize, u16)>,
+    new_size: u32,
+    prev_xref: usize,
+    root: ObjRef,
+    trailer_extra: &[String],
+    xref_offset: usize,
+) -> Result<Vec<u8>> {
     if xref_entries.is_empty() {
         return Err(RevenantError::Pdf(
             "Cannot build xref table: no objects to reference.".to_owned(),
@@ -235,8 +268,7 @@ pub fn build_xref_and_trailer(
     for group in group_consecutive(&nums) {
         lines.push(format!("{} {}", group[0], group.len()));
         for obj_num in group {
-            let offset = xref_entries[&obj_num];
-            let generation = if obj_num == root_obj_num { root_gen } else { 0 };
+            let (offset, generation) = xref_entries[&obj_num];
             // 20-byte entry: "oooooooooo ggggg n\r" + the joining "\n".
             lines.push(format!("{offset:010} {generation:05} n\r"));
         }
@@ -246,7 +278,7 @@ pub fn build_xref_and_trailer(
     lines.push("<<".to_owned());
     lines.push(format!("  /Size {new_size}"));
     lines.push(format!("  /Prev {prev_xref}"));
-    lines.push(format!("  /Root {root_obj_num} {root_gen} R"));
+    lines.push(format!("  /Root {root}"));
     for extra in trailer_extra {
         lines.push(format!("  {extra}"));
     }
@@ -273,12 +305,35 @@ pub fn build_xref_stream(
     xref_offset: usize,
     xref_obj_num: u32,
 ) -> Result<Vec<u8>> {
+    let root = ObjRef::new(root_obj_num, root_gen);
+    write_xref_stream(
+        &entries_with_root(xref_entries, root),
+        prev_xref,
+        root,
+        trailer_extra,
+        xref_offset,
+        xref_obj_num,
+    )
+}
+
+fn write_xref_stream(
+    xref_entries: &BTreeMap<u32, (usize, u16)>,
+    prev_xref: usize,
+    root: ObjRef,
+    trailer_extra: &[String],
+    xref_offset: usize,
+    xref_obj_num: u32,
+) -> Result<Vec<u8>> {
     // The xref stream references itself.
     let mut all_entries = xref_entries.clone();
-    all_entries.insert(xref_obj_num, xref_offset);
+    all_entries.insert(xref_obj_num, (xref_offset, 0));
 
     let actual_size = xref_obj_num + 1;
-    let max_offset = all_entries.values().copied().max().unwrap_or(0);
+    let max_offset = all_entries
+        .values()
+        .map(|&(offset, _)| offset)
+        .max()
+        .unwrap_or(0);
     // Offsets are written as fixed-width big-endian fields whose width
     // `bytes_needed` caps at 4. An offset past 4 bytes would be silently
     // truncated to a wrong location, corrupting the xref stream -- reject the
@@ -292,7 +347,11 @@ pub fn build_xref_stream(
         ));
     }
     let w2 = bytes_needed(max_offset);
-    let w3 = bytes_needed(usize::from(root_gen));
+    let max_gen = all_entries
+        .values()
+        .map(|&(_, generation)| generation)
+        .fold(root.gen, u16::max);
+    let w3 = bytes_needed(usize::from(max_gen));
 
     let nums: Vec<u32> = all_entries.keys().copied().collect();
     let mut index_parts: Vec<String> = Vec::new();
@@ -300,8 +359,7 @@ pub fn build_xref_stream(
     for group in group_consecutive(&nums) {
         index_parts.push(format!("{} {}", group[0], group.len()));
         for obj_num in group {
-            let offset = all_entries[&obj_num];
-            let generation = if obj_num == root_obj_num { root_gen } else { 0 };
+            let (offset, generation) = all_entries[&obj_num];
             binary.push(1u8); // type 1 = in-use, uncompressed
             binary.extend_from_slice(&offset_be_bytes(offset, w2));
             binary.extend_from_slice(&generation.to_be_bytes()[2 - w3..]);
@@ -316,7 +374,7 @@ pub fn build_xref_stream(
         "  /Type /XRef".to_owned(),
         format!("  /Size {actual_size}"),
         format!("  /Prev {prev_xref}"),
-        format!("  /Root {root_obj_num} {root_gen} R"),
+        format!("  /Root {root}"),
         format!("  /W [1 {w2} {w3}]"),
         format!("  /Index [{}]", index_parts.join(" ")),
         "  /Filter /FlateDecode".to_owned(),

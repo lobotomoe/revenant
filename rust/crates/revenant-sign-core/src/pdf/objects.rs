@@ -10,7 +10,7 @@ use std::io::Write as _;
 use flate2::write::ZlibEncoder;
 use flate2::Compression;
 
-use super::reader::PdfReader;
+use super::reader::{ObjRef, PdfReader};
 use crate::{Result, RevenantError};
 
 /// A raw PDF object as `(serialized_bytes, object_number)`, the unit the
@@ -205,7 +205,7 @@ impl SigObjectNums {
 
 // ── Object override builders ────────────────────────────────────────────
 
-/// Build a raw override of the page object that adds `/Annots`.
+/// Build a raw override of a generation-zero page that adds `/Annots`.
 ///
 /// # Errors
 ///
@@ -216,11 +216,15 @@ pub fn build_page_override(
     page_obj_num: u32,
     annots_list: &str,
 ) -> Result<Vec<u8>> {
-    reader.object_override(
-        page_obj_num,
-        "/Annots",
-        &format!("  /Annots [{annots_list}]"),
-    )
+    page_override_for_ref(reader, ObjRef::new(page_obj_num, 0), annots_list)
+}
+
+pub(super) fn page_override_for_ref(
+    reader: &PdfReader,
+    page: ObjRef,
+    annots_list: &str,
+) -> Result<Vec<u8>> {
+    reader.object_override_for_ref(page, "/Annots", &format!("  /Annots [{annots_list}]"))
 }
 
 /// Zlib-deflate a byte slice at the default compression level.

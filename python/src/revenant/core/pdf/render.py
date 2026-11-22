@@ -259,6 +259,8 @@ def build_annot_widget(
     y: float,
     w: float,
     h: float,
+    *,
+    page_gen: int = 0,
 ) -> str:
     """Build the annotation widget for the signature field."""
     sig = obj_nums["sig"]
@@ -276,7 +278,7 @@ def build_annot_widget(
         f"  /V {sig} 0 R\n"
         f"  /T (Signature_{annot})\n"
         f"  /F {ANNOT_FLAGS_SIG_WIDGET}\n"
-        f"  /P {page_obj_num} 0 R\n"
+        f"  /P {page_obj_num} {page_gen} R\n"
         f"  /AP << /N {ap} 0 R >>\n"
         f"  /Border [0 0 0]\n"
         f">>\n"
@@ -287,6 +289,8 @@ def build_annot_widget(
 def build_invisible_annot_widget(
     obj_nums: SigObjectNums,
     page_obj_num: int,
+    *,
+    page_gen: int = 0,
 ) -> str:
     """Build an invisible annotation widget (/Rect [0 0 0 0], no /AP).
 
@@ -305,7 +309,7 @@ def build_invisible_annot_widget(
         f"  /V {sig} 0 R\n"
         f"  /T (Signature_{annot})\n"
         f"  /F {ANNOT_FLAGS_SIG_WIDGET}\n"
-        f"  /P {page_obj_num} 0 R\n"
+        f"  /P {page_obj_num} {page_gen} R\n"
         f"  /Border [0 0 0]\n"
         f">>\n"
         f"endobj\n"

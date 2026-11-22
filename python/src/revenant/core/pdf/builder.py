@@ -107,7 +107,7 @@ def prepare_pdf_with_sig_field(
     """
     # ── Read-only analysis of the original PDF ──────────────────
     (root_obj_num, root_gen), page_info = read_root_and_page(pdf_bytes, page)
-    page_obj_num, page_w, page_h, _has_annots, existing_annots = page_info
+    page_ref, page_w, page_h, _has_annots, existing_annots = page_info
     prev_xref, prev_size, trailer_extra, use_xref_stream = find_prev_startxref(pdf_bytes)
 
     if visible:
@@ -116,7 +116,7 @@ def prepare_pdf_with_sig_field(
             prev_size,
             root_obj_num,
             root_gen,
-            page_obj_num,
+            page_ref,
             existing_annots,
             page_w,
             page_h,
@@ -137,7 +137,7 @@ def prepare_pdf_with_sig_field(
             prev_size,
             root_obj_num,
             root_gen,
-            page_obj_num,
+            page_ref,
             existing_annots,
             reason,
             name,
@@ -153,6 +153,7 @@ def prepare_pdf_with_sig_field(
         root_gen=root_gen,
         trailer_extra=trailer_extra,
         use_xref_stream=use_xref_stream,
+        page_ref=page_ref,
     )
 
     # ── Patch the ByteRange and return offsets ─────────────────
@@ -164,7 +165,7 @@ def _prepare_visible(
     prev_size: int,
     root_obj_num: int,
     root_gen: int,
-    page_obj_num: int,
+    page_ref: tuple[int, int],
     existing_annots: list[str],
     page_w: float,
     page_h: float,
@@ -217,7 +218,7 @@ def _prepare_visible(
         obj_nums=obj_nums,
         root_obj_num=root_obj_num,
         root_gen=root_gen,
-        page_obj_num=page_obj_num,
+        page_ref=page_ref,
         existing_annots=existing_annots,
         x=x,
         y=y,
@@ -237,7 +238,7 @@ def _prepare_invisible(
     prev_size: int,
     root_obj_num: int,
     root_gen: int,
-    page_obj_num: int,
+    page_ref: tuple[int, int],
     existing_annots: list[str],
     reason: str,
     name: str | None,
@@ -246,14 +247,15 @@ def _prepare_invisible(
     obj_nums = allocate_sig_objects(prev_size, has_image=False, has_smask=False, visible=False)
 
     sig_dict_raw = build_sig_dict(obj_nums["sig"], reason, name)
-    annot_raw = build_invisible_annot_widget(obj_nums, page_obj_num)
+    page_obj_num, page_gen = page_ref
+    annot_raw = build_invisible_annot_widget(obj_nums, page_obj_num, page_gen=page_gen)
 
     annots_list = " ".join(existing_annots) if existing_annots else ""
     if annots_list:
         annots_list += " "
     annots_list += f"{obj_nums['annot']} 0 R"
 
-    page_override = build_page_override(pdf_bytes, page_obj_num, annots_list)
+    page_override = build_page_override(pdf_bytes, page_obj_num, annots_list, page_gen=page_gen)
     catalog_override = build_catalog_override(
         pdf_bytes, root_obj_num, obj_nums["annot"], root_gen=root_gen
     )
@@ -272,7 +274,7 @@ def _build_all_objects(
     obj_nums: SigObjectNums,
     root_obj_num: int,
     root_gen: int,
-    page_obj_num: int,
+    page_ref: tuple[int, int],
     existing_annots: list[str],
     x: float,
     y: float,
@@ -297,7 +299,8 @@ def _build_all_objects(
     n0_raw, n2_raw, frm_raw, ap_raw, img_raw, smask_raw = build_form_xobjects(
         obj_nums, w, h, ap_info, img_data
     )
-    annot_raw = build_annot_widget(obj_nums, page_obj_num, x, y, w, h)
+    page_obj_num, page_gen = page_ref
+    annot_raw = build_annot_widget(obj_nums, page_obj_num, x, y, w, h, page_gen=page_gen)
 
     # Updated page object (override with /Annots added)
     annots_list = " ".join(existing_annots) if existing_annots else ""
@@ -305,7 +308,7 @@ def _build_all_objects(
         annots_list += " "
     annots_list += f"{obj_nums['annot']} 0 R"
 
-    page_override = build_page_override(pdf_bytes, page_obj_num, annots_list)
+    page_override = build_page_override(pdf_bytes, page_obj_num, annots_list, page_gen=page_gen)
     catalog_override = build_catalog_override(
         pdf_bytes, root_obj_num, obj_nums["annot"], root_gen=root_gen
     )

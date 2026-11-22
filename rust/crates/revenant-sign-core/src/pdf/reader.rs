@@ -46,7 +46,7 @@ impl std::fmt::Display for ObjRef {
 /// Structural facts about one page needed to place a signature.
 #[derive(Debug, Clone, PartialEq)]
 pub struct PageInfo {
-    /// The page object's number (generation is assumed 0).
+    /// The page object's number.
     pub obj_num: u32,
     /// Effective page width in PDF points (CropBox over MediaBox, rotation-aware).
     pub width: f64,
@@ -166,6 +166,10 @@ impl PdfReader {
     /// its box cannot be read, or an existing annotation is not an indirect
     /// reference.
     pub fn page_info(&self, page_index: usize) -> Result<PageInfo> {
+        self.page_info_with_ref(page_index).map(|(_, info)| info)
+    }
+
+    pub(super) fn page_info_with_ref(&self, page_index: usize) -> Result<(ObjRef, PageInfo)> {
         let pages = self.doc.get_pages();
         // get_pages() is keyed 1-based.
         let page_number = u32::try_from(page_index)
@@ -182,12 +186,15 @@ impl PdfReader {
         let (width, height) = self.page_dimensions(page_id)?;
         let annots = self.page_annots(page_id)?;
 
-        Ok(PageInfo {
-            obj_num: page_id.0,
-            width,
-            height,
-            annots,
-        })
+        Ok((
+            ObjRef::new(page_id.0, page_id.1),
+            PageInfo {
+                obj_num: page_id.0,
+                width,
+                height,
+                annots,
+            },
+        ))
     }
 
     /// Effective (width, height): CropBox if present else MediaBox, with the
@@ -246,7 +253,7 @@ impl PdfReader {
     ///
     /// Enumerates every entry of object `obj_num` (generation 0), skipping
     /// `skip_key`, re-serializes each value, appends `new_entry`, and returns
-    /// the complete `N 0 obj ... endobj` definition as bytes. Indirect
+    /// the complete indirect object definition as bytes. Indirect
     /// references are preserved as references (not inlined); this is valid PDF
     /// and avoids duplicating the referenced objects into the override.
     ///
@@ -260,9 +267,19 @@ impl PdfReader {
         skip_key: &str,
         new_entry: &str,
     ) -> Result<Vec<u8>> {
+        self.object_override_for_ref(ObjRef::new(obj_num, 0), skip_key, new_entry)
+    }
+
+    pub(super) fn object_override_for_ref(
+        &self,
+        object: ObjRef,
+        skip_key: &str,
+        new_entry: &str,
+    ) -> Result<Vec<u8>> {
+        let obj_num = object.num;
         let obj = self
             .doc
-            .get_object((obj_num, 0))
+            .get_object((obj_num, object.gen))
             .map_err(|e| RevenantError::Pdf(format!("Cannot read object {obj_num}: {e}")))?;
         let dict = obj.as_dict().map_err(|e| {
             RevenantError::Pdf(format!("Object {obj_num} is not a dictionary: {e}"))
@@ -271,7 +288,7 @@ impl PdfReader {
         let skip = skip_key.strip_prefix('/').unwrap_or(skip_key).as_bytes();
 
         let mut out = Vec::new();
-        out.extend_from_slice(format!("{obj_num} 0 obj\n<<\n").as_bytes());
+        out.extend_from_slice(format!("{obj_num} {} obj\n<<\n", object.gen).as_bytes());
         for (key, value) in dict {
             if key.as_slice() == skip {
                 continue;

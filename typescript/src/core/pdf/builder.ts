@@ -13,6 +13,8 @@
 
 import { createHash } from "node:crypto";
 
+import type { PDFRef } from "pdf-lib";
+
 import { PDFError } from "../../errors.js";
 import { bytesToHex } from "../../utils.js";
 import type { FontMetrics } from "../appearance/fonts.js";
@@ -127,7 +129,7 @@ export async function preparePdfWithSigField(
       prevSize: prevInfo.maxSize,
       rootObjNum: root.objectNumber,
       rootGen: root.generationNumber,
-      pageObjNum: pageInfo.pageObjNum,
+      pageRef: pageInfo.pageRef,
       existingAnnots: pageInfo.existingAnnots,
       pageW: pageInfo.pageWidth,
       pageH: pageInfo.pageHeight,
@@ -150,7 +152,7 @@ export async function preparePdfWithSigField(
       prevInfo.maxSize,
       root.objectNumber,
       root.generationNumber,
-      pageInfo.pageObjNum,
+      pageInfo.pageRef,
       pageInfo.existingAnnots,
       reason,
       name,
@@ -169,6 +171,7 @@ export async function preparePdfWithSigField(
     root.generationNumber,
     prevInfo.trailerExtra,
     prevInfo.useXrefStream,
+    pageInfo.pageRef,
   );
 
   // Patch the ByteRange and return offsets
@@ -232,7 +235,7 @@ interface VisibleSigParams {
   prevSize: number;
   rootObjNum: number;
   rootGen: number;
-  pageObjNum: number;
+  pageRef: PDFRef;
   existingAnnots: string[];
   pageW: number;
   pageH: number;
@@ -300,7 +303,7 @@ async function prepareVisible(
     objNums,
     params.rootObjNum,
     params.rootGen,
-    params.pageObjNum,
+    params.pageRef,
     params.existingAnnots,
     x,
     y,
@@ -323,7 +326,7 @@ async function prepareInvisible(
   prevSize: number,
   rootObjNum: number,
   rootGen: number,
-  pageObjNum: number,
+  pageRef: PDFRef,
   existingAnnots: string[],
   reason: string,
   name: string | null,
@@ -331,19 +334,19 @@ async function prepareInvisible(
   const objNums = allocateSigObjects(prevSize, false, false, false);
 
   const sigDictRaw = buildSigDict(objNums.sig, reason, name);
-  const annotRaw = buildInvisibleAnnotWidget(objNums, pageObjNum);
+  const annotRaw = buildInvisibleAnnotWidget(objNums, pageRef);
 
   let annotsList = existingAnnots.length > 0 ? existingAnnots.join(" ") : "";
   if (annotsList) annotsList += " ";
   annotsList += `${objNums.annot} 0 R`;
 
-  const pageOverride = await buildPageOverride(pdfBytes, pageObjNum, annotsList);
+  const pageOverride = await buildPageOverride(pdfBytes, pageRef, annotsList);
   const catalogOverride = await buildCatalogOverride(pdfBytes, rootObjNum, objNums.annot, rootGen);
 
   const rawObjects: Array<{ raw: Uint8Array; objNum: number }> = [
     { raw: toBytes(sigDictRaw), objNum: objNums.sig },
     { raw: toBytes(annotRaw), objNum: objNums.annot },
-    { raw: toBytes(pageOverride), objNum: pageObjNum },
+    { raw: toBytes(pageOverride), objNum: pageRef.objectNumber },
     { raw: toBytes(catalogOverride), objNum: rootObjNum },
   ];
 
@@ -357,7 +360,7 @@ async function buildAllObjects(
   objNums: SigObjectNums,
   rootObjNum: number,
   rootGen: number,
-  pageObjNum: number,
+  pageRef: PDFRef,
   existingAnnots: string[],
   x: number,
   y: number,
@@ -372,13 +375,13 @@ async function buildAllObjects(
   const sigDictRaw = buildSigDict(objNums.sig, reason, name);
   const fontObjects = buildEmbeddedFontObjects(objNums, fontMetrics);
   const xobjects = buildFormXobjects(objNums, w, h, apInfo, imgData);
-  const annotRaw = buildAnnotWidget(objNums, pageObjNum, x, y, w, h);
+  const annotRaw = buildAnnotWidget(objNums, pageRef, x, y, w, h);
 
   let annotsList = existingAnnots.length > 0 ? existingAnnots.join(" ") : "";
   if (annotsList) annotsList += " ";
   annotsList += `${objNums.annot} 0 R`;
 
-  const pageOverride = await buildPageOverride(pdfBytes, pageObjNum, annotsList);
+  const pageOverride = await buildPageOverride(pdfBytes, pageRef, annotsList);
   const catalogOverride = await buildCatalogOverride(pdfBytes, rootObjNum, objNums.annot, rootGen);
 
   return collectObjects(
@@ -389,7 +392,7 @@ async function buildAllObjects(
     pageOverride,
     catalogOverride,
     objNums,
-    pageObjNum,
+    pageRef.objectNumber,
     rootObjNum,
   );
 }

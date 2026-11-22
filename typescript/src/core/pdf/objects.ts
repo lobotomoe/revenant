@@ -121,6 +121,11 @@ export function serializePdfObject(obj: { toString(): string } | null | undefine
 
 // -- Object override builders -------------------------------------------------
 
+/** Numeric object IDs in the low-level builders default to generation zero. */
+export function toPdfRef(id: number | PDFRef): PDFRef {
+  return typeof id === "number" ? PDFRef.of(id) : id;
+}
+
 /**
  * Build a raw override of a PDF object with a new/replaced entry.
  *
@@ -129,7 +134,7 @@ export function serializePdfObject(obj: { toString(): string } | null | undefine
  */
 export async function buildObjectOverride(
   pdfBytes: Uint8Array,
-  objNum: number,
+  id: number | PDFRef,
   skipKey: string,
   newEntry: string,
 ): Promise<string> {
@@ -137,12 +142,12 @@ export async function buildObjectOverride(
     updateMetadata: false,
   });
   const context = pdfDoc.context;
-  const ref = PDFRef.of(objNum, 0);
+  const ref = toPdfRef(id);
   const obj = context.lookup(ref);
 
   if (!(obj instanceof PDFDict)) {
     throw new PDFError(
-      `Object ${objNum} is not a dictionary (got ${obj?.constructor.name ?? "null"})`,
+      `Object ${ref.objectNumber} is not a dictionary (got ${obj?.constructor.name ?? "null"})`,
     );
   }
 
@@ -155,7 +160,7 @@ export async function buildObjectOverride(
 
   entries.push(newEntry);
   const body = entries.join("\n");
-  return `${objNum} 0 obj\n<<\n${body}\n>>\nendobj\n`;
+  return `${ref.objectNumber} ${ref.generationNumber} obj\n<<\n${body}\n>>\nendobj\n`;
 }
 
 /**
@@ -163,10 +168,10 @@ export async function buildObjectOverride(
  */
 export async function buildPageOverride(
   pdfBytes: Uint8Array,
-  pageObjNum: number,
+  page: number | PDFRef,
   annotsList: string,
 ): Promise<string> {
-  return buildObjectOverride(pdfBytes, pageObjNum, "/Annots", `  /Annots [${annotsList}]`);
+  return buildObjectOverride(pdfBytes, page, "/Annots", `  /Annots [${annotsList}]`);
 }
 
 /**

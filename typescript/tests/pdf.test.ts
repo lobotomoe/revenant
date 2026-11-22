@@ -1258,6 +1258,16 @@ describe("buildXrefAndTrailer", () => {
   });
 });
 
+function readXrefStream(bytes: Uint8Array) {
+  const afterObjectHeader = bytes.indexOf(0x0a) + 1;
+  const stream = PDFObjectParser.forBytes(
+    bytes.subarray(afterObjectHeader),
+    PDFContext.create(),
+  ).parseObject();
+  if (!(stream instanceof PDFRawStream)) throw new Error("Expected a cross-reference stream");
+  return PDFXRefStreamParser.forStream(stream).parseIntoContext();
+}
+
 describe("buildXrefStream", () => {
   it("produces a valid XRef stream object", () => {
     const entries = new Map([
@@ -1289,12 +1299,7 @@ describe("buildXrefStream", () => {
     // Should NOT contain traditional "trailer" keyword
     expect(text).not.toContain("trailer");
 
-    const stream = PDFObjectParser.forBytes(
-      result.subarray("12 0 obj\n".length),
-      PDFContext.create(),
-    ).parseObject();
-    if (!(stream instanceof PDFRawStream)) throw new Error("Expected a cross-reference stream");
-    const xref = PDFXRefStreamParser.forStream(stream).parseIntoContext();
+    const xref = readXrefStream(result);
     expect(xref.map(({ ref, offset }) => [ref.toString(), offset])).toEqual([
       ["10 513 R", 1000],
       ["11 0 R", 2000],
@@ -1437,10 +1442,22 @@ describe("patchByterange", () => {
 
 describe("preparePdfWithSigField", () => {
   it.each([
-    { fixture: "catalog_gen_1.pdf", root: PDFRef.of(1, 1), visible: true },
-    { fixture: "catalog_gen_513.pdf", root: PDFRef.of(1, 513), visible: false },
-    { fixture: "catalog_two_revisions.pdf", root: PDFRef.of(7, 0), visible: true },
-  ])("preserves the current catalog in $fixture", async ({ fixture, root, visible }) => {
+    { fixture: "catalog_gen_1.pdf", root: PDFRef.of(1, 1), page: PDFRef.of(3, 0), visible: true },
+    {
+      fixture: "catalog_gen_513.pdf",
+      root: PDFRef.of(1, 513),
+      page: PDFRef.of(3, 0),
+      visible: false,
+    },
+    {
+      fixture: "catalog_two_revisions.pdf",
+      root: PDFRef.of(7, 0),
+      page: PDFRef.of(3, 0),
+      visible: true,
+    },
+    { fixture: "page_gen_1.pdf", root: PDFRef.of(1, 0), page: PDFRef.of(3, 1), visible: true },
+    { fixture: "page_gen_513.pdf", root: PDFRef.of(1, 1), page: PDFRef.of(3, 513), visible: false },
+  ])("preserves the catalog and page in $fixture", async ({ fixture, root, page, visible }) => {
     const source = readFileSync(
       new URL(`../../rust/crates/revenant-sign-core/src/pdf/testdata/${fixture}`, import.meta.url),
     );
@@ -1449,12 +1466,31 @@ describe("preparePdfWithSigField", () => {
 
     const doc = await PDFDocument.load(pdf, { updateMetadata: false });
     expect(doc.context.trailerInfo.Root).toEqual(root);
+    expect(doc.getPage(0).ref).toEqual(page);
+
+    // pdf-lib reloads objects by scanning their headers. Check the actual xref as well.
+    const bytes = Buffer.from(pdf);
+    const pageOffset =
+      bytes.indexOf(`\n${page.objectNumber} ${page.generationNumber} obj\n`, source.length - 1) + 1;
+    expect(pageOffset).toBeGreaterThanOrEqual(source.length);
+    const { prevXref, useXrefStream } = await findPrevStartxref(pdf);
+    const xref = bytes.subarray(prevXref);
+    if (useXrefStream) {
+      const entry = readXrefStream(xref).find(({ ref }) => ref.objectNumber === page.objectNumber);
+      expect(entry).toMatchObject({ ref: page, offset: pageOffset });
+    } else {
+      const offset = String(pageOffset).padStart(10, "0");
+      const generation = String(page.generationNumber).padStart(5, "0");
+      expect(xref.toString("latin1")).toContain(`${offset} ${generation} n\r\n`);
+    }
     const form = doc.catalog.lookup(PDFName.of("AcroForm"), PDFDict);
     const fields = form.lookup(PDFName.of("Fields"), PDFArray);
     expect(fields.size()).toBe(1);
     const annots = doc.getPage(0).node.lookup(PDFName.of("Annots"), PDFArray);
     expect(annots.asArray()).toEqual(fields.asArray());
-    expect(fields.lookup(0, PDFDict).get(PDFName.of("FT"))).toEqual(PDFName.of("Sig"));
+    const widget = fields.lookup(0, PDFDict);
+    expect(widget.get(PDFName.of("FT"))).toEqual(PDFName.of("Sig"));
+    expect(widget.get(PDFName.of("P"))).toEqual(page);
     const names = doc.catalog.lookup(PDFName.of("Names"), PDFDict);
     expect(names.get(PDFName.of("EmbeddedFiles"))).toEqual(PDFRef.of(4, 0));
   });
