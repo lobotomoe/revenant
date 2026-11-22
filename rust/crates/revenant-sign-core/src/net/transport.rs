@@ -215,7 +215,7 @@ impl Transport {
                     }
                     return read_ok_body(resp, current.as_str(), status);
                 }
-                Err(err) => return Err(classify_ureq(&current, err)),
+                Err(err) => return Err(classify_ureq(&current, &err)),
             }
         }
         Err(RevenantError::tls_retryable(format!(
@@ -245,7 +245,7 @@ impl Transport {
                 let status = resp.status().as_u16();
                 read_ok_body(resp, url, status)
             }
-            Err(err) => Err(classify_ureq(&parsed, err)),
+            Err(err) => Err(classify_ureq(&parsed, &err)),
         }
     }
 }
@@ -352,9 +352,9 @@ fn read_ok_body(resp: ureq::http::Response<ureq::Body>, url: &str, status: u16) 
 
 /// Map a `ureq` error into the library error type. Connection and TLS-level
 /// faults are retryable; everything else is permanent.
-fn classify_ureq(url: &Url, err: ureq::Error) -> RevenantError {
+fn classify_ureq(url: &Url, err: &ureq::Error) -> RevenantError {
     let message = err.to_string();
-    if is_connection_failure(&err) {
+    if is_connection_failure(err) {
         RevenantError::tls_retryable(format!("Standard HTTPS failed for {url}: {message}"))
     } else {
         RevenantError::Other(format!("HTTP request failed for {url}: {message}"))
