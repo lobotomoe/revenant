@@ -84,7 +84,7 @@ pub(crate) fn show(
             }
             let current = store.language();
             let chosen = egui::CentralPanel::default()
-                .show_inside(ui, |ui| match layout {
+                .show(ui, |ui| match layout {
                     SettingsLayout::Form => form(ui, l10n, &current),
                     SettingsLayout::Page => page(ui, l10n, &current),
                 })

@@ -463,7 +463,7 @@ impl RevenantApp {
             i.raw
                 .dropped_files
                 .iter()
-                .filter_map(|file| file.path.clone())
+                .map(|file| file.path().to_path_buf())
                 .collect()
         });
         if dropped.is_empty() {
@@ -658,7 +658,7 @@ impl RevenantApp {
         let mut sign_action = SignAction::None;
         let mut verify_action = VerifyAction::None;
         let mut account_action = AccountAction::None;
-        egui::CentralPanel::default().show_inside(ui, |ui| {
+        egui::CentralPanel::default().show(ui, |ui| {
             ui.with_layout(egui::Layout::top_down(align), |ui| {
                 // Scroll when content (account panel + form, or long verify
                 // results) exceeds the window, so nothing clips on small sizes.
@@ -856,8 +856,8 @@ impl RevenantApp {
 
 impl eframe::App for RevenantApp {
     fn ui(&mut self, ui: &mut egui::Ui, _frame: &mut eframe::Frame) {
-        // egui 0.34's UI-first entrypoint hands us the root `Ui`; panels attach
-        // to it via `show_inside`. The context (cheap to clone -- it is an Arc)
+        // The UI-first entrypoint hands us the root `Ui`; panels attach to it
+        // via `show`. The context (cheap to clone -- it is an Arc)
         // still drives input polling and top-level dialogs.
         let ctx = ui.ctx().clone();
         self.process_worker_results();
