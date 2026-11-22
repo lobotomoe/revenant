@@ -102,7 +102,12 @@ impl Transport {
     pub fn new() -> Self {
         // Redirects are followed manually (GET only) so we can refuse an
         // HTTPS->HTTP downgrade; ureq's own follower cannot filter by scheme.
-        let agent = ureq::AgentBuilder::new().redirects(0).build();
+        // Statuses are read here too, so a 4xx/5xx is a response, not an error.
+        let agent: ureq::Agent = ureq::Agent::config_builder()
+            .max_redirects(0)
+            .http_status_as_error(false)
+            .build()
+            .into();
         Self {
             agent,
             host_tls: Mutex::new(HashMap::new()),
@@ -196,19 +201,21 @@ impl Transport {
         for _ in 0..=MAX_REDIRECTS {
             match self
                 .agent
-                .request_url("GET", &current)
-                .timeout(timeout)
+                .get(current.as_str())
+                .config()
+                .timeout_global(Some(timeout))
+                .build()
                 .call()
             {
                 Ok(resp) => {
-                    let status = resp.status();
+                    let status = resp.status().as_u16();
                     if (300..400).contains(&status) {
                         current = follow_redirect(&current, &resp)?;
                         continue;
                     }
                     return read_ok_body(resp, current.as_str(), status);
                 }
-                Err(err) => return Err(classify_ureq(&current, err)),
+                Err(err) => return Err(classify_ureq(&current, &err)),
             }
         }
         Err(RevenantError::tls_retryable(format!(
@@ -224,16 +231,21 @@ impl Transport {
         timeout: Duration,
     ) -> Result<Vec<u8>> {
         let parsed = parse_https(url)?;
-        let mut request = self.agent.request_url("POST", &parsed).timeout(timeout);
+        let mut request = self
+            .agent
+            .post(parsed.as_str())
+            .config()
+            .timeout_global(Some(timeout))
+            .build();
         for (name, value) in headers {
-            request = request.set(name, value);
+            request = request.header(*name, *value);
         }
-        match request.send_bytes(body) {
+        match request.send(body) {
             Ok(resp) => {
-                let status = resp.status();
+                let status = resp.status().as_u16();
                 read_ok_body(resp, url, status)
             }
-            Err(err) => Err(classify_ureq(&parsed, err)),
+            Err(err) => Err(classify_ureq(&parsed, &err)),
         }
     }
 }
@@ -282,10 +294,17 @@ fn host_of(url: &Url) -> Result<String> {
 
 /// Resolve a redirect `Location` against the current URL, refusing any
 /// HTTPS->HTTP downgrade so credentials cannot leak over plaintext.
-fn follow_redirect(current: &Url, resp: &ureq::Response) -> Result<Url> {
-    let location = resp.header("location").ok_or_else(|| {
-        RevenantError::Other(format!("Redirect from {current} without a Location header"))
-    })?;
+fn follow_redirect(current: &Url, resp: &ureq::http::Response<ureq::Body>) -> Result<Url> {
+    let location = resp
+        .headers()
+        .get(ureq::http::header::LOCATION)
+        .ok_or_else(|| {
+            RevenantError::Other(format!("Redirect from {current} without a Location header"))
+        })?
+        .to_str()
+        .map_err(|e| {
+            RevenantError::Other(format!("Unreadable Location header from {current}: {e}"))
+        })?;
     let next = current.join(location).map_err(|e| {
         RevenantError::Other(format!(
             "Invalid redirect target '{location}' from {current}: {e}"
@@ -301,18 +320,22 @@ fn follow_redirect(current: &Url, resp: &ureq::Response) -> Result<Url> {
 }
 
 /// Read a 2xx response body, enforcing the size limit; error on any other status.
-fn read_ok_body(resp: ureq::Response, url: &str, status: u16) -> Result<Vec<u8>> {
+fn read_ok_body(resp: ureq::http::Response<ureq::Body>, url: &str, status: u16) -> Result<Vec<u8>> {
     if !(200..300).contains(&status) {
         return Err(RevenantError::Other(format!(
             "HTTP {status} from {url}: {}",
-            resp.status_text()
+            resp.status().canonical_reason().unwrap_or("")
         )));
     }
     let limit = u64::try_from(MAX_RESPONSE_SIZE)
         .unwrap_or(u64::MAX)
         .saturating_add(1);
     let mut buf = Vec::new();
-    resp.into_reader()
+    // `into_with_config` lifts ureq's default 10 MB cap; the `take` below is
+    // the limit that applies.
+    resp.into_body()
+        .into_with_config()
+        .reader()
         .take(limit)
         .read_to_end(&mut buf)
         .map_err(|e| {
@@ -327,33 +350,33 @@ fn read_ok_body(resp: ureq::Response, url: &str, status: u16) -> Result<Vec<u8>>
     Ok(buf)
 }
 
-/// Map a `ureq` error into the library error type. Connection/TLS-level faults
-/// are retryable (and trigger the legacy fallback); HTTP status and config
-/// errors are permanent.
-fn classify_ureq(url: &Url, err: ureq::Error) -> RevenantError {
-    match err {
-        ureq::Error::Status(code, resp) => {
-            RevenantError::Other(format!("HTTP {code} from {url}: {}", resp.status_text()))
-        }
-        ureq::Error::Transport(transport) => {
-            let kind = transport.kind();
-            let message = transport.to_string();
-            if is_connection_failure(kind) {
-                RevenantError::tls_retryable(format!("Standard HTTPS failed for {url}: {message}"))
-            } else {
-                RevenantError::Other(format!("HTTP request failed for {url}: {message}"))
-            }
-        }
+/// Map a `ureq` error into the library error type. Connection and TLS-level
+/// faults are retryable; everything else is permanent.
+fn classify_ureq(url: &Url, err: &ureq::Error) -> RevenantError {
+    let message = err.to_string();
+    if is_connection_failure(err) {
+        RevenantError::tls_retryable(format!("Standard HTTPS failed for {url}: {message}"))
+    } else {
+        RevenantError::Other(format!("HTTP request failed for {url}: {message}"))
     }
 }
 
-/// Whether a transport error kind denotes a connection/TLS-level failure worth
-/// retrying and falling back from.
-fn is_connection_failure(kind: ureq::ErrorKind) -> bool {
-    use ureq::ErrorKind::{ConnectionFailed, Dns, Io, ProxyConnect, TooManyRedirects};
+/// Whether an error denotes a connection or TLS-level failure worth retrying.
+///
+/// Matches what ureq 2 reported as `Dns`, `ConnectionFailed` (which covered a
+/// failed TLS handshake), `Io` (which covered timeouts), `TooManyRedirects` and
+/// `ProxyConnect`.
+fn is_connection_failure(err: &ureq::Error) -> bool {
     matches!(
-        kind,
-        Dns | ConnectionFailed | Io | TooManyRedirects | ProxyConnect
+        err,
+        ureq::Error::HostNotFound
+            | ureq::Error::ConnectionFailed
+            | ureq::Error::Io(_)
+            | ureq::Error::Timeout(_)
+            | ureq::Error::TooManyRedirects
+            | ureq::Error::ConnectProxyFailed(_)
+            | ureq::Error::Tls(_)
+            | ureq::Error::Rustls(_)
     )
 }
 
@@ -464,11 +487,13 @@ mod tests {
 
     #[test]
     fn connection_failures_are_retryable_others_not() {
-        assert!(is_connection_failure(ureq::ErrorKind::ConnectionFailed));
-        assert!(is_connection_failure(ureq::ErrorKind::Dns));
-        assert!(is_connection_failure(ureq::ErrorKind::Io));
-        assert!(!is_connection_failure(ureq::ErrorKind::InvalidUrl));
-        assert!(!is_connection_failure(ureq::ErrorKind::UnknownScheme));
+        let io = std::io::Error::from(std::io::ErrorKind::ConnectionReset);
+        assert!(is_connection_failure(&ureq::Error::ConnectionFailed));
+        assert!(is_connection_failure(&ureq::Error::HostNotFound));
+        assert!(is_connection_failure(&ureq::Error::Io(io)));
+        assert!(is_connection_failure(&ureq::Error::Tls("handshake")));
+        assert!(!is_connection_failure(&ureq::Error::StatusCode(500)));
+        assert!(!is_connection_failure(&ureq::Error::BadUri("x".into())));
     }
 
     #[test]

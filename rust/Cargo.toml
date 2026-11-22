@@ -111,7 +111,7 @@ hex = "0.4"
 quick-xml = "0.41"
 
 # -- HTTP for the standard (non-legacy) TLS path -----------------------------
-ureq = "2.12"
+ureq = "3.4"
 url = "2.5"
 
 # -- Config persistence ------------------------------------------------------
@@ -135,7 +135,7 @@ keyring = { version = "3", default-features = false, features = [
     "crypto-rust",
 ] }
 clap = { version = "4", features = ["derive"] }
-base64 = "0.22"
+base64 = "0.23"
 thiserror = "2"
 flate2 = "1"
 log = "0.4"
