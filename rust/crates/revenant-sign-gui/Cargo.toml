@@ -39,7 +39,7 @@ env_logger.workspace = true
 eframe = "0.36"
 sys-locale = "0.3.2"
 # Native file open/save dialogs on all three platforms (AppKit / Win32 / xdg).
-rfd = "0.17"
+rfd = "0.18"
 # Must track eframe's egui minor: 0.14 targets egui 0.36. It is also the newest
 # egui-phosphor, which is why eframe stays at 0.36 rather than 0.37.
 egui-phosphor = "0.14"
