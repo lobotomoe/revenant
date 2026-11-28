@@ -84,7 +84,7 @@ jiff = "1"
 # encryption support is not feature-gated, so `default-features = false` keeps it
 # while dropping the date (chrono/jiff/time) and rayon deps we never use -- we
 # only read PDF structure and detect encryption.
-lopdf = { version = "0.44", default-features = false }
+lopdf = { version = "0.47", default-features = false }
 
 # -- Signature image loading (optional visual element) -----------------------
 # Trimmed to exactly the formats the Python client accepts via Pillow. Pulls in
